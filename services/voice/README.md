@@ -2,4 +2,23 @@
 
 Servicio de voz en Python 3.12 (gestionado con `uv`): AEC, wake word (openWakeWord), VAD (Silero), STT (whisper.cpp Vulkan), TTS intercambiable y barge-in.
 
-Se implementa en **Fase 2**. Ver `docs/VOICE_PIPELINE.md`.
+El servicio se implementa en la **Fase 2** (ver `docs/VOICE_PIPELINE.md`). Por ahora solo contiene diagnósticos de la Fase 0.
+
+## Requisitos
+- `uv` y **Python 3.12 oficial** (`py install 3.12`). El intérprete que descarga `uv` no está firmado y Smart App Control lo bloquea (ver `docs/TROUBLESHOOTING.md`).
+
+## Diagnóstico de audio (Fase 0)
+```powershell
+cd services/voice
+uv sync
+uv run jarvis-audio-check --list          # ver dispositivos
+uv run jarvis-audio-check                 # prueba guiada (~1 min)
+uv run jarvis-audio-check --input 15 --output 12 --skip-latency
+```
+Mide: que la salida suene, el ruido de fondo, el nivel de voz, la saturación, la relación señal/ruido, la latencia del driver y la latencia acústica ida y vuelta (parlante → micrófono).
+**No guarda audio**: solo escribe un reporte JSON en `%APPDATA%\Jarvis\diagnostics\`.
+
+## Tests
+```powershell
+uv run pytest
+```

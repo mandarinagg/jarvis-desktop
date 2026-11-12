@@ -18,7 +18,8 @@
 | Windows | 11 Pro (26200) | ✅ |
 | Node.js | 26.13.0 | ✅ (fijar versión LTS del proyecto en `.nvmrc`/`engines`) |
 | npm / pnpm | 11.20 / 10.34 | ✅ pnpm para el monorepo |
-| Python | 3.15.2 | ⚠️ Muy nuevo: usar `uv` con Python 3.12 para el servicio de voz |
+| Python | 3.15.2 (+ 3.12.10 oficial) | ⚠️ 3.15 es muy nuevo: el servicio de voz usa 3.12 vía `uv`. **Smart App Control activo**: solo intérpretes firmados (ver TROUBLESHOOTING) |
+| Micrófono | Razer Seiren Mini (WASAPI, predeterminado) | ✅ Latencia del driver: 22 ms entrada / 22 ms salida (Realtek) |
 | Rust / Cargo | — | ❌ No instalado (ver ADR-002) |
 | Git | 2.56 | ✅ |
 | GitHub CLI | logueado | ✅ |
@@ -26,7 +27,7 @@
 
 ## Pendiente
 
-- [ ] Prueba de micrófono: nivel, ruido de fondo, latencia de captura (con y sin Voicemod)
+- [ ] Prueba de micrófono: nivel, ruido de fondo, latencia de captura (con y sin Voicemod) → `uv run jarvis-audio-check` en `services/voice`
 - [ ] Prueba de salida de audio y latencia de reproducción
 - [ ] Verificar soporte Vulkan: `vulkaninfo --summary`
 - [ ] Benchmark whisper.cpp
