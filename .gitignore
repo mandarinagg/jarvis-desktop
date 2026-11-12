@@ -1,0 +1,47 @@
+# deps / builds
+node_modules/
+dist/
+out/
+build/
+.turbo/
+*.tsbuildinfo
+coverage/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.uv/
+
+# secrets & env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# runtime data (never commit personal data)
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+recordings/
+transcripts/
+data/
+models/
+*.wav
+*.mp3
+*.onnx
+*.bin
+*.gguf
+
+# local tooling
+.remember/
+.claude/settings.local.json
+graphify-out/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
