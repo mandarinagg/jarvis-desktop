@@ -21,7 +21,7 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 - [ ] Benchmark STT: whisper.cpp (Vulkan) `large-v3-turbo` vs `small` en español con 20 frases propias
 - [ ] Comparativa TTS en español (2 nube + 2 local): calidad, latencia al primer audio, costo, licencia
 - [ ] Cuenta Anthropic API + tope de gasto mensual configurado en la consola
-- [ ] Aprobar ADR-001…006
+- [x] Aprobar ADR-001…006 (2026-11-12) + ADR-007 y ADR-008 complementarios
 
 **Exit:** ADRs aprobados; motor STT y TTS elegidos con datos; costo estimado por día documentado.
 
