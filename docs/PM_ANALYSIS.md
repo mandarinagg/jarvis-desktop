@@ -119,7 +119,7 @@ Briefing matutino, recordatorios de pendientes, alertas de proyectos. Siempre co
 | Precisión STT en español (WER, frases propias) | < 12% | < 7% |
 | Falsas activaciones de wake word | — | < 1 por día |
 | Tasa de éxito en evals de tareas | ≥ 80% | ≥ 95% |
-| Costo diario promedio | < USD 1 | definido por owner |
+| Costo diario promedio | < USD 1 | definido por owner. Estimación de Fase 0: ~USD 2,2/día con uso típico (ver `CLAUDE_API.md` §4.1); revisar con datos de Fase 1 |
 | Uso real (dogfooding) | ≥ 5 interacciones/día | ≥ 30/día |
 | Acciones ejecutadas sin confirmación requerida | 0 | 0 |
 
