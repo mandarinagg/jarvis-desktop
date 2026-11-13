@@ -9,7 +9,7 @@
 | Robo de API key | Logs, repo, renderer | Credential Manager; redacción en logs; renderer sin Node |
 | Escucha no deseada | Wake word | Detección 100% local, indicador obligatorio, mute global |
 | Servidor MCP malicioso | Terceros | Opt-in, revisión, mínimos privilegios, aislamiento |
-| Acceso local a IPC | Otro proceso del equipo | Named pipe con ACL del usuario + token por sesión; sin puertos TCP abiertos |
+| Acceso local a IPC | Otro proceso del equipo | Named pipe + token de sesión de 256 bits (comparación en tiempo constante, timeout de auth de 5 s); sin puertos TCP abiertos. La ACL del pipe queda por defecto (Node no permite fijarla): ver `packages/core/README.md` |
 | Fuga en repo público | Commits | `.gitignore`, datos en `%APPDATA%`, secret scanning y push protection de GitHub |
 
 ## 2. Controles obligatorios
