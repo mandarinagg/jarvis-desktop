@@ -7,7 +7,20 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    },
+    "./paths": {
+      "types": "./dist/paths.d.ts",
+      "default": "./dist/paths.js"
+    },
+    "./token": {
+      "types": "./dist/token.d.ts",
+      "default": "./dist/token.js"
+    },
+    "./main": "./dist/main.js"
   },
   "bin": {
     "jarvis-core": "./dist/main.js"

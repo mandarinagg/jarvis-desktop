@@ -1,0 +1,390 @@
+/*
+ * Jarvis: an instrument panel at dusk. Slate-blue ink (not black), a sage "signal" accent for
+ * Jarvis's voice channel, amber only for spend warnings. Fonts ship with Windows (no network).
+ */
+:root {
+  --ground: #1a2230;
+  --rail: #151c28;
+  --panel: #222c3c;
+  --ink: #e4e8ee;
+  --ink-soft: #a9b3c2;
+  --muted: #7b8798;
+  --line: #2f3b4e;
+  --signal: #84bba9;
+  --signal-dim: #4f7f71;
+  --amber: #d9a441;
+  --danger: #e07a6b;
+
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-tech: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --ground: #eef1f4;
+    --rail: #e3e8ee;
+    --panel: #ffffff;
+    --ink: #1b2433;
+    --ink-soft: #3e4a5c;
+    --muted: #5d6879;
+    --line: #cfd6df;
+    --signal: #2f7d6b;
+    --signal-dim: #8fbcb0;
+    --amber: #a86d09;
+    --danger: #b3412f;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 15px/1.55 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  height: 100%;
+}
+
+/* ------------------------------------------------------------------ rail */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 20px 12px 12px;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 18px;
+}
+
+.brand-name {
+  font: 600 20px/1 var(--font-tech);
+  letter-spacing: 0.02em;
+}
+
+.signal {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.signal.on {
+  background: var(--signal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 25%, transparent);
+}
+
+.new {
+  margin: 0 4px 14px;
+  padding: 9px 12px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: var(--font-tech);
+}
+
+.new:hover:not(:disabled) {
+  border-color: var(--signal-dim);
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.hint {
+  margin: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.thread {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 10px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0 6px 6px 0;
+}
+
+.thread:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+}
+
+.thread.active {
+  background: var(--panel);
+  border-left-color: var(--signal);
+}
+
+.thread-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+
+.thread-when {
+  color: var(--muted);
+  font: 12px var(--font-tech);
+}
+
+/* ------------------------------------------------------------------ stage */
+
+.stage {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.meter-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--line);
+  font: 13px var(--font-tech);
+  color: var(--ink-soft);
+}
+
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.meter-track {
+  width: 140px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  background: var(--signal);
+  transition: width 400ms ease;
+}
+
+.meter.warn .meter-fill {
+  background: var(--amber);
+}
+
+.meter.over .meter-fill {
+  background: var(--danger);
+}
+
+.meter.warn .meter-text,
+.meter.over .meter-text {
+  color: var(--amber);
+}
+
+.meter-last {
+  color: var(--muted);
+}
+
+.transcript {
+  overflow-y: auto;
+  padding: 36px 28px 24px;
+  min-height: 0;
+}
+
+/* One measure for every line (in px, not ch: ch would shrink with the smaller user text). */
+.transcript > * {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.empty {
+  margin-top: 18vh;
+}
+
+.empty-lead {
+  margin: 0 0 6px;
+  font: 500 30px/1.2 var(--font-tech);
+}
+
+.empty-sub {
+  margin: 0;
+  color: var(--muted);
+}
+
+.said {
+  margin-top: 0;
+  margin-bottom: 22px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The owner's words: quieter, set off by indentation rather than a bubble. */
+.said.user {
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+/* Jarvis's words: the voice channel, a sage rule down the left edge. */
+.said.jarvis {
+  padding-left: 16px;
+  border-left: 2px solid var(--signal-dim);
+  font-size: 16.5px;
+  line-height: 1.6;
+}
+
+.said.jarvis.live {
+  border-left-color: var(--signal);
+}
+
+.said.jarvis p {
+  margin: 0;
+}
+
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  background: var(--signal);
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.cut {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--amber);
+  font: 12px var(--font-tech);
+}
+
+.notice {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 28px 10px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--line));
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.link {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--signal);
+  text-decoration: underline;
+}
+
+.composer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  padding: 14px 28px 22px;
+  border-top: 1px solid var(--line);
+}
+
+.composer textarea {
+  flex: 1;
+  min-height: 52px;
+  max-height: 220px;
+  padding: 12px 14px;
+  resize: vertical;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+}
+
+.composer textarea:focus {
+  outline: none;
+  border-color: var(--signal-dim);
+}
+
+.action {
+  min-width: 132px;
+  padding: 12px 16px;
+  background: var(--signal);
+  color: #10231d;
+  border: 0;
+  border-radius: 10px;
+  font: 600 14px var(--font-tech);
+}
+
+.action.stop {
+  background: transparent;
+  color: var(--amber);
+  border: 1px solid var(--amber);
+}
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .rail {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+  .meter-fill {
+    transition: none;
+  }
+}

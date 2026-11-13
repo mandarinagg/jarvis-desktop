@@ -74,6 +74,9 @@ async function main(): Promise<number> {
       chatSend: (s, m) => chat.chatSend(s, m),
       chatCancel: (s, m) => chat.chatCancel(s, m),
       disconnected: (s) => chat.disconnected(s),
+      conversationsList: (s, m) => chat.conversationsList(s, m),
+      conversationsGet: (s, m) => chat.conversationsGet(s, m),
+      budgetGet: (s, m) => chat.budgetGet(s, m),
       shutdown: () => stop("core.shutdown"),
     },
   });

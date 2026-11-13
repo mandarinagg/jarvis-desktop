@@ -102,7 +102,16 @@ describe("schemas", () => {
 
   it("client messages are a closed set", () => {
     const types = ClientMessage.options.map((o) => o.shape.type.value).sort();
-    expect(types).toEqual(["auth.hello", "chat.cancel", "chat.send", "core.ping", "core.shutdown"]);
+    expect(types).toEqual([
+      "auth.hello",
+      "budget.get",
+      "chat.cancel",
+      "chat.send",
+      "conversations.get",
+      "conversations.list",
+      "core.ping",
+      "core.shutdown",
+    ]);
   });
 });
 

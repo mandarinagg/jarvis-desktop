@@ -23,7 +23,7 @@ ADR-001 define Core + clientes con named pipe, pero el diagrama de `ARCHITECTURE
 **Apagado**
 - `core.shutdown` → cancela turnos en curso → `tts.cancel` → espera 3 s a que la voz termine → cierra la DB (checkpoint WAL).
 
-**Empaquetado (a validar en Fase 1)**
+**Empaquetado (validado el 2026-11-13: el Node 24.22 de Electron 45 trae `node:sqlite` con FTS5 y carga `@napi-rs/keyring`; la UI arranca el Core así)**
 - Opción preferida: correr el Core con el runtime de Electron (`ELECTRON_RUN_AS_NODE=1`) para no distribuir un segundo Node. Es válida solo si la versión de Node incluida en Electron trae `node:sqlite` (ADR-007); si no, se distribuye Node LTS junto al Core.
 
 ## Alternativas consideradas

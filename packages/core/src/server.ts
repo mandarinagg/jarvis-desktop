@@ -5,8 +5,11 @@
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 import {
+  type BudgetGet,
   type ChatCancel,
   type ChatSend,
+  type ConversationsGet,
+  type ConversationsList,
   type ClientMessage,
   type CoreMessage,
   FrameTooLargeError,
@@ -36,6 +39,9 @@ export interface Handlers {
   chatSend?(session: Session, message: ChatSend): void | Promise<void>;
   chatCancel?(session: Session, message: ChatCancel): void | Promise<void>;
   shutdown?(session: Session): void | Promise<void>;
+  conversationsList?(session: Session, message: ConversationsList): void;
+  conversationsGet?(session: Session, message: ConversationsGet): void;
+  budgetGet?(session: Session, message: BudgetGet): void;
   disconnected?(session: Session): void;
 }
 
@@ -171,6 +177,16 @@ export class CoreServer {
     });
   }
 
+  /** Read-only queries: answered by the handler, or reported as unavailable. */
+  private query<M extends ClientMessage>(
+    session: Session,
+    message: M,
+    handler: ((session: Session, message: M) => void) | undefined,
+  ): void {
+    if (handler) return handler(session, message);
+    session.send({ type: "error", id: message.id, code: "upstream_error", message: `${message.type} is not available` });
+  }
+
   private async dispatch(session: Session, message: ClientMessage): Promise<void> {
     const h = this.handlers;
     try {
@@ -194,6 +210,12 @@ export class CoreServer {
         case "core.shutdown":
           await h.shutdown?.(session);
           return;
+        case "conversations.list":
+          return this.query(session, message, h.conversationsList);
+        case "conversations.get":
+          return this.query(session, message, h.conversationsGet);
+        case "budget.get":
+          return this.query(session, message, h.budgetGet);
       }
     } catch (err) {
       this.logger.log("error", "ipc.handler_failed", {
