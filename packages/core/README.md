@@ -13,6 +13,22 @@ Jarvis Core: un daemon en Node/TS. Cuando esté completo va a tener el orquestad
 - **`CoreClient`:** el cliente que van a usar la UI, la CLI y los tests.
 - **Logs:** JSON por stderr. `redact()` elimina antes de escribir las claves `sk-ant-…`, `AIza…`, los `Bearer …` y los tokens de 64 caracteres hex.
 
+- **Persistencia (ADR-007):**
+  - `node:sqlite` en modo WAL, en `%APPDATA%/Jarvis/jarvis.db`, con foreign keys activas.
+  - Migraciones SQL versionadas en `migrations/`, aplicadas al arrancar dentro de una transacción.
+  - `ConversationStore` guarda las conversaciones, los mensajes (con una marca de "interrumpido") y el uso por turno.
+  - El uso por turno queda asociado al **día calendario local**, para el tope diario.
+- **Secretos (ADR-007):** `KeyringSecretStore` usa el Windows Credential Manager, con servicio `Jarvis` y cuentas `anthropic-api-key` y `google-tts-api-key`.
+- **Pendiente de ADR-007:** el cifrado AES-GCM de campos sensibles (llega con la memoria, en la Fase 3) y los backups `VACUUM INTO`.
+
+## Guardar la API key
+```powershell
+pnpm build
+node packages/core/dist/set-secret.js anthropic-api-key                     # la pide sin mostrarla
+Get-Clipboard | node packages/core/dist/set-secret.js anthropic-api-key     # o desde el portapapeles
+```
+La clave nunca pasa por argumentos, por el historial de la terminal ni por los logs.
+
 ## Uso
 ```powershell
 pnpm build
