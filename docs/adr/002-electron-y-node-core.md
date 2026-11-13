@@ -1,6 +1,6 @@
 # ADR-002: Electron + Node/TS en vez de Tauri + Rust
 
-- **Estado:** Propuesta
+- **Estado:** Aceptada — aprobada por el owner el 2026-11-12
 - **Fecha:** 2026-11-12
 
 ## Contexto

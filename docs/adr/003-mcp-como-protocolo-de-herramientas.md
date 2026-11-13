@@ -1,6 +1,6 @@
 # ADR-003: MCP como protocolo de herramientas
 
-- **Estado:** Propuesta
+- **Estado:** Aceptada — aprobada por el owner el 2026-11-12
 - **Fecha:** 2026-11-12
 
 ## Contexto

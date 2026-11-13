@@ -1,6 +1,6 @@
 # Arquitectura
 
-> Estado: **Propuesta** (ver ADR-001, ADR-002, ADR-003). Se valida al cerrar la Fase 0.
+> Estado: **Aceptada** (ADR-001…008, 2026-11-12). Los detalles de voz y del router se calibran con datos de las Fases 0–2.
 
 ## 1. Vista general: Core + Clientes
 
@@ -8,7 +8,7 @@
                 ┌──────────────────────────── Clientes ────────────────────────────┐
                 │  Desktop UI (Electron/React)   Overlay de voz   CLI   (futuro: móvil/Telegram) │
                 └───────────────┬───────────────────────────────────────────────────┘
-                                │ IPC local autenticado (named pipe + token por sesión)
+                                │ IPC local autenticado (named pipe + token por sesión, ADR-008)
 ┌───────────────────────────────▼──────────────────────────────────────────────────┐
 │                               JARVIS CORE (Node/TS, daemon)                      │
 │                                                                                  │
@@ -31,7 +31,7 @@
 │  │ (SQLite)     │ │ (FTS5+embed) │ │ (scheduler)   │ │ (append)  │ │          │  │
 │  └──────────────┘ └──────────────┘ └───────────────┘ └───────────┘ └──────────┘  │
 └───────────────────────────────▲──────────────────────────────────────────────────┘
-                                │ IPC local (stdio / websocket loopback con token)
+                                │ stdio del proceso hijo, JSON Lines (ADR-008)
 ┌───────────────────────────────┴──────────────────────────────────────────────────┐
 │                     VOICE SERVICE (Python 3.12 + binarios nativos)               │
 │   Mic → AEC → Wake word (openWakeWord) → VAD (Silero) → STT (whisper.cpp Vulkan) │
@@ -41,7 +41,7 @@
 
 ## 2. Componentes
 
-| Componente | Responsabilidad | Tecnología propuesta |
+| Componente | Responsabilidad | Tecnología |
 |------------|-----------------|----------------------|
 | **Desktop UI** | Ventana, chat, estados, paneles de proyectos/memoria/permisos/costos, confirmaciones | Electron + React + TypeScript + Vite |
 | **Overlay de voz** | Indicador siempre visible (escuchando/pensando/hablando), mute | Ventana Electron transparente |
@@ -50,12 +50,12 @@
 | **MCP Client Hub** | Conectar y gestionar servidores MCP | `@modelcontextprotocol/sdk` |
 | **Permission Engine** | Evaluar cada tool call contra políticas; pedir confirmación | Módulo propio en Core |
 | **Builder** | Tareas de construcción de software | `@anthropic-ai/claude-agent-sdk` con hooks de permisos |
-| **Memory Store** | Memoria episódica/semántica/procedural | SQLite (better-sqlite3) + cifrado de campos sensibles |
+| **Memory Store** | Memoria episódica/semántica/procedural | SQLite (`node:sqlite`, WAL) + AES-GCM en campos sensibles (ADR-007) |
 | **Project Index** | Índice y búsqueda de archivos autorizados | SQLite FTS5; embeddings locales opcionales |
 | **Reflection Job** | Consolidar memoria, proponer aprendizajes | Scheduler en Core |
 | **Audit Log** | Registro append-only de acciones | SQLite tabla append-only + export JSONL |
 | **Voice Service** | Captura, wake word, VAD, STT, TTS, barge-in | Python 3.12 (uv) + whisper.cpp |
-| **Secrets** | API keys | Windows Credential Manager (`keytar` / DPAPI) |
+| **Secrets** | API keys | Windows Credential Manager vía `@napi-rs/keyring` (ADR-007) |
 
 ## 3. Flujo de un turno de voz
 
@@ -107,6 +107,6 @@ docs/                Especificaciones, ADRs, guías
 
 ## 7. Decisiones abiertas
 
-- Electron vs Tauri → ADR-002 (propuesta: Electron).
+- Empaquetado del Core (runtime de Electron vs Node incluido) → se valida en Fase 1 (ADR-008).
 - TTS por defecto (nube vs local) → se decide con la comparativa de Fase 0.
 - Embeddings locales: sí/no y cuál → Fase 3.

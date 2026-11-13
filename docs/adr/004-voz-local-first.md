@@ -1,6 +1,6 @@
 # ADR-004: Pipeline de voz local-first
 
-- **Estado:** Propuesta (se confirma con benchmarks de Fase 0)
+- **Estado:** Aceptada (se confirma con benchmarks de Fase 0) — aprobada por el owner el 2026-11-12
 - **Fecha:** 2026-11-12
 
 ## Contexto

@@ -16,7 +16,7 @@
 
 - Indicador visible del micrófono; silencio inmediato.
 - No almacenar audio crudo por defecto; transcripciones solo si se activa.
-- Cifrado de datos locales sensibles (DPAPI para claves de cifrado).
+- Cifrado de datos locales sensibles (AES-256-GCM; clave maestra en Windows Credential Manager, ADR-007).
 - API keys en almacén seguro del SO.
 - Permisos por carpeta y herramienta; confirmación antes de enviar datos externamente.
 - Registro de acciones.

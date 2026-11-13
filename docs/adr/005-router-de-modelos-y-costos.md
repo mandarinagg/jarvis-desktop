@@ -1,6 +1,6 @@
 # ADR-005: Router de modelos y control de costos
 
-- **Estado:** Propuesta (se calibra con datos de Fases 1–2)
+- **Estado:** Aceptada (se calibra con datos de Fases 1–2) — aprobada por el owner el 2026-11-12
 - **Fecha:** 2026-11-12
 
 ## Contexto
