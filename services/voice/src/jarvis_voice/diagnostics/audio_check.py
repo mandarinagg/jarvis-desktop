@@ -35,7 +35,12 @@ CHIRP_SECONDS = 0.5
 MIN_LAG_CONFIDENCE = 8.0
 VIRTUAL_HINTS = ("voicemod", "nahimic", "virtual", "cable", "stereo mix", "mezcla estéreo", "vb-audio")
 PREFERRED_HOST_API = "Windows WASAPI"
-TEST_SENTENCE = "Jarvis, abrí el proyecto de la tienda y decime qué tareas quedaron pendientes desde el martes."
+NON_INTERACTIVE_MSG = (
+    "Esta prueba es guiada y necesita una terminal interactiva (espera tus Enter y respuestas).\n"
+    "Abrí PowerShell o Windows Terminal en la carpeta del proyecto y ejecutá:\n"
+    "  cd services/voice; uv run jarvis-audio-check"
+)
+TEST_SENTENCE ="Jarvis, abrí el proyecto de la tienda y decime qué tareas quedaron pendientes desde el martes."
 
 
 @dataclass
@@ -243,7 +248,15 @@ def save_report(rep: Report) -> Path:
     return path
 
 
+def force_utf8_console() -> None:
+    # Windows falls back to cp1252 when output is piped, which breaks accents and symbols.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
+    force_utf8_console()
     p = argparse.ArgumentParser(description="Diagnóstico de micrófono y parlantes para JARVIS (Fase 0).")
     p.add_argument("--list", action="store_true", help="listar dispositivos y salir")
     p.add_argument("--input", type=int, help="índice del dispositivo de entrada")
@@ -255,6 +268,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.list:
         list_devices()
         return 0
+
+    if not sys.stdin.isatty():
+        print(NON_INTERACTIVE_MSG, file=sys.stderr)
+        return 2
 
     inp, out, host = resolve_devices(args)
     in_name = sd.query_devices(inp)["name"]
@@ -285,6 +302,9 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         rep.notes.append("Interrumpido por el usuario.")
         print("\nInterrumpido.")
+    except EOFError:
+        print(f"\n\n{NON_INTERACTIVE_MSG}", file=sys.stderr)
+        return 2
     except sd.PortAudioError as e:
         rep.notes.append(f"Error de audio: {e}")
         print(f"\nError de audio: {e}\nProbá con --host-api MME o elegí otros dispositivos (--list).", file=sys.stderr)

@@ -12,7 +12,7 @@ El servicio se implementa en la **Fase 2** (ver `docs/VOICE_PIPELINE.md`). Por a
 cd services/voice
 uv sync
 uv run jarvis-audio-check --list          # ver dispositivos
-uv run jarvis-audio-check                 # prueba guiada (~1 min)
+uv run jarvis-audio-check                 # prueba guiada (~1 min), en una terminal propia
 uv run jarvis-audio-check --input 15 --output 12 --skip-latency
 ```
 Mide: que la salida suene, el ruido de fondo, el nivel de voz, la saturación, la relación señal/ruido, la latencia del driver y la latencia acústica ida y vuelta (parlante → micrófono).
