@@ -6,3 +6,6 @@ export * from "./token.js";
 export * from "./db.js";
 export * from "./secrets.js";
 export * from "./store.js";
+export * from "./chat.js";
+export * from "./claude/model.js";
+export * from "./claude/pricing.js";

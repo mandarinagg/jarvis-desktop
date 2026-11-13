@@ -18,6 +18,7 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
     "@jarvis/shared": "workspace:*",
     "@napi-rs/keyring": "2.1.2"
   }
