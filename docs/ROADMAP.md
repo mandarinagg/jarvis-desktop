@@ -17,7 +17,7 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 
 ## Fase 0 — Diagnóstico (en curso)
 - [x] Inventario de runtimes y hardware (ver `ENVIRONMENT_AUDIT.md`)
-- [ ] Prueba de micrófono y salida de audio (nivel, ruido, latencia)
+- [x] Prueba de micrófono y salida de audio (nivel, ruido, latencia) — SNR 40 dB, ver `ENVIRONMENT_AUDIT.md`
 - [ ] Benchmark STT: whisper.cpp (Vulkan) `large-v3-turbo` vs `small` en español con 20 frases propias
 - [ ] Comparativa TTS en español (2 nube + 2 local): calidad, latencia al primer audio, costo, licencia
 - [ ] Cuenta Anthropic API + tope de gasto mensual configurado en la consola

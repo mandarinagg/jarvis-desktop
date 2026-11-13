@@ -28,8 +28,8 @@
 
 ## Pendiente
 
-- [ ] Prueba de micrófono: nivel, ruido de fondo, latencia de captura (con y sin Voicemod) → `uv run jarvis-audio-check` en `services/voice`
-- [ ] Prueba de salida de audio y latencia de reproducción
+- [x] Prueba de micrófono (2026-11-13, `jarvis-audio-check`): ruido −72.5 dBFS, voz −32.2 dBFS (pico −17.9, sin saturación), **SNR 40.3 dB**. Acción: subir la ganancia de la Razer ~8–10 dB antes del benchmark de STT
+- [x] Prueba de salida (auriculares por el jack Realtek): OK; latencia del driver 22 ms. Latencia acústica ida y vuelta: no aplica (auriculares, sin eco)
 - [ ] Verificar soporte Vulkan: `vulkaninfo --summary`
 - [ ] Benchmark whisper.cpp
 - [ ] Comparativa TTS
