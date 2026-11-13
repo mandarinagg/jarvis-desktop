@@ -1,7 +1,7 @@
 # CLAUDE.md — reglas para Claude Code en este repo
 
 ## Contexto
-JARVIS Desktop: asistente personal de voz y texto sobre la API de Claude. Leé `docs/PRODUCT_SPEC.md`, `docs/ARCHITECTURE.md` y `docs/ROADMAP.md` antes de cambios no triviales. La fase actual está en `docs/ROADMAP.md`.
+JARVIS Desktop: asistente personal de voz y texto sobre la API de Claude. Leé `docs/PRODUCT_SPEC.md`, `docs/ARCHITECTURE.md` y `docs/ROADMAP.md` antes de cambios no triviales. La fase actual está en `docs/ROADMAP.md`; el estado de la última sesión y los próximos pasos, en `docs/HANDOFF.md` (actualizalo al cerrar cada sesión).
 
 ## Reglas
 - No implementes features de una fase posterior a la actual sin pedido explícito.
