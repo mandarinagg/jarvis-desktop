@@ -108,5 +108,5 @@ docs/                Especificaciones, ADRs, guías
 ## 7. Decisiones abiertas
 
 - Empaquetado del Core (runtime de Electron vs Node incluido) → se valida en Fase 1 (ADR-008).
-- TTS por defecto (nube vs local) → se decide con la comparativa de Fase 0.
+- ~~TTS por defecto (nube vs local)~~ → Google Neural2 con fallback local Piper (ADR-011).
 - Embeddings locales: sí/no y cuál → Fase 3.

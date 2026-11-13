@@ -1,6 +1,6 @@
 # ADR-004: Pipeline de voz local-first
 
-- **Estado:** Aceptada (se confirma con benchmarks de Fase 0) — aprobada por el owner el 2026-11-12
+- **Estado:** Aceptada (se confirma con benchmarks de Fase 0) — aprobada por el owner el 2026-11-12. **La parte de TTS la reemplaza ADR-011** (Google Neural2, nube-first)
 - **Fecha:** 2026-11-12
 
 ## Contexto

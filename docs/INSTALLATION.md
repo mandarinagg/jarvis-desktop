@@ -7,7 +7,7 @@
 - Windows 11
 - Node.js LTS + pnpm (`corepack enable`)
 - Git
-- [uv](https://docs.astral.sh/uv/) para el servicio de voz (`winget install astral-sh.uv`), que gestiona Python 3.12 aislado
+- [uv](https://docs.astral.sh/uv/) para el servicio de voz (`winget install astral-sh.uv`) + Python 3.12 oficial (`py install 3.12`). No usar `uv python install`: Smart App Control bloquea esos intérpretes sin firmar
 - ffmpeg (`winget install Gyan.FFmpeg`) para pruebas de audio
 - Drivers de GPU con soporte Vulkan (AMD Adrenalin actualizado)
 - Cuenta en la consola de Anthropic con API key y **tope de gasto configurado**
