@@ -1,0 +1,17 @@
+# Frases de la comparativa de TTS (Fase 0). Una por línea; '#' = comentario.
+# Son respuestas típicas de Jarvis: acuses cortos, voseo, números, siglas y anglicismos técnicos.
+# El pipeline sintetiza frase por frase, así que cada línea es una unidad realista.
+Dale, ya lo miro.
+Listo. Revisé tus tres proyectos y el de JARVIS tiene dos PRs abiertos en GitHub.
+Tenés una reunión a las 15:30 con el equipo de diseño, en 40 minutos.
+El build falló en el paso de tests: hay 3 errores en el módulo de voz.
+¿Querés que le mande el resumen a Martín o lo dejo como borrador?
+Encontré el archivo, pesa 2,4 megas y lo modificaste ayer a la noche.
+Ojo: eso borraría 120 archivos de la carpeta Descargas. ¿Confirmás?
+La API de Claude respondió en 380 milisegundos, dentro del presupuesto.
+Hoy gastaste 1,20 dólares en tokens; te quedan 8,80 del tope diario.
+Hice el commit en la rama feature barra voz y abrí el pull request.
+No pude conectarme al servidor MCP de Notion. ¿Lo reintento en un minuto?
+Perfecto, quedó agendado para el jueves 20 de noviembre a las 9 de la mañana.
+Mientras tanto, te cuento: el pronóstico dice 28 grados con chances de lluvia a la tarde.
+Entendido. Cancelo todo y vuelvo a escuchar.

@@ -108,5 +108,5 @@ docs/                Especificaciones, ADRs, guías
 ## 7. Decisiones abiertas
 
 - Electron vs Tauri → ADR-002 (propuesta: Electron).
-- TTS por defecto (nube vs local) → se decide con la comparativa de Fase 0.
+- ~~TTS por defecto (nube vs local)~~ → Google Neural2 con fallback local Piper (ADR-011).
 - Embeddings locales: sí/no y cuál → Fase 3.

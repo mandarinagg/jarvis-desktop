@@ -32,4 +32,4 @@
 - [x] Prueba de salida (auriculares por el jack Realtek): OK; latencia del driver 22 ms. Latencia acústica ida y vuelta: no aplica (auriculares, sin eco)
 - [x] Vulkan: API 1.4.315, driver propietario AMD, RX 6600 XT detectada por ggml-vulkan (2026-11-13)
 - [x] Benchmark de STT con la voz del owner (2026-11-13) → Parakeet TDT v3 (ADR-010)
-- [ ] Comparativa TTS
+- [x] Comparativa TTS (2026-11-13, `jarvis-tts-bench`) → Google Neural2 (ADR-011). Red a Google: RTT ~160 ms, llamadas sin síntesis de 314–1200 ms (jitter alto)

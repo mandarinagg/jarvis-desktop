@@ -1,7 +1,7 @@
 [project]
 name = "jarvis-voice"
 version = "0.0.1"
-description = "JARVIS voice service (Phase 0: audio diagnostics only)"
+description = "JARVIS voice service (Phase 0: audio, STT and TTS diagnostics only)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "numpy>=2.1",
@@ -10,10 +10,16 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest>=8"]
+tts-bench = [
+    "google-cloud-texttospeech>=2.38.0",
+    "kokoro-onnx>=0.6.1",
+    "piper-tts>=1.8.0",
+]
 
 [project.scripts]
 jarvis-audio-check = "jarvis_voice.diagnostics.audio_check:main"
 jarvis-stt-bench = "jarvis_voice.diagnostics.stt_bench:main"
+jarvis-tts-bench = "jarvis_voice.diagnostics.tts_bench:main"
 
 [build-system]
 requires = ["hatchling"]
