@@ -14,7 +14,7 @@ Altavoz ◀─ Reproductor ◀─ TTS por frase ◀─ Segmentador de frases ◀
 
 | Etapa | Motor propuesto | Local | Notas |
 |-------|-----------------|-------|-------|
-| AEC | WebRTC APM | ✅ | Necesario para barge-in con parlantes |
+| AEC | WebRTC APM | ✅ | Necesario para barge-in con parlantes. Setup del owner: auriculares → AEC opcional (se implementa después, no bloquea la Fase 2) |
 | Wake word | openWakeWord | ✅ | Umbral ajustable; nunca envía audio previo a la activación |
 | VAD | Silero VAD | ✅ | Detecta fin de frase (~500–700 ms de silencio, configurable) |
 | STT | whisper.cpp (Vulkan) | ✅ | Benchmark: `large-v3-turbo` vs `medium`/`small` Q5 |

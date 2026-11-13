@@ -20,6 +20,7 @@
 | npm / pnpm | 11.20 / 10.34 | ✅ pnpm para el monorepo |
 | Python | 3.15.2 (+ 3.12.10 oficial) | ⚠️ 3.15 es muy nuevo: el servicio de voz usa 3.12 vía `uv`. **Smart App Control activo**: solo intérpretes firmados (ver TROUBLESHOOTING) |
 | Micrófono | Razer Seiren Mini (WASAPI, predeterminado) | ✅ Latencia del driver: 22 ms entrada / 22 ms salida (Realtek) |
+| Salida de audio | **Auriculares** (sin parlantes) | ✅ Sin eco: AEC no es bloqueante para barge-in. Evitar el mic Bluetooth en modo manos libres (HFP, calidad telefónica) → usar la Razer |
 | Rust / Cargo | — | ❌ No instalado (ver ADR-002) |
 | Git | 2.56 | ✅ |
 | GitHub CLI | logueado | ✅ |
