@@ -91,6 +91,15 @@ class Engine:
     gpu: bool = True
     beam: bool = False
     auto_audio_ctx: bool = True
+    prompt: str | None = None
+
+
+# Generic domain vocabulary + a rioplatense (voseo) sample to bias whisper's decoder.
+# Deliberately not the benchmark sentences themselves.
+VOCAB_PROMPT = (
+    "Che Jarvis, fijate y decime. Vocabulario: Jarvis, Claude, Anthropic, API, MCP, GitHub, "
+    "commit, branch, README, pipeline, websocket, Electron, Tauri, Vulkan, Radeon."
+)
 
 
 TURBO = "models/whisper/ggml-large-v3-turbo-q5_0.bin"
@@ -102,6 +111,7 @@ ENGINES = {
     for e in [
         Engine("whisper-turbo-gpu", "whisper-cli.exe", TURBO),
         Engine("whisper-turbo-gpu-fullctx", "whisper-cli.exe", TURBO, auto_audio_ctx=False),
+        Engine("whisper-turbo-gpu-fullctx-vocab", "whisper-cli.exe", TURBO, auto_audio_ctx=False, prompt=VOCAB_PROMPT),
         Engine("whisper-turbo-gpu-beam5", "whisper-cli.exe", TURBO, beam=True),
         Engine("whisper-small-gpu", "whisper-cli.exe", SMALL),
         Engine("parakeet-v3-gpu", "parakeet-cli.exe", PARAKEET, auto_audio_ctx=False),
@@ -291,7 +301,9 @@ MIN_AUDIO_CTX = 512  # below this whisper large-v3-turbo hallucinates repeated p
 def audio_ctx_for(duration_s: float) -> int:
     """Whisper encodes a fixed 30 s window (1500 frames, 20 ms each); shrink it to the clip + 2 s margin.
 
-    Floor of 512 (~10 s): measured in Phase 0, ac <= 384 made turbo repeat the sentence 2-4 times.
+    Floor of 512 (~10 s): with synthetic voice, ac <= 384 made turbo repeat the sentence 2-4 times.
+    With the owner's real voice it still hallucinated repeats in 3/20 clips even at 512, so reduced
+    audio_ctx is kept only as a benchmark variant and is NOT used in production (ADR-010).
     """
     return min(1500, max(MIN_AUDIO_CTX, math.ceil(duration_s * 50) + 100))
 
@@ -304,6 +316,8 @@ def build_command(engine: Engine, wav: Path, duration_s: float, threads: int) ->
         cmd += ["-bs", "5", "-bo", "5"] if engine.beam else ["-bs", "1", "-bo", "1"]
         if engine.auto_audio_ctx:
             cmd += ["-ac", str(audio_ctx_for(duration_s))]
+        if engine.prompt:
+            cmd += ["--prompt", engine.prompt]
     if not engine.gpu:
         cmd.append("-ng")
     return cmd

@@ -90,3 +90,9 @@ def test_markdown_table_sorts_by_wer():
     b = sb.EngineResult("b", files=2, wer=0.05, latency_p50_ms=300)
     table = sb.markdown_table([a, b])
     assert table.index("| b |") < table.index("| a |")
+
+
+def test_vocab_engine_passes_prompt_and_full_context():
+    cmd = sb.build_command(sb.ENGINES["whisper-turbo-gpu-fullctx-vocab"], Path("x.wav"), 5.0, 6)
+    assert cmd[cmd.index("--prompt") + 1] == sb.VOCAB_PROMPT
+    assert "-ac" not in cmd

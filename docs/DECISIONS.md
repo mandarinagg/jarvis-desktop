@@ -12,3 +12,4 @@ Estados: **Propuesta** → **Aceptada** / **Rechazada** → (**Reemplazada por A
 | [005](adr/005-router-de-modelos-y-costos.md) | Router de modelos y control de costos | Propuesta |
 | [006](adr/006-evolucion-controlada.md) | Evolución controlada: evals + aprobación + git | Propuesta |
 | [009](adr/009-binarios-nativos-y-smart-app-control.md) | Binarios nativos de voz bajo Smart App Control (whisper.cpp + ggml-vulkan.dll fijados) | Aceptada |
+| [010](adr/010-motor-stt-parakeet.md) | Motor de STT: Parakeet TDT 0.6B v3 (Vulkan); whisper turbo contexto completo como alternativo | Aceptada |

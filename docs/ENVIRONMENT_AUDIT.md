@@ -31,5 +31,5 @@
 - [x] Prueba de micrófono (2026-11-13, `jarvis-audio-check`): ruido −72.5 dBFS, voz −32.2 dBFS (pico −17.9, sin saturación), **SNR 40.3 dB**. Acción: subir la ganancia de la Razer ~8–10 dB antes del benchmark de STT
 - [x] Prueba de salida (auriculares por el jack Realtek): OK; latencia del driver 22 ms. Latencia acústica ida y vuelta: no aplica (auriculares, sin eco)
 - [x] Vulkan: API 1.4.315, driver propietario AMD, RX 6600 XT detectada por ggml-vulkan (2026-11-13)
-- [ ] Benchmark whisper.cpp con la voz del owner → `uv run jarvis-stt-bench` (preliminar con voz sintética en `VOICE_PIPELINE.md`)
+- [x] Benchmark de STT con la voz del owner (2026-11-13) → Parakeet TDT v3 (ADR-010)
 - [ ] Comparativa TTS

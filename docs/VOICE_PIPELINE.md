@@ -17,7 +17,7 @@ Altavoz ◀─ Reproductor ◀─ TTS por frase ◀─ Segmentador de frases ◀
 | AEC | WebRTC APM | ✅ | Necesario para barge-in con parlantes. Setup del owner: auriculares → AEC opcional (se implementa después, no bloquea la Fase 2) |
 | Wake word | openWakeWord | ✅ | Umbral ajustable; nunca envía audio previo a la activación |
 | VAD | Silero VAD | ✅ | Detecta fin de frase (~500–700 ms de silencio, configurable) |
-| STT | whisper.cpp (Vulkan) | ✅ | Benchmark: `large-v3-turbo` vs `medium`/`small` Q5 |
+| STT | Parakeet TDT 0.6B v3 sobre whisper.cpp/ggml (Vulkan) | ✅ | Elegido por benchmark (ADR-010); alternativo: whisper turbo con contexto completo |
 | TTS | Adaptador | nube/local | Ver comparativa en Fase 0 |
 
 ## 2. Presupuesto de latencia (meta p50 < 1.5 s)
@@ -65,19 +65,19 @@ Requisito de voz: original, español latinoamericano, cálida, sobria y tecnoló
 
 ## 7. Benchmark de STT (Fase 0)
 
-Herramienta: `services/voice` → `uv run jarvis-stt-bench setup | record | run` (ver README del servicio). Binarios y Vulkan: ADR-009.
+Herramienta: `services/voice` → `uv run jarvis-stt-bench setup | record | run` (ver el README del servicio). Binarios y Vulkan: ADR-009. Decisión: **ADR-010**.
 
-**Preliminar (2026-11-13), voz sintética de Windows (Sabina, es-ES), 3 frases.** Solo indica velocidad; el WER se infla porque la voz sintética lee el voseo y los anglicismos como en España.
+**Resultado (2026-11-13): 20 frases del owner, 89 s, RX 6600 XT por Vulkan, solo inferencia.**
 
-| Motor | Inferencia p50 | Notas |
-|-------|----------------|-------|
-| whisper `large-v3-turbo` q5_0, Vulkan, greedy, `ac` dinámico ≥ 512 | **~225 ms** | Candidato principal |
-| ídem, beam 5 | ~300 ms | Misma precisión en esta muestra |
-| ídem, contexto completo (1500) | ~720 ms | |
-| whisper `small` q5_1, Vulkan | ~155 ms | Más errores |
-| Parakeet TDT 0.6B v3 q8_0, Vulkan | ~180 ms | Confunde anglicismos ("commit") |
-| whisper `large-v3-turbo`, CPU | ~2.9 s | Descartado |
+| Motor | WER | CER | p50 | p95 |
+|-------|-----|-----|-----|-----|
+| **Parakeet TDT 0.6B v3** (elegido) | 15.3% | **4.8%** | **184 ms** | **193 ms** |
+| whisper turbo, contexto completo (+ vocabulario) | 14.0–14.5% | 6.9–7.0% | ~735 ms | ~790 ms |
+| whisper turbo, beam 5, `audio_ctx` reducido | 18.4% | 11.8% | 331 ms | 418 ms |
+| whisper small | 28.9% | 15.2% | 172 ms | 196 ms |
+| whisper turbo, greedy, `audio_ctx` reducido | 30.7% | 21.7% | 249 ms | 328 ms |
+| whisper turbo, CPU | 26.3% | 16.9% | 4.7 s | 5.1 s |
 
-Hallazgo: con `audio_ctx` ≤ 384, turbo **alucina repeticiones** → piso de 512.
-
-**Pendiente:** correr con las 20 frases grabadas por el owner (`benchmarks/stt_phrases_es.txt`) y elegir el motor por WER + p95.
+Hallazgos:
+- `audio_ctx` reducido en Whisper **alucina frases repetidas** con voz real (aun con piso de 512). No usarlo.
+- Parakeet respeta el voseo; falla en nombres propios y siglas → corrección por diccionario en la Fase 2.

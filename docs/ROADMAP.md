@@ -18,7 +18,7 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 ## Fase 0 — Diagnóstico (en curso)
 - [x] Inventario de runtimes y hardware (ver `ENVIRONMENT_AUDIT.md`)
 - [x] Prueba de micrófono y salida de audio (nivel, ruido, latencia) — SNR 40 dB, ver `ENVIRONMENT_AUDIT.md`
-- [ ] Benchmark STT: whisper.cpp (Vulkan) `large-v3-turbo` vs `small` en español con 20 frases propias
+- [x] Benchmark STT con 20 frases propias → **Parakeet TDT v3 en Vulkan** (WER 15.3%, p50 184 ms). Ver ADR-010
 - [ ] Comparativa TTS en español (2 nube + 2 local): calidad, latencia al primer audio, costo, licencia
 - [ ] Cuenta Anthropic API + tope de gasto mensual configurado en la consola
 - [ ] Aprobar ADR-001…006
