@@ -25,7 +25,7 @@ uv run jarvis-stt-bench record    # grabás las 20 frases de benchmarks/stt_phra
 uv run jarvis-stt-bench run       # compara motores: WER, CER, latencia p50/p95
 ```
 Motores: whisper `large-v3-turbo` (GPU: greedy, beam 5 y contexto completo; también CPU), whisper `small` (GPU) y Parakeet v3 (GPU). La GPU usa Vulkan con el `ggml-vulkan.dll` de llama.cpp (ADR-009).
-Las grabaciones son tu voz: quedan en `%APPDATA%\Jarvisenchmarks\stt\` y nunca se suben al repo.
+Las grabaciones son tu voz: quedan en `%APPDATA%\Jarvisbenchmarks\stt\` y nunca se suben al repo.
 
 ## Tests
 ```powershell
