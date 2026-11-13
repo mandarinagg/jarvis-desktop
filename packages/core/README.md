@@ -21,6 +21,34 @@ Jarvis Core: un daemon en Node/TS. Cuando esté completo va a tener el orquestad
 - **Secretos (ADR-007):** `KeyringSecretStore` usa el Windows Credential Manager, con servicio `Jarvis` y cuentas `anthropic-api-key` y `google-tts-api-key`.
 - **Pendiente de ADR-007:** el cifrado AES-GCM de campos sensibles (llega con la memoria, en la Fase 3) y los backups `VACUUM INTO`.
 
+- **Chat (L0):**
+  - `ChatService` chequea el tope diario, guarda el mensaje, transmite la respuesta de Claude y después guarda la respuesta y el costo.
+  - Permite un solo turno a la vez por conversación.
+  - `chat.cancel`, o que el cliente se desconecte, cortan la respuesta. Lo dicho hasta ahí se guarda marcado como interrumpido.
+- **Adaptador de Claude** (`claude/model.ts`):
+  - usa el SDK oficial `@anthropic-ai/sdk` 1.8, siempre con streaming (`beta.messages.stream`);
+  - cancela con `AbortSignal`, reintenta 2 veces ante 408/409/429/5xx y corta a los 120 s;
+  - cachea el system prompt y el historial, y fija `effort: low` por defecto (configurable);
+  - tiene **fallbacks del lado del servidor** activados (`fallbacks: "default"`): si Opus 5.5 rechaza un pedido, la API lo reintenta en el modelo recomendado.
+  - Los errores se traducen a mensajes seguros, sin la clave.
+- **Costo** (`claude/pricing.ts`): sale de los precios de lista (`CLAUDE_API.md` §4.1) y del modelo que realmente respondió. Un modelo desconocido se cobra al precio más caro, para que el tope nunca quede por debajo.
+- **Prompt:** `prompts/system.md`. Es estable, sin fechas ni datos variables, para no romper la caché.
+
+## Configuración (variables de entorno, opcionales)
+| Variable | Default | Uso |
+|---|---|---|
+| `JARVIS_DAILY_BUDGET_USD` | `3` | Tope duro diario (día local) |
+| `JARVIS_DEFAULT_MODEL` | `claude-opus-5-5` | Modelo |
+| `JARVIS_EFFORT` | `low` | `low`…`max` (ADR-005: se calibra con evals) |
+| `ANTHROPIC_API_KEY` | — | **Solo para desarrollo**: el Credential Manager tiene prioridad |
+| `JARVIS_DATA_DIR` / `JARVIS_PIPE` | `%APPDATA%/Jarvis` / pipe del usuario | Para dev y tests |
+
+## Chat por terminal
+```powershell
+node packages/core/dist/main.js          # en una terminal (el Core)
+node packages/core/dist/chat-cli.js      # en otra: /nueva, /salir, Ctrl+C corta la respuesta
+```
+
 ## Guardar la API key
 ```powershell
 pnpm build
