@@ -1,0 +1,18 @@
+{
+  "id": "011-memoria-en-conversacion",
+  "category": "contexto",
+  "turns": [
+    "Estoy armando un proyecto que se llama Atalaya, es un monitor de precios de criptomonedas.",
+    "¿Cómo se llamaba mi proyecto y de qué era?"
+  ],
+  "checks": {
+    "mustMatch": [
+      "atalaya"
+    ]
+  },
+  "rubric": [
+    "Recuerda el nombre del proyecto (Atalaya).",
+    "Recuerda que es un monitor de precios de criptomonedas.",
+    "Responde breve."
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "009-abogado-del-diablo",
+  "category": "criterio",
+  "turns": [
+    "Tengo una idea: una app que te recuerda tomar agua cada 20 minutos con notificaciones. Hacé de abogado del diablo."
+  ],
+  "checks": {
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})quieres(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})",
+      "(?<!\\p{L})sabes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Plantea objeciones concretas y relevantes (mercado saturado, fatiga de notificaciones, retención, etc.).",
+    "No es complaciente ni descalifica sin argumentos.",
+    "Es conciso."
+  ]
+}

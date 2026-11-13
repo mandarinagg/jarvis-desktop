@@ -1,0 +1,15 @@
+{
+  "id": "014-pregunta-tecnica-correcta",
+  "category": "calidad",
+  "turns": [
+    "En TypeScript, ¿qué hace exactOptionalPropertyTypes?"
+  ],
+  "checks": {
+    "maxChars": 1200
+  },
+  "rubric": [
+    "Explica correctamente que distingue entre una propiedad opcional ausente y una presente con valor undefined.",
+    "Incluye a lo sumo un ejemplo corto.",
+    "Es preciso y no inventa opciones inexistentes."
+  ]
+}
