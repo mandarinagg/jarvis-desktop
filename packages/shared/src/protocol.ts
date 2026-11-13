@@ -37,7 +37,25 @@ export type ChatSend = z.infer<typeof ChatSend>;
 export const ChatCancel = z.strictObject({ type: z.literal("chat.cancel"), id: Id, turnId: Id });
 export type ChatCancel = z.infer<typeof ChatCancel>;
 
-export const ClientMessage = z.discriminatedUnion("type", [AuthHello, CorePing, CoreShutdown, ChatSend, ChatCancel]);
+export const ConversationsList = z.strictObject({ type: z.literal("conversations.list"), id: Id });
+export type ConversationsList = z.infer<typeof ConversationsList>;
+
+export const ConversationsGet = z.strictObject({ type: z.literal("conversations.get"), id: Id, conversationId: Id });
+export type ConversationsGet = z.infer<typeof ConversationsGet>;
+
+export const BudgetGet = z.strictObject({ type: z.literal("budget.get"), id: Id });
+export type BudgetGet = z.infer<typeof BudgetGet>;
+
+export const ClientMessage = z.discriminatedUnion("type", [
+  AuthHello,
+  CorePing,
+  CoreShutdown,
+  ChatSend,
+  ChatCancel,
+  ConversationsList,
+  ConversationsGet,
+  BudgetGet,
+]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
 // ------------------------------------------------------------------ core -> client
@@ -96,7 +114,52 @@ export const ChatDone = z.strictObject({
 });
 export type ChatDone = z.infer<typeof ChatDone>;
 
-export const CoreMessage = z.discriminatedUnion("type", [AuthOk, CorePong, CoreError, ChatStarted, ChatDelta, ChatDone]);
+export const ConversationSummary = z.strictObject({ id: Id, title: z.string(), updatedAt: z.string() });
+export type ConversationSummary = z.infer<typeof ConversationSummary>;
+
+export const ConversationsListResult = z.strictObject({
+  type: z.literal("conversations.list.result"),
+  id: Id,
+  conversations: z.array(ConversationSummary).max(500),
+});
+export type ConversationsListResult = z.infer<typeof ConversationsListResult>;
+
+export const HistoryMessage = z.strictObject({
+  role: z.enum(["user", "assistant"]),
+  content: z.string(),
+  interrupted: z.boolean(),
+  createdAt: z.string(),
+});
+export type HistoryMessage = z.infer<typeof HistoryMessage>;
+
+export const ConversationHistory = z.strictObject({
+  type: z.literal("conversations.history"),
+  id: Id,
+  conversationId: Id,
+  title: z.string(),
+  messages: z.array(HistoryMessage),
+});
+export type ConversationHistory = z.infer<typeof ConversationHistory>;
+
+export const BudgetStatus = z.strictObject({
+  type: z.literal("budget.status"),
+  id: Id,
+  spentTodayUsd: z.number().nonnegative(),
+  dailyBudgetUsd: z.number().positive(),
+});
+export type BudgetStatus = z.infer<typeof BudgetStatus>;
+
+export const CoreMessage = z.discriminatedUnion("type", [
+  AuthOk,
+  CorePong,
+  CoreError,
+  ChatStarted,
+  ChatDelta,
+  ChatDone,
+  ConversationsListResult,
+  ConversationHistory,
+  BudgetStatus,
+]);
 export type CoreMessage = z.infer<typeof CoreMessage>;
 
 // ------------------------------------------------------------------ helpers

@@ -3,7 +3,7 @@
  * persist reply + usage. One turn at a time per conversation; cancellable (chat.cancel, disconnect).
  */
 import { randomUUID } from "node:crypto";
-import type { ChatCancel, ChatSend } from "@jarvis/shared";
+import type { BudgetGet, ChatCancel, ChatSend, ConversationsGet, ConversationsList } from "@jarvis/shared";
 import { type ChatModel, TurnCancelledError, UpstreamError } from "./claude/model.js";
 import { costOf } from "./claude/pricing.js";
 import { localDay } from "./db.js";
@@ -26,6 +26,8 @@ interface ActiveTurn {
   sessionId: string;
   conversationId: string;
 }
+
+const HISTORY_LIMIT = 200;
 
 const NO_KEY =
   "No hay API key de Anthropic configurada. Guardala con: node packages/core/dist/set-secret.js anthropic-api-key";
@@ -112,6 +114,34 @@ export class ChatService {
 
   disconnected(session: Session): void {
     for (const turn of this.active.values()) if (turn.sessionId === session.id) turn.controller.abort();
+  }
+
+  conversationsList(session: Session, msg: ConversationsList): void {
+    const conversations = this.opts.store.listConversations(100).map(({ id, title, updatedAt }) => ({ id, title, updatedAt }));
+    session.send({ type: "conversations.list.result", id: msg.id, conversations });
+  }
+
+  /** Last HISTORY_LIMIT messages: keeps the reply well under the 1 MB IPC frame. */
+  conversationsGet(session: Session, msg: ConversationsGet): void {
+    const conversation = this.opts.store.getConversation(msg.conversationId);
+    if (!conversation) {
+      session.send({ type: "error", id: msg.id, code: "invalid_message", message: "la conversación no existe" });
+      return;
+    }
+    const messages = this.opts.store
+      .messages(conversation.id)
+      .slice(-HISTORY_LIMIT)
+      .map(({ role, content, interrupted, createdAt }) => ({ role, content, interrupted, createdAt }));
+    session.send({ type: "conversations.history", id: msg.id, conversationId: conversation.id, title: conversation.title, messages });
+  }
+
+  budgetGet(session: Session, msg: BudgetGet): void {
+    session.send({
+      type: "budget.status",
+      id: msg.id,
+      spentTodayUsd: this.opts.store.spentOn(localDay(this.now())),
+      dailyBudgetUsd: this.opts.dailyBudgetUsd,
+    });
   }
 
   cancelAll(): void {

@@ -164,3 +164,37 @@ describe("ChatService cancellation", () => {
     await first;
   });
 });
+
+describe("ChatService queries", () => {
+  it("lists conversations and returns their history", async () => {
+    const { service } = setup();
+    const { session, sent } = fakeSession();
+    await service.chatSend(session, { type: "chat.send", id: "m1", text: "primera pregunta" });
+    const conversationId = (sent[0] as Extract<CoreMessage, { type: "chat.started" }>).conversationId;
+
+    service.conversationsList(session, { type: "conversations.list", id: "l" });
+    expect(sent.at(-1)).toMatchObject({
+      type: "conversations.list.result",
+      conversations: [{ id: conversationId, title: "primera pregunta" }],
+    });
+
+    service.conversationsGet(session, { type: "conversations.get", id: "g", conversationId });
+    expect(sent.at(-1)).toMatchObject({
+      type: "conversations.history",
+      messages: [
+        { role: "user", content: "primera pregunta", interrupted: false },
+        { role: "assistant", content: "Hola", interrupted: false },
+      ],
+    });
+  });
+
+  it("reports unknown conversations and the budget status", async () => {
+    const { service } = setup(new FakeModel(), 2);
+    const { session, sent } = fakeSession();
+    service.conversationsGet(session, { type: "conversations.get", id: "g", conversationId: "nope" });
+    expect(sent.at(-1)).toMatchObject({ type: "error", code: "invalid_message" });
+    await service.chatSend(session, { type: "chat.send", id: "m1", text: "hola" });
+    service.budgetGet(session, { type: "budget.get", id: "b" });
+    expect(sent.at(-1)).toMatchObject({ type: "budget.status", dailyBudgetUsd: 2, spentTodayUsd: costOf("claude-opus-5-5", usage) });
+  });
+});
