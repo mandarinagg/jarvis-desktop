@@ -52,14 +52,29 @@ El indicador de micrófono abierto es **obligatorio y no se puede ocultar**.
 - Transcripciones persistentes solo si el owner lo activa.
 - Hotkey de mute global + ícono en bandeja.
 
-## 6. Comparativa TTS (completar en Fase 0)
+## 6. Comparativa TTS (Fase 0, en curso)
 
-| Motor | Tipo | Calidad ES (1–5) | Primer audio (ms) | Costo | Licencia | Notas |
-|-------|------|------------------|-------------------|-------|----------|-------|
-| _Nube A_ | nube | | | | | |
-| _Nube B_ | nube | | | | | |
-| Piper | local | | | gratis | MIT | |
-| Kokoro | local | | | gratis | Apache-2.0 | verificar voces en español |
+Herramienta: `jarvis-tts-bench` (ver `services/voice/README.md`). Son 14 frases típicas de Jarvis (`services/voice/benchmarks/tts_phrases_es.txt`), sintetizadas **una por una**, como lo hará el pipeline. Cada motor se carga y se precalienta antes de medir.
+
+- **Primer audio:** espera hasta el primer fragmento de audio. Es lo que compite contra los 300 ms del presupuesto.
+- **Percibido:** primer audio más el silencio inicial de ese fragmento.
+- **Calidad:** escucha a ciegas del owner (`rate`), con puntaje de 1 a 5. Recién al final se revela qué motor era cada versión.
+
+Medición local del 2026-11-13 (Ryzen 5 3600, solo CPU):
+
+| Motor | Tipo | Calidad ES (1–5) | Primer audio p50 / p95 (ms) | RTF p50 | Costo (10k car./día) | Licencia |
+|-------|------|------------------|-----------------------------|---------|----------------------|----------|
+| Google Chirp 3 HD (streaming) | nube | pendiente | pendiente (faltan credenciales) | — | US$ 9/mes (US$30/M car.) | propietaria |
+| Google Neural2 (legacy) | nube | pendiente | pendiente | — | US$ 4,80/mes (US$16/M car.) | propietaria |
+| Piper `es_MX-claude-high` | local | pendiente | **300 / 394** | 0.07 | gratis | piper-tts GPL-3.0 · voz Apache-2.0 |
+| Piper `es_AR-daniela-high` | local | pendiente | 1384 / 2006 | 0.44 | gratis | piper-tts GPL-3.0 · voz CC BY-SA 4.0 |
+| Kokoro `ef_dora` | local | pendiente | 2499 / 4604 | 0.72 | gratis | modelo Apache-2.0 · espeak-ng GPL-3.0 |
+| Kokoro `em_alex` | local | pendiente | 3771 / 4182 | 0.81 | gratis | modelo Apache-2.0 · espeak-ng GPL-3.0 |
+
+Observaciones preliminares:
+- Solo **Piper claude** entra en el presupuesto de 300 ms en CPU. Kokoro no da streaming dentro de una frase y en CPU tarda 2.5–3.8 s por frase. Para que fuera usable habría que probarlo con `onnxruntime-directml` en la RX 6600 XT, que queda como pendiente opcional.
+- Según el plan gratis de Google, que hay que verificar en la consola, los primeros ~1M de caracteres por mes podrían no tener costo. Con 10k caracteres por día son 300k por mes.
+- Licencias: `piper-tts` y espeak-ng son GPL-3.0 y el repo es MIT. Si el producto los usa, tienen que correr como **proceso separado** y no como librería enlazada. Esto se decide en el ADR de TTS.
 
 Requisito de voz: original, español latinoamericano, cálida, sobria y tecnológica. Sin clonar voces protegidas.
 
