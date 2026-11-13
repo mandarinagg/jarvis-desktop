@@ -22,7 +22,6 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 - [x] Comparativa TTS en español (2 nube + 2 local) → **Google Neural2** (calidad 4.8/5 a ciegas, primer audio p50 1.2 s, ~US$ 5/mes); fallback offline Piper. Ver ADR-011. ⚠️ El tramo TTS no cumple los 300 ms (red): mitigaciones en Fase 2
 - [ ] Cuenta Anthropic API + tope de gasto mensual configurado en la consola
 - [x] Aprobar ADR-001…006 (2026-11-12) + ADR-007 y ADR-008 complementarios
-
 - [x] Costo estimado por día → típico ~US$ 2,2/día solo Opus (~US$ 1,5 con router); supera el objetivo de US$ 1. Ver `CLAUDE_API.md` §4.1
 
 **Exit:** ADRs aprobados; motor STT y TTS elegidos con datos; costo estimado por día documentado.
