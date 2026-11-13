@@ -18,6 +18,15 @@ uv run jarvis-audio-check --input 15 --output 12 --skip-latency
 Mide: que la salida suene, el ruido de fondo, el nivel de voz, la saturación, la relación señal/ruido, la latencia del driver y la latencia acústica ida y vuelta (parlante → micrófono).
 **No guarda audio**: solo escribe un reporte JSON en `%APPDATA%\Jarvis\diagnostics\`.
 
+## Benchmark de STT (Fase 0)
+```powershell
+uv run jarvis-stt-bench setup     # baja binarios y modelos fijados (~1.5 GB, verificados por SHA-256)
+uv run jarvis-stt-bench record    # grabás las 20 frases de benchmarks/stt_phrases_es.txt (~5 min)
+uv run jarvis-stt-bench run       # compara motores: WER, CER, latencia p50/p95
+```
+Motores: whisper `large-v3-turbo` (GPU: greedy, beam 5 y contexto completo; también CPU), whisper `small` (GPU) y Parakeet v3 (GPU). La GPU usa Vulkan con el `ggml-vulkan.dll` de llama.cpp (ADR-009).
+Las grabaciones son tu voz: quedan en `%APPDATA%\Jarvisenchmarks\stt\` y nunca se suben al repo.
+
 ## Tests
 ```powershell
 uv run pytest

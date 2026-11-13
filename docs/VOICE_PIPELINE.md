@@ -62,3 +62,22 @@ El indicador de micrófono abierto es **obligatorio y no se puede ocultar**.
 | Kokoro | local | | | gratis | Apache-2.0 | verificar voces en español |
 
 Requisito de voz: original, español latinoamericano, cálida, sobria y tecnológica. Sin clonar voces protegidas.
+
+## 7. Benchmark de STT (Fase 0)
+
+Herramienta: `services/voice` → `uv run jarvis-stt-bench setup | record | run` (ver README del servicio). Binarios y Vulkan: ADR-009.
+
+**Preliminar (2026-11-13), voz sintética de Windows (Sabina, es-ES), 3 frases.** Solo indica velocidad; el WER se infla porque la voz sintética lee el voseo y los anglicismos como en España.
+
+| Motor | Inferencia p50 | Notas |
+|-------|----------------|-------|
+| whisper `large-v3-turbo` q5_0, Vulkan, greedy, `ac` dinámico ≥ 512 | **~225 ms** | Candidato principal |
+| ídem, beam 5 | ~300 ms | Misma precisión en esta muestra |
+| ídem, contexto completo (1500) | ~720 ms | |
+| whisper `small` q5_1, Vulkan | ~155 ms | Más errores |
+| Parakeet TDT 0.6B v3 q8_0, Vulkan | ~180 ms | Confunde anglicismos ("commit") |
+| whisper `large-v3-turbo`, CPU | ~2.9 s | Descartado |
+
+Hallazgo: con `audio_ctx` ≤ 384, turbo **alucina repeticiones** → piso de 512.
+
+**Pendiente:** correr con las 20 frases grabadas por el owner (`benchmarks/stt_phrases_es.txt`) y elegir el motor por WER + p95.

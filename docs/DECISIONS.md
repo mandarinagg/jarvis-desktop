@@ -11,3 +11,4 @@ Estados: **Propuesta** → **Aceptada** / **Rechazada** → (**Reemplazada por A
 | [004](adr/004-voz-local-first.md) | Pipeline de voz local-first (openWakeWord + Silero + whisper.cpp Vulkan) | Propuesta |
 | [005](adr/005-router-de-modelos-y-costos.md) | Router de modelos y control de costos | Propuesta |
 | [006](adr/006-evolucion-controlada.md) | Evolución controlada: evals + aprobación + git | Propuesta |
+| [009](adr/009-binarios-nativos-y-smart-app-control.md) | Binarios nativos de voz bajo Smart App Control (whisper.cpp + ggml-vulkan.dll fijados) | Aceptada |

@@ -13,6 +13,7 @@ dev = ["pytest>=8"]
 
 [project.scripts]
 jarvis-audio-check = "jarvis_voice.diagnostics.audio_check:main"
+jarvis-stt-bench = "jarvis_voice.diagnostics.stt_bench:main"
 
 [build-system]
 requires = ["hatchling"]

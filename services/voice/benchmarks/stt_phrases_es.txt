@@ -1,0 +1,23 @@
+# Frases de referencia para el benchmark de STT (Fase 0).
+# Mezcla de comandos cortos, conversación, nombres propios, números y jerga técnica.
+# Una frase por línea; las líneas que empiezan con # se ignoran.
+Jarvis, ¿qué tengo en la agenda para hoy?
+Abrí el proyecto de la tienda y decime qué tareas quedaron pendientes.
+Recordame llamar a mi vieja el jueves a las siete y media de la tarde.
+¿Cuánto gasté en la API de Claude esta semana?
+Buscá en mis notas todo lo que hable sobre el pipeline de voz.
+Creá una rama nueva que se llame feature login y hacé el commit inicial.
+Pará, pará, no hace falta que leas todo, dame solo el resumen.
+Tengo una idea para una app que conecte paseadores de perros con dueños del barrio.
+¿Me ayudás a pensar los pros y contras de usar Electron en vez de Tauri?
+Mandale un mensaje a Martín diciéndole que llego quince minutos tarde.
+¿Cuál es la diferencia entre un named pipe y un websocket?
+Leé el archivo README del repositorio jarvis desktop.
+Silenciá las notificaciones hasta mañana a las nueve.
+Convertí doscientos cincuenta dólares a pesos al cambio de hoy.
+Explicame en dos minutos qué es el protocolo MCP.
+Anotá en el idea vault: probar whisper con Vulkan en la Radeon.
+¿Qué opinás de este plan? Primero el core, después la voz y al final la memoria.
+Corré los tests del paquete core y avisame si alguno falla.
+Bajá el volumen un poco y hablá más despacio, por favor.
+Listo, eso es todo por ahora. Gracias, Jarvis.
