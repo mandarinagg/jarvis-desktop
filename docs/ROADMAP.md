@@ -23,6 +23,8 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 - [ ] Cuenta Anthropic API + tope de gasto mensual configurado en la consola
 - [x] Aprobar ADR-001…006 (2026-11-12) + ADR-007 y ADR-008 complementarios
 
+- [x] Costo estimado por día → típico ~US$ 2,2/día solo Opus (~US$ 1,5 con router); supera el objetivo de US$ 1. Ver `CLAUDE_API.md` §4.1
+
 **Exit:** ADRs aprobados; motor STT y TTS elegidos con datos; costo estimado por día documentado.
 
 ## Fase 1 — L0: Core + chat
