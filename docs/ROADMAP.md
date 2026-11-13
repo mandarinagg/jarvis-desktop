@@ -26,14 +26,15 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 
 **Exit:** ADRs aprobados; motor STT y TTS elegidos con datos; costo estimado por día documentado.
 
-## Fase 1 — L0: Core + chat
-- Monorepo pnpm + TypeScript + lint + test + CI
-- Core daemon con IPC autenticado
-- Adaptador Claude con streaming, cancelación, timeouts, reintentos
-- API key en Windows Credential Manager
-- UI de chat (Electron + React) con historial persistente (SQLite)
-- Medidor de costo por conversación + tope diario
-- Primeros 15 evals de conversación
+## Fase 1 — L0: Core + chat (implementada, en validación)
+- [x] Monorepo pnpm + TypeScript + lint + test + CI (ADR-012)
+- [x] Core daemon con IPC autenticado (named pipe + token, instancia única)
+- [x] Adaptador Claude con streaming, cancelación, timeouts, reintentos y fallbacks del lado del servidor
+- [x] API key en Windows Credential Manager (`set-secret`)
+- [x] UI de chat (Electron + React) con historial persistente (SQLite); el Core corre sobre el Node de Electron
+- [x] Medidor de costo por conversación + tope diario (alerta al 80%)
+- [x] 15 evals de conversación + runner con juez
+- [ ] Validación con la API real: correr las evals (≥ 80%) y usarlo una semana (requiere la cuenta de Anthropic)
 
 **Exit:** uso diario por texto durante 1 semana; evals ≥ 80%; la clave no aparece en ningún log ni archivo.
 

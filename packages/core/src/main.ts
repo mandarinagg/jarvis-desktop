@@ -3,15 +3,14 @@
  * Jarvis Core daemon entry point (ADR-001 / ADR-008).
  * Owns the per-user named pipe (single instance), the SQLite database and the Claude adapter.
  */
-import { readFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { ChatService } from "./chat.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
 import { openDatabase } from "./db.js";
 import { createLogger } from "./log.js";
 import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
+import { loadSystemPrompt } from "./prompt.js";
 import { KeyringSecretStore } from "./secrets.js";
 import { AlreadyRunningError, CoreServer } from "./server.js";
 import { ConversationStore } from "./store.js";
@@ -19,10 +18,6 @@ import { newSessionToken, writeSessionToken } from "./token.js";
 
 export const CORE_VERSION = "0.1.0";
 const EFFORTS: readonly Effort[] = ["low", "medium", "high", "xhigh", "max"];
-
-function loadSystemPrompt(): string {
-  return readFileSync(fileURLToPath(new URL("../prompts/system.md", import.meta.url)), "utf8").trim();
-}
 
 /** Key from Credential Manager; ANTHROPIC_API_KEY only as a dev fallback (.env is never committed). */
 function modelResolver(env: NodeJS.ProcessEnv): () => ChatModel | undefined {

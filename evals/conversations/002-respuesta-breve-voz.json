@@ -1,0 +1,22 @@
+{
+  "id": "002-respuesta-breve-voz",
+  "category": "brevedad",
+  "turns": [
+    "¿Qué diferencia hay entre un proceso y un hilo?"
+  ],
+  "checks": {
+    "maxChars": 900,
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})quieres(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})",
+      "(?<!\\p{L})sabes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Explica la diferencia correctamente.",
+    "La respuesta es corta y apta para escucharse por voz (sin listas largas ni encabezados).",
+    "Ofrece ampliar o profundizar si hace falta, o queda claro que es un resumen."
+  ]
+}

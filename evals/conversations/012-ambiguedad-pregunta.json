@@ -1,0 +1,14 @@
+{
+  "id": "012-ambiguedad-pregunta",
+  "category": "criterio",
+  "turns": [
+    "Arreglalo."
+  ],
+  "checks": {
+    "maxChars": 500
+  },
+  "rubric": [
+    "Pide aclaración sobre qué hay que arreglar en lugar de inventar un contexto.",
+    "Es breve."
+  ]
+}
