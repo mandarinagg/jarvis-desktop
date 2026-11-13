@@ -18,10 +18,13 @@ export const AuthHello = z.strictObject({
   protocolVersion: z.string().max(16),
   client: z.enum(["desktop", "cli", "voice"]),
 });
+export type AuthHello = z.infer<typeof AuthHello>;
 
 export const CorePing = z.strictObject({ type: z.literal("core.ping"), id: Id });
+export type CorePing = z.infer<typeof CorePing>;
 
 export const CoreShutdown = z.strictObject({ type: z.literal("core.shutdown"), id: Id });
+export type CoreShutdown = z.infer<typeof CoreShutdown>;
 
 export const ChatSend = z.strictObject({
   type: z.literal("chat.send"),
@@ -29,8 +32,10 @@ export const ChatSend = z.strictObject({
   conversationId: Id.optional(),
   text: z.string().min(1).max(32_000),
 });
+export type ChatSend = z.infer<typeof ChatSend>;
 
 export const ChatCancel = z.strictObject({ type: z.literal("chat.cancel"), id: Id, turnId: Id });
+export type ChatCancel = z.infer<typeof ChatCancel>;
 
 export const ClientMessage = z.discriminatedUnion("type", [AuthHello, CorePing, CoreShutdown, ChatSend, ChatCancel]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
@@ -58,8 +63,10 @@ export const Usage = z.strictObject({
 export type Usage = z.infer<typeof Usage>;
 
 export const AuthOk = z.strictObject({ type: z.literal("auth.ok"), id: Id, coreVersion: z.string() });
+export type AuthOk = z.infer<typeof AuthOk>;
 
 export const CorePong = z.strictObject({ type: z.literal("core.pong"), id: Id });
+export type CorePong = z.infer<typeof CorePong>;
 
 export const CoreError = z.strictObject({
   type: z.literal("error"),
@@ -67,6 +74,7 @@ export const CoreError = z.strictObject({
   code: ErrorCode,
   message: z.string().max(2_000),
 });
+export type CoreError = z.infer<typeof CoreError>;
 
 export const ChatStarted = z.strictObject({
   type: z.literal("chat.started"),
@@ -74,8 +82,10 @@ export const ChatStarted = z.strictObject({
   turnId: Id,
   conversationId: Id,
 });
+export type ChatStarted = z.infer<typeof ChatStarted>;
 
 export const ChatDelta = z.strictObject({ type: z.literal("chat.delta"), turnId: Id, text: z.string() });
+export type ChatDelta = z.infer<typeof ChatDelta>;
 
 export const ChatDone = z.strictObject({
   type: z.literal("chat.done"),
@@ -84,6 +94,7 @@ export const ChatDone = z.strictObject({
   usage: Usage,
   costUsd: z.number().nonnegative(),
 });
+export type ChatDone = z.infer<typeof ChatDone>;
 
 export const CoreMessage = z.discriminatedUnion("type", [AuthOk, CorePong, CoreError, ChatStarted, ChatDelta, ChatDone]);
 export type CoreMessage = z.infer<typeof CoreMessage>;
