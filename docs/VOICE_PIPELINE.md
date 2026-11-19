@@ -72,6 +72,10 @@ Los logs registran la duración y la latencia de cada frase, pero **nunca el tex
 
 Primera medición de punta a punta (2026-11-19, sin key de Anthropic, así que la respuesta fue la frase de error): STT 78 ms y **voz → primer audio en 1367 ms**.
 
+## 2.4 Escritorio (Fase 2)
+- Atajo global `Ctrl+Shift+Space`, que funciona como interruptor porque Electron no informa cuándo se suelta la tecla. `Ctrl+Alt+Space` ya estaba tomado por otra app en la PC del owner. En la ventana, el botón «Mantené para hablar» funciona apretando y soltando.
+- Overlay en `apps/desktop`: lo muestra u oculta el proceso principal según `voice.state`, y con `micOpen` se ve siempre.
+
 ## 3. Estados (visibles en overlay)
 
 `inactivo` → `escuchando` → `transcribiendo` → `pensando` → `hablando` → `inactivo`, más `muteado` y `error`.

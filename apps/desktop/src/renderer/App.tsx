@@ -1,5 +1,5 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useReducer, useRef, useState } from "react";
-import { budgetLevel, initialState, reduce } from "./state.js";
+import { VOICE_LABELS, budgetLevel, initialState, pttPressed, reduce } from "./state.js";
 
 const usd = (n: number) => `US$ ${n.toFixed(2)}`;
 let seq = 0;
@@ -18,30 +18,41 @@ function relativeDay(iso: string): string {
 export function App() {
   const [state, dispatch] = useReducer(reduce, initialState);
   const [draft, setDraft] = useState("");
+  const [hotkey, setHotkey] = useState<string | null>(null);
+  const [holding, setHolding] = useState(false);
+  const latest = useRef(state);
+  latest.current = state;
   const transcriptEnd = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const { jarvis } = window;
 
   useEffect(() => {
+    const refresh = () => {
+      jarvis.send({ type: "conversations.list", id: nextId("l") });
+      jarvis.send({ type: "budget.get", id: nextId("b") });
+      jarvis.send({ type: "voice.status.get", id: nextId("v") });
+    };
+    const offHotkey = jarvis.onHotkey(() => {
+      const s = latest.current;
+      if (!s.connected || s.voice.state === "unavailable") return;
+      jarvis.send({ type: "voice.ptt", id: nextId("p"), pressed: pttPressed(s.voice), ...(s.activeId ? { conversationId: s.activeId } : {}) });
+    });
     const offMessage = jarvis.onMessage((message) => {
       dispatch({ kind: "core", message });
       if (message.type === "chat.done") jarvis.send({ type: "conversations.list", id: nextId("l") });
     });
     const offStatus = jarvis.onStatus((s) => {
       dispatch({ kind: "status", connected: s.connected, ...(s.error ? { error: s.error } : {}) });
-      if (s.connected) {
-        jarvis.send({ type: "conversations.list", id: nextId("l") });
-        jarvis.send({ type: "budget.get", id: nextId("b") });
-      }
+      setHotkey(s.hotkey ?? null);
+      if (s.connected) refresh();
     });
     void jarvis.status().then((s) => {
       dispatch({ kind: "status", connected: s.connected });
-      if (s.connected) {
-        jarvis.send({ type: "conversations.list", id: nextId("l") });
-        jarvis.send({ type: "budget.get", id: nextId("b") });
-      }
+      setHotkey(s.hotkey ?? null);
+      if (s.connected) refresh();
     });
     return () => {
+      offHotkey();
       offMessage();
       offStatus();
     };
@@ -53,6 +64,15 @@ export function App() {
 
   const busy = state.streaming !== undefined;
   const level = budgetLevel(state.budget);
+  const voiceReady = state.connected && state.voice.state !== "unavailable";
+  const shortcut = hotkey?.replaceAll("Control", "Ctrl").replaceAll("+", " + ");
+
+  /** In-window push-to-talk: hold the button, like a walkie-talkie. */
+  const ptt = (pressed: boolean) => {
+    if (!voiceReady || pressed === holding) return;
+    setHolding(pressed);
+    jarvis.send({ type: "voice.ptt", id: nextId("p"), pressed, ...(state.activeId ? { conversationId: state.activeId } : {}) });
+  };
 
   const send = (e?: FormEvent) => {
     e?.preventDefault();
@@ -114,6 +134,14 @@ export function App() {
 
       <main className="stage">
         <header className="meter-bar">
+          <div
+            className={`voice-chip ${state.voice.state} ${state.voice.micOpen ? "mic-open" : ""}`}
+            title={state.voice.detail ?? (shortcut ? `Atajo global: ${shortcut}` : "Atajo global no disponible")}
+          >
+            <span className="voice-dot" aria-hidden="true" />
+            <span>{state.voice.micOpen ? "Micrófono abierto" : VOICE_LABELS[state.voice.state]}</span>
+            {shortcut && voiceReady && <kbd>{shortcut}</kbd>}
+          </div>
           {state.budget ? (
             <div className={`meter ${level}`} title="Gasto de hoy en la API de Claude">
               <div className="meter-track">
@@ -139,7 +167,9 @@ export function App() {
             <div className="empty">
               <p className="empty-lead">¿En qué te ayudo?</p>
               <p className="empty-sub">
-                Escribí abajo. Enter envía, Shift+Enter agrega una línea y Esc corta una respuesta en curso.
+                Escribí abajo o mantené apretado «Mantené para hablar». Enter envía, Shift+Enter agrega una línea y Esc
+                corta una respuesta en curso.
+                {shortcut ? ` Desde cualquier ventana, ${shortcut} empieza y termina de escuchar.` : ""}
               </p>
             </div>
           )}
@@ -183,6 +213,27 @@ export function App() {
             disabled={!state.connected}
             aria-label="Mensaje para Jarvis"
           />
+          <button
+            type="button"
+            className={`action talk ${holding ? "held" : ""}`}
+            disabled={!voiceReady}
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              ptt(true);
+            }}
+            onPointerUp={() => ptt(false)}
+            onPointerCancel={() => ptt(false)}
+            onKeyDown={(e) => {
+              if ((e.key === " " || e.key === "Enter") && !e.repeat) ptt(true);
+            }}
+            onKeyUp={(e) => {
+              if (e.key === " " || e.key === "Enter") ptt(false);
+            }}
+            aria-pressed={holding}
+            title={voiceReady ? "Mantené apretado para hablar" : (state.voice.detail ?? "La voz no está disponible")}
+          >
+            {holding ? "Soltá para enviar" : "Mantené para hablar"}
+          </button>
           {busy ? (
             <button type="button" className="action stop" onClick={cancel} disabled={!state.streaming?.turnId}>
               Cortar respuesta

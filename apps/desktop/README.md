@@ -9,10 +9,16 @@ pnpm --filter @jarvis/desktop start
 ```
 Si el Core no está corriendo, la app lo arranca con el runtime de Electron (`ELECTRON_RUN_AS_NODE=1`), desacoplado (ADR-008). Cerrar la ventana no apaga el Core.
 
+## Voz (Fase 2)
+- **Atajo global** `Ctrl+Shift+Space` (si está ocupado, `Ctrl+Alt+J`; se cambia con `JARVIS_PTT_SHORTCUT`). Electron solo avisa cuando se aprieta una tecla, no cuando se suelta, así que el atajo funciona como **interruptor**: la primera vez empieza a escuchar y la segunda termina. Apretarlo mientras Jarvis piensa o habla lo interrumpe (barge-in).
+- **«Mantené para hablar»** en la ventana: se habla mientras está apretado, como un walkie-talkie.
+- **Overlay:** una píldora chica, siempre visible, que no toma el foco ni los clics, abajo al centro de la pantalla. Muestra el estado (escuchando, transcribiendo, pensando, hablando). **El proceso principal decide cuándo se ve**: mientras el micrófono está abierto se muestra siempre, y nada en un renderer puede ocultarlo.
+- Los turnos de voz aparecen en la conversación como mensajes normales: lo que se entendió y la respuesta en streaming.
+
 ## Seguridad (ADR-002 / PRIVACY_AND_SECURITY)
 - `contextIsolation`, `sandbox` y sin `nodeIntegration`.
 - CSP estricta: solo recursos propios, sin conexiones de red desde el renderer.
-- El preload expone solo `send`, `onMessage` y `onStatus`.
+- El preload expone solo `send`, `onMessage`, `onStatus` y `onHotkey`.
 - El proceso principal **vuelve a validar** cada mensaje del renderer contra una lista permitida (`bridge.ts`). El renderer nunca puede mandar `auth.hello` ni `core.shutdown`.
 - Sin navegación ni ventanas nuevas. Los links `https` se abren en el navegador del sistema.
 - El token de sesión vive solo en el proceso principal.
@@ -27,5 +33,7 @@ Un panel de instrumentos sobrio:
 ## Prueba de humo (desarrollo)
 ```powershell
 electron apps/desktop --smoke-screenshot=C:\ruta\captura.png --smoke-open-first
+electron apps/desktop --smoke-screenshot=C:\ruta\app.png --smoke-overlay=C:\ruta\overlay.png
 ```
+`--smoke-overlay` captura el overlay con un estado simulado de micrófono abierto: el smoke nunca abre el micrófono real. No uses `Start-Process -Wait`: espera también al Core desacoplado y no vuelve nunca.
 Abre la app, carga los datos, abre la primera conversación, saca una captura y sale.

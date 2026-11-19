@@ -1,5 +1,6 @@
+import type { CoreMessage } from "@jarvis/shared";
 import { describe, expect, it } from "vitest";
-import { type State, budgetLevel, initialState, reduce } from "./state.js";
+import { type State, budgetLevel, initialState, pttPressed, reduce } from "./state.js";
 
 const usage = { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 };
 
@@ -75,5 +76,63 @@ describe("budgetLevel", () => {
     expect(budgetLevel({ spentTodayUsd: 1, dailyBudgetUsd: 3 })).toBe("ok");
     expect(budgetLevel({ spentTodayUsd: 2.4, dailyBudgetUsd: 3 })).toBe("warn");
     expect(budgetLevel({ spentTodayUsd: 3, dailyBudgetUsd: 3 })).toBe("over");
+  });
+});
+
+describe("voice", () => {
+  const core = (s: State, message: CoreMessage) => reduce(s, { kind: "core", message });
+
+  it("tracks the voice state and the microphone indicator", () => {
+    const s = core(initialState, { type: "voice.state", state: "listening", micOpen: true });
+    expect(s.voice).toEqual({ state: "listening", micOpen: true });
+    expect(core(s, { type: "voice.state", state: "idle", micOpen: false, detail: "sin micrófono" }).voice.detail).toBe("sin micrófono");
+  });
+
+  it("the shortcut toggles listening and interrupts otherwise", () => {
+    expect(pttPressed({ state: "idle", micOpen: false })).toBe(true);
+    expect(pttPressed({ state: "listening", micOpen: true })).toBe(false);
+    expect(pttPressed({ state: "speaking", micOpen: false })).toBe(true);
+  });
+
+  it("shows a spoken turn as a user message and streams the reply", () => {
+    let s = core({ ...initialState, activeId: "c1" }, { type: "voice.transcript", utteranceId: "u1", text: "¿Qué tengo hoy?" });
+    expect(s.streaming).toEqual({ requestId: "voice:u1", voice: true });
+    s = core(s, { type: "chat.started", id: "core-req", turnId: "t9", conversationId: "c1" });
+    s = core(s, { type: "chat.delta", turnId: "t9", text: "Nada." });
+    expect(s.messages.map((m) => [m.role, m.content])).toEqual([
+      ["user", "¿Qué tengo hoy?"],
+      ["assistant", "Nada."],
+    ]);
+    s = core(s, { type: "chat.done", turnId: "t9", stopReason: "end_turn", usage, costUsd: 0.01 });
+    expect(s.streaming).toBeUndefined();
+  });
+
+  it("switches to the conversation the voice turn went to", () => {
+    let s: State = { ...initialState, activeId: "old", messages: [{ role: "user", content: "viejo", interrupted: false, pending: false }] };
+    s = core(s, { type: "voice.transcript", utteranceId: "u1", text: "nuevo" });
+    s = core(s, { type: "chat.started", id: "r", turnId: "t", conversationId: "new" });
+    expect(s.activeId).toBe("new");
+    expect(s.messages.map((m) => m.content)).toEqual(["nuevo", ""]);
+  });
+
+  it("an error before the voice turn starts is shown and clears the placeholder", () => {
+    let s = core(initialState, { type: "voice.transcript", utteranceId: "u1", text: "hola" });
+    s = core(s, { type: "error", id: "core-req", code: "upstream_error", message: "No hay API key" });
+    expect(s.streaming).toBeUndefined();
+    expect(s.error).toBe("No hay API key");
+    expect(s.messages.map((m) => m.content)).toEqual(["hola"]);
+  });
+
+  it("a barge-in marks the spoken reply as cut", () => {
+    let s = core(initialState, { type: "voice.transcript", utteranceId: "u1", text: "hola" });
+    s = core(s, { type: "chat.started", id: "r", turnId: "t", conversationId: "c" });
+    s = core(s, { type: "chat.delta", turnId: "t", text: "Te cuento" });
+    s = core(s, { type: "error", id: "r", code: "cancelled", message: "respuesta cancelada" });
+    expect(s.messages.at(-1)).toMatchObject({ content: "Te cuento", interrupted: true, pending: false });
+  });
+
+  it("ignores a transcript while a typed turn is streaming", () => {
+    const s = streamTurn();
+    expect(core(s, { type: "voice.transcript", utteranceId: "u1", text: "x" })).toBe(s);
   });
 });

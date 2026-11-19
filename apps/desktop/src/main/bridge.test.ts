@@ -22,3 +22,21 @@ describe("parseRendererMessage", () => {
     expect(parseRendererMessage({ type: "chat.send", id: "1", text: "x", extra: 1 })).toBeUndefined();
   });
 });
+
+describe("voice from the renderer", () => {
+  it("allows push-to-talk and status queries", () => {
+    expect(parseRendererMessage({ type: "voice.ptt", id: "1", pressed: true, conversationId: "c" })).toBeDefined();
+    expect(parseRendererMessage({ type: "voice.status.get", id: "1" })).toBeDefined();
+    expect(parseRendererMessage({ type: "voice.ptt", id: "1", pressed: "yes" })).toBeUndefined();
+  });
+});
+
+describe("overlayVisible", () => {
+  it("is shown during a voice turn and always while the mic is open", async () => {
+    const { overlayVisible } = await import("./overlay.js");
+    expect(overlayVisible({ state: "idle", micOpen: false })).toBe(false);
+    expect(overlayVisible({ state: "unavailable", micOpen: false })).toBe(false);
+    expect(overlayVisible({ state: "speaking", micOpen: false })).toBe(true);
+    expect(overlayVisible({ state: "idle", micOpen: true })).toBe(true);
+  });
+});

@@ -371,6 +371,164 @@ button:disabled {
   border: 1px solid var(--amber);
 }
 
+/* ------------------------------------------------------------------ voice */
+
+.voice-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font: 500 13px var(--font-tech);
+}
+
+.voice-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.voice-chip.idle .voice-dot,
+.voice-chip.thinking .voice-dot,
+.voice-chip.transcribing .voice-dot,
+.voice-chip.speaking .voice-dot {
+  background: var(--signal);
+}
+
+/* The open microphone is always the loudest thing on screen (VOICE_PIPELINE §3). */
+.voice-chip.mic-open {
+  color: var(--ink);
+  border-color: var(--danger);
+}
+
+.voice-chip.mic-open .voice-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.voice-chip kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  font: 500 11px var(--font-tech);
+}
+
+.action.talk {
+  background: transparent;
+  color: var(--signal);
+  border: 1px solid var(--signal-dim);
+  touch-action: none;
+  user-select: none;
+}
+
+.action.talk.held {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+.action:disabled {
+  opacity: 0.45;
+}
+
+/* Overlay window: transparent page, one small pill. */
+html.is-overlay,
+html.is-overlay body {
+  background: transparent;
+  overflow: hidden;
+}
+
+.overlay {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  margin: 8px;
+  padding: 0 18px;
+  background: color-mix(in srgb, var(--rail) 92%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font: 600 14px var(--font-tech);
+}
+
+.overlay .mic {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--signal);
+}
+
+.overlay .mic.open {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.overlay-label {
+  flex: 1;
+}
+
+.bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+}
+
+.bars i {
+  width: 3px;
+  height: 4px;
+  border-radius: 1px;
+  background: var(--signal);
+}
+
+.overlay.speaking .bars i,
+.overlay.listening .bars i {
+  animation: bar 0.9s ease-in-out infinite;
+}
+
+.overlay.listening .bars i {
+  background: var(--danger);
+}
+
+.bars i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.bars i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.overlay.thinking .bars i,
+.overlay.transcribing .bars i {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes bar {
+  0%,
+  100% {
+    height: 4px;
+  }
+  50% {
+    height: 16px;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @media (max-width: 860px) {
   .shell {
     grid-template-columns: 1fr;
@@ -386,5 +544,8 @@ button:disabled {
   }
   .meter-fill {
     transition: none;
+  }
+  .bars i {
+    animation: none !important;
   }
 }
