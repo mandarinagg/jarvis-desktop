@@ -38,8 +38,8 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 
 **Exit:** uso diario por texto durante 1 semana; evals ≥ 80%; la clave no aparece en ningún log ni archivo.
 
-## Fase 2 — L1: Voz
-- Voice Service (Python 3.12 / uv) con IPC al Core
+## Fase 2 — L1: Voz (en curso)
+- [x] Voice Service (Python 3.12 / uv) como proceso hijo del Core: protocolo por stdio, supervisor con backoff y estado degradado (ADR-013)
 - Push-to-talk con atajo global + overlay de estado
 - STT streaming local; TTS por frases; barge-in
 - Métricas de latencia por turno

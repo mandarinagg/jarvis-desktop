@@ -166,7 +166,7 @@ export type CoreMessage = z.infer<typeof CoreMessage>;
 
 export type ParseResult<T> = { ok: true; message: T } | { ok: false; code: "invalid_json" | "invalid_message"; message: string };
 
-function parseWith<T>(schema: z.ZodType<T>, line: string): ParseResult<T> {
+export function parseWith<T>(schema: z.ZodType<T>, line: string): ParseResult<T> {
   let raw: unknown;
   try {
     raw = JSON.parse(line);

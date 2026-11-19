@@ -2,7 +2,19 @@
 
 Servicio de voz en Python 3.12 (gestionado con `uv`): AEC, wake word (openWakeWord), VAD (Silero), STT (whisper.cpp Vulkan), TTS intercambiable y barge-in.
 
-El servicio se implementa en la **Fase 2** (ver `docs/VOICE_PIPELINE.md`). Por ahora solo contiene diagnósticos de la Fase 0 (audio, STT y TTS).
+El servicio se implementa en la **Fase 2** (ver `docs/VOICE_PIPELINE.md` y ADR-013). También contiene los diagnósticos de la Fase 0 (audio, STT y TTS).
+
+## Servicio (Fase 2)
+El Core lo lanza como proceso hijo y le habla en JSON Lines por stdio:
+
+```powershell
+uv run --project services/voice --locked python -m jarvis_voice.service
+```
+
+- **stdout** lleva solo frames del protocolo (`src/jarvis_voice/protocol.py`, espejo de `packages/shared/src/voice-protocol.ts`). Los logs salen por **stderr** en JSON.
+- Si se cierra stdin, el servicio sale: nunca queda huérfano.
+- Para probarlo a mano: `{"type":"voice.configure","id":"c1","protocolVersion":"1.0"}` → `voice.ready`.
+- En el Core: `JARVIS_VOICE=0` desactiva la voz; `JARVIS_VOICE_DIR` y `JARVIS_UV` cambian las rutas.
 
 ## Requisitos
 - `uv` y **Python 3.12 oficial** (`py install 3.12`). El intérprete que descarga `uv` no está firmado y Smart App Control lo bloquea (ver `docs/TROUBLESHOOTING.md`).

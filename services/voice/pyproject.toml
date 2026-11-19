@@ -1,7 +1,7 @@
 [project]
 name = "jarvis-voice"
-version = "0.0.1"
-description = "JARVIS voice service (Phase 0: audio, STT and TTS diagnostics only)"
+version = "0.1.0"
+description = "JARVIS voice service (Phase 2: child process of the Core over stdio, plus Phase 0 diagnostics)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "numpy>=2.1",

@@ -17,3 +17,4 @@ Estados: **Propuesta** → **Aceptada** / **Rechazada** → (**Reemplazada por A
 | [010](adr/010-motor-stt-parakeet.md) | Motor de STT: Parakeet TDT 0.6B v3 (Vulkan); whisper turbo contexto completo como alternativo | Aceptada |
 | [011](adr/011-motor-tts-google-neural2.md) | Motor de TTS: Google Neural2 (nube) + Piper daniela como fallback offline; reemplaza la parte TTS de ADR-004 | Aceptada |
 | [012](adr/012-toolchain-del-monorepo.md) | Toolchain: TypeScript 6 estricto, ESLint 10 flat, Vitest 5, CI en windows-latest | Aceptada |
+| [013](adr/013-protocolo-de-voz-y-orquestacion.md) | Protocolo Core↔Voz (fixtures compartidos TS/Python), el Core orquesta el turno, secretos por stdio, push-to-talk primero | Aceptada |
