@@ -4,7 +4,15 @@
  */
 import { ClientMessage } from "@jarvis/shared";
 
-export const RENDERER_ALLOWED = ["chat.send", "chat.cancel", "conversations.list", "conversations.get", "budget.get"] as const;
+export const RENDERER_ALLOWED = [
+  "chat.send",
+  "chat.cancel",
+  "conversations.list",
+  "conversations.get",
+  "budget.get",
+  "voice.ptt",
+  "voice.status.get",
+] as const;
 
 export type RendererMessage = Extract<ClientMessage, { type: (typeof RENDERER_ALLOWED)[number] }>;
 

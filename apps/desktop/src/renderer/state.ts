@@ -1,5 +1,5 @@
 /** Pure chat state for the renderer: every Core message and UI action goes through `reduce`. */
-import type { ConversationSummary, CoreMessage } from "@jarvis/shared";
+import type { ConversationSummary, CoreMessage, VoiceStateName } from "@jarvis/shared";
 
 export interface UiMessage {
   role: "user" | "assistant";
@@ -14,8 +14,9 @@ export interface State {
   conversations: ConversationSummary[];
   activeId?: string;
   messages: UiMessage[];
-  /** Request in flight: set on send, gets its turnId on chat.started. */
-  streaming?: { requestId: string; turnId?: string };
+  /** Request in flight: set on send (or on voice.transcript for voice turns), gets its turnId on chat.started. */
+  streaming?: { requestId: string; turnId?: string; voice?: boolean };
+  voice: { state: VoiceStateName; micOpen: boolean; detail?: string };
   budget?: { spentTodayUsd: number; dailyBudgetUsd: number };
   lastTurnCostUsd?: number;
   error?: string;
@@ -29,7 +30,29 @@ export type Action =
   | { kind: "new" }
   | { kind: "dismissError" };
 
-export const initialState: State = { connected: false, conversations: [], messages: [] };
+export const initialState: State = {
+  connected: false,
+  conversations: [],
+  messages: [],
+  voice: { state: "unavailable", micOpen: false },
+};
+
+/**
+ * The global shortcut is a toggle (Electron only reports key presses, not releases): it stops
+ * listening if Jarvis is listening; otherwise it starts, which also interrupts a reply (barge-in).
+ */
+export function pttPressed(voice: State["voice"]): boolean {
+  return voice.state !== "listening";
+}
+
+export const VOICE_LABELS: Record<VoiceStateName, string> = {
+  unavailable: "Voz no disponible",
+  idle: "Listo",
+  listening: "Escuchando",
+  transcribing: "Transcribiendo",
+  thinking: "Pensando",
+  speaking: "Hablando",
+};
 
 const updateLastAssistant = (messages: UiMessage[], fn: (m: UiMessage) => UiMessage): UiMessage[] => {
   const i = messages.findLastIndex((m) => m.role === "assistant");
@@ -78,9 +101,33 @@ export function reduce(state: State, action: Action): State {
   }
 }
 
+/** A voice turn the Core started: its request id is unknown until chat.started arrives. */
+const awaitingVoiceTurn = (s: State) => s.streaming?.voice === true && s.streaming.turnId === undefined;
+
 function reduceCore(state: State, m: CoreMessage): State {
   switch (m.type) {
+    case "voice.state": {
+      const voice: State["voice"] = { state: m.state, micOpen: m.micOpen };
+      if (m.detail) voice.detail = m.detail;
+      return { ...state, voice };
+    }
+    case "voice.transcript":
+      if (state.streaming) return state; // a typed turn is in flight; the Core will reject the overlap
+      return {
+        ...state,
+        streaming: { requestId: `voice:${m.utteranceId}`, voice: true },
+        messages: [
+          ...state.messages,
+          { role: "user", content: m.text, interrupted: false, pending: false },
+          { role: "assistant", content: "", interrupted: false, pending: true },
+        ],
+      };
     case "chat.started":
+      if (awaitingVoiceTurn(state)) {
+        // Spoken into another conversation: show just this exchange until its history loads.
+        const messages = state.activeId && state.activeId !== m.conversationId ? state.messages.slice(-2) : state.messages;
+        return { ...state, messages, activeId: m.conversationId, streaming: { requestId: m.id, turnId: m.turnId, voice: true } };
+      }
       if (state.streaming?.requestId !== m.id) return state;
       return { ...state, activeId: m.conversationId, streaming: { requestId: m.id, turnId: m.turnId } };
     case "chat.delta":
@@ -98,7 +145,7 @@ function reduceCore(state: State, m: CoreMessage): State {
       return next;
     }
     case "error": {
-      if (!state.streaming || state.streaming.requestId !== m.id) {
+      if (!state.streaming || (state.streaming.requestId !== m.id && !(awaitingVoiceTurn(state) && m.id))) {
         return m.id ? state : { ...state, error: m.message };
       }
       const next: State = { ...state };

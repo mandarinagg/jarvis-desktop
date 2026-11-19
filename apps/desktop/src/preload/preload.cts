@@ -23,4 +23,10 @@ contextBridge.exposeInMainWorld("jarvis", {
   status(): Promise<unknown> {
     return ipcRenderer.invoke("jarvis:status");
   },
+  /** The global push-to-talk shortcut was pressed (the renderer decides start/stop). */
+  onHotkey(listener: () => void): () => void {
+    const wrapped = () => listener();
+    ipcRenderer.on("jarvis:hotkey", wrapped);
+    return () => ipcRenderer.off("jarvis:hotkey", wrapped);
+  },
 });
