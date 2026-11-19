@@ -24,7 +24,11 @@ ACKNOWLEDGEMENTS = (
     "Un segundo.",
     "Perfecto.",
     "Hecho.",
+    # Spoken by the Core's VoiceTurns (packages/core/src/voice/turns.ts, PHRASES): keep in sync.
     "No te escuché bien, ¿me lo repetís?",
+    "Llegué al tope de gasto de hoy. Seguimos mañana o subí el tope.",
+    "No pude hablar con Claude. Te dejé el detalle en pantalla.",
+    "Algo falló. Te dejé el detalle en pantalla.",
 )
 
 _SPACES = re.compile(r"\s+")

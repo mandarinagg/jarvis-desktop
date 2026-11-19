@@ -111,6 +111,8 @@ describe("schemas", () => {
       "conversations.list",
       "core.ping",
       "core.shutdown",
+      "voice.ptt",
+      "voice.status.get",
     ]);
   });
 });

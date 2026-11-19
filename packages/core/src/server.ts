@@ -11,6 +11,8 @@ import {
   type ConversationsGet,
   type ConversationsList,
   type ClientMessage,
+  type VoicePtt,
+  type VoiceStatusGet,
   type CoreMessage,
   FrameTooLargeError,
   LineDecoder,
@@ -42,6 +44,8 @@ export interface Handlers {
   conversationsList?(session: Session, message: ConversationsList): void;
   conversationsGet?(session: Session, message: ConversationsGet): void;
   budgetGet?(session: Session, message: BudgetGet): void;
+  voicePtt?(session: Session, message: VoicePtt): void;
+  voiceStatusGet?(session: Session, message: VoiceStatusGet): void;
   disconnected?(session: Session): void;
 }
 
@@ -60,6 +64,7 @@ type FailCode = "unauthenticated" | "incompatible_version" | "invalid_message";
 export class CoreServer {
   private readonly server: net.Server;
   private readonly sockets = new Set<net.Socket>();
+  private readonly sessions = new Set<Session>();
   private readonly handlers: Handlers;
   private readonly logger: Logger;
   private readonly authTimeoutMs: number;
@@ -96,6 +101,11 @@ export class CoreServer {
 
   get clientCount(): number {
     return this.sockets.size;
+  }
+
+  /** Sends to every authenticated client (voice state, voice turns streamed to all windows). */
+  broadcast(message: CoreMessage): void {
+    for (const s of this.sessions) s.send(message);
   }
 
   private accept(socket: net.Socket): void {
@@ -156,6 +166,7 @@ export class CoreServer {
           }
           clearTimeout(authTimer);
           session = { id: randomUUID(), client: hello.client, send: write, close: () => socket.end() };
+          this.sessions.add(session);
           log.log("info", "ipc.auth.ok", { session: session.id, client: hello.client });
           write({ type: "auth.ok", id: hello.id, coreVersion: this.options.coreVersion });
           continue;
@@ -173,7 +184,10 @@ export class CoreServer {
     socket.on("close", () => {
       clearTimeout(authTimer);
       this.sockets.delete(socket);
-      if (session) this.handlers.disconnected?.(session);
+      if (session) {
+        this.sessions.delete(session);
+        this.handlers.disconnected?.(session);
+      }
     });
   }
 
@@ -216,6 +230,10 @@ export class CoreServer {
           return this.query(session, message, h.conversationsGet);
         case "budget.get":
           return this.query(session, message, h.budgetGet);
+        case "voice.ptt":
+          return this.query(session, message, h.voicePtt);
+        case "voice.status.get":
+          return this.query(session, message, h.voiceStatusGet);
       }
     } catch (err) {
       this.logger.log("error", "ipc.handler_failed", {

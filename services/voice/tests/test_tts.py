@@ -302,3 +302,21 @@ def test_prewarm_fills_cache_and_stops_when_offline(tmp_path):
     p2, _, _ = make(offline, cache=PhraseCache(tmp_path, "other"))
     p2.prewarm(["a", "b", "c"]).join(2)
     assert len(offline.calls) == 1
+
+
+def test_end_marks_the_turn_finished_after_queued_phrases():
+    p, player, sent = make()
+    speak(p, 0, "Hola.")
+    p.end("t1")
+    p.wait_idle()
+    player.drain()
+    assert [m["type"] for m in sent] == ["tts.started", "tts.finished"]
+    assert sent[-1]["interrupted"] is False
+
+
+def test_end_without_phrases_still_finishes():
+    p, player, sent = make()
+    p.end("t9")
+    p.wait_idle()
+    player.drain()
+    assert sent == [{"type": "tts.finished", "turnId": "t9", "interrupted": False}]

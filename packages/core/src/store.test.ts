@@ -22,11 +22,11 @@ describe("openDatabase", () => {
   it("applies migrations once and uses WAL", () => {
     const file = tempDb();
     const db = openDatabase(file);
-    expect(schemaVersion(db)).toBe(1);
+    expect(schemaVersion(db)).toBe(2);
     expect(db.prepare("PRAGMA journal_mode").get()).toMatchObject({ journal_mode: "wal" });
     db.close();
     const again = openDatabase(file);
-    expect(schemaVersion(again)).toBe(1);
+    expect(schemaVersion(again)).toBe(2);
     again.close();
   });
 
@@ -83,5 +83,19 @@ describe("localDay", () => {
   it("uses the local calendar day, not UTC", () => {
     const d = new Date(2026, 10, 13, 23, 30); // 13 Nov, 23:30 local
     expect(localDay(d)).toBe("2026-11-13");
+  });
+});
+
+describe("markInterrupted", () => {
+  it("flags the assistant reply of a turn", () => {
+    const store = new ConversationStore(openDatabase(":memory:"));
+    const c = store.createConversation("hola");
+    store.appendMessage({ conversationId: c.id, turnId: "t1", role: "user", content: "hola" });
+    store.appendMessage({ conversationId: c.id, turnId: "t1", role: "assistant", content: "Hola. Te cuento..." });
+    store.markInterrupted("t1");
+    expect(store.messages(c.id).map((m) => [m.role, m.interrupted])).toEqual([
+      ["user", false],
+      ["assistant", true],
+    ]);
   });
 });

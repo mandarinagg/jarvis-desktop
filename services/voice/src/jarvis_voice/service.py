@@ -66,11 +66,13 @@ class VoiceService:
         elif kind == "voice.shutdown":
             log("info", "voice.shutdown")
             self.running = False
-        elif kind in ("tts.speak", "tts.cancel"):
+        elif kind in ("tts.speak", "tts.cancel", "tts.end"):
             if self.tts is None:
                 self.error("not_configured", "TTS is not configured", id_)
             elif kind == "tts.speak":
                 self.tts.speak(msg)
+            elif kind == "tts.end":
+                self.tts.end(msg["turnId"])
             else:
                 self.tts.cancel(msg["turnId"])
         elif kind in ("stt.start", "stt.stop", "stt.cancel"):

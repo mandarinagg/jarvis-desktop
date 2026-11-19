@@ -55,6 +55,23 @@ Primera medición real (2026-11-19, en frío, con el prewarm compitiendo por el 
 
 Los logs registran la duración y la latencia de cada frase, pero **nunca el texto transcripto**.
 
+## 2.3 Turno de voz (Fase 2, ADR-013)
+
+`packages/core/src/voice/turns.ts` orquesta el turno así:
+1. `voice.ptt` presionado → `stt.start`.
+2. `voice.ptt` suelto → `stt.stop`.
+3. `stt.final` → `voice.transcript` y `chat.send`, por una sesión virtual del `ChatService`.
+4. Cada `chat.delta` pasa por el segmentador y sale como `tts.speak`. `chat.done` → `tts.end`.
+5. `tts.finished` cierra el turno y registra las métricas.
+
+- El stream de Claude también llega a la UI como texto, por broadcast.
+- Sin conversación indicada, un turno nuevo sigue la última conversación de voz si pasaron menos de 10 minutos.
+- **Barge-in:** apretar el atajo mientras Jarvis piensa o habla cancela el stream de Claude y manda `tts.cancel`. Si el texto ya se había guardado entero, la respuesta queda marcada como interrumpida.
+- **Errores hablados:** frases cortas y presintetizadas (tope de gasto, falla de Claude). El detalle queda en pantalla.
+- **Métricas:** tabla `voice_turns` (migración 002), solo con tiempos y nunca con texto. Reporte: `node packages/core/dist/voice-stats.js`.
+
+Primera medición de punta a punta (2026-11-19, sin key de Anthropic, así que la respuesta fue la frase de error): STT 78 ms y **voz → primer audio en 1367 ms**.
+
 ## 3. Estados (visibles en overlay)
 
 `inactivo` → `escuchando` → `transcribiendo` → `pensando` → `hablando` → `inactivo`, más `muteado` y `error`.
