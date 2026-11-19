@@ -4,6 +4,7 @@
  * Owns the per-user named pipe (single instance), the SQLite database and the Claude adapter.
  */
 import { rm } from "node:fs/promises";
+import type { TtsConfig } from "@jarvis/shared";
 import path from "node:path";
 import { ChatService } from "./chat.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
@@ -36,6 +37,17 @@ function modelResolver(env: NodeJS.ProcessEnv): () => ChatModel | undefined {
   };
 }
 
+/** Neural2 when there is a Google key (ADR-011), otherwise the offline Piper voice. */
+function ttsResolver(env: NodeJS.ProcessEnv): () => TtsConfig {
+  const secrets = new KeyringSecretStore();
+  return () => {
+    const googleApiKey = secrets.get("google-tts-api-key") ?? env.JARVIS_GOOGLE_TTS_API_KEY;
+    return googleApiKey
+      ? { engine: "google", voice: env.JARVIS_TTS_VOICE || "es-US-Neural2-B", googleApiKey }
+      : { engine: "piper", voice: "es_AR-daniela-high" };
+  };
+}
+
 async function main(): Promise<number> {
   const env = process.env;
   const logger = createLogger();
@@ -54,7 +66,7 @@ async function main(): Promise<number> {
   });
 
   // Voice is on by default (Phase 2); JARVIS_VOICE=0 keeps the Core text-only.
-  const voice = env.JARVIS_VOICE === "0" ? undefined : new VoiceSupervisor({ spawn: createVoiceSpawner(env), logger });
+  const voice = env.JARVIS_VOICE === "0" ? undefined : new VoiceSupervisor({ spawn: createVoiceSpawner(env), tts: ttsResolver(env), logger });
 
   const stop = async (reason: string) => {
     logger.log("info", "core.stopping", { reason });

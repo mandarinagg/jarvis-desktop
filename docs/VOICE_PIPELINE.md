@@ -33,6 +33,18 @@ Altavoz ◀─ Reproductor ◀─ TTS por frase ◀─ Segmentador de frases ◀
 
 Técnicas: STT parcial mientras habla, prompt caching, TTS por frase (no esperar respuesta completa), pre-calentar conexiones, frases de acuse breves ("Dale, miro…") cuando un turno va a tardar.
 
+## 2.1 TTS implementado (Fase 2)
+
+| Pieza | Dónde | Detalle |
+|-------|-------|---------|
+| Segmentador | `packages/core/src/voice/segmenter.ts` | Corta en fin de oración y en saltos de línea. La primera frase puede cortarse en `, ; :` después de 30 caracteres, para que el primer audio salga antes. Ninguna frase pasa de 250 caracteres. Limpia el markdown y no lee los bloques de código |
+| Motores | `services/voice/src/jarvis_voice/tts/engines.py` | Neural2 por gRPC con deadline de 2.5 s. Piper como proceso aparte (`python -m piper --output-raw`), por la licencia GPL |
+| Pipeline | `tts/pipeline.py` | Caché → motor principal (un reintento) → fallback. Un hilo sintetiza en orden mientras suena la frase anterior |
+| Caché | `tts/cache.py` | `%APPDATA%/Jarvis/cache/tts/<motor-voz>/`, frases de hasta 80 caracteres. Al configurar se presintetizan 8 acuses |
+| Reproductor | `tts/player.py` | Stream de 24 kHz siempre abierto, en bloques de 20 ms. `tts.cancel` corta con un fade de 30 ms |
+
+Primera medición real (2026-11-19, en frío, con el prewarm compitiendo por el canal): la primera frase arrancó a los 1.8 s y la segunda empalmó sin hueco. Piper genera 2.5 s de audio en 1.7 s, carga del modelo incluida.
+
 ## 3. Estados (visibles en overlay)
 
 `inactivo` → `escuchando` → `transcribiendo` → `pensando` → `hablando` → `inactivo`, más `muteado` y `error`.

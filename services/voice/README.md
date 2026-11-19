@@ -13,6 +13,7 @@ uv run --project services/voice --locked python -m jarvis_voice.service
 
 - **stdout** lleva solo frames del protocolo (`src/jarvis_voice/protocol.py`, espejo de `packages/shared/src/voice-protocol.ts`). Los logs salen por **stderr** en JSON.
 - Si se cierra stdin, el servicio sale: nunca queda huérfano.
+- **TTS** (`src/jarvis_voice/tts/`): con `tts` en `voice.configure`, el servicio acepta `tts.speak` y `tts.cancel` y emite `tts.started` y `tts.finished`. La key de Google llega del Core, que la lee del Credential Manager (`google-tts-api-key`). Sin key, usa Piper `es_AR-daniela-high`.
 - Para probarlo a mano: `{"type":"voice.configure","id":"c1","protocolVersion":"1.0"}` → `voice.ready`.
 - En el Core: `JARVIS_VOICE=0` desactiva la voz; `JARVIS_VOICE_DIR` y `JARVIS_UV` cambian las rutas.
 

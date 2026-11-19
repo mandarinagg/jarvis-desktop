@@ -4,12 +4,15 @@ version = "0.1.0"
 description = "JARVIS voice service (Phase 2: child process of the Core over stdio, plus Phase 0 diagnostics)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "google-cloud-texttospeech>=2.38.0",
     "numpy>=2.1",
     "sounddevice>=0.5",
 ]
 
 [dependency-groups]
 dev = ["pytest>=8"]
+# Offline TTS fallback. GPL-3.0: only ever run as a separate process (`python -m piper`, ADR-011).
+tts-offline = ["piper-tts>=1.8.0"]
 tts-bench = [
     "google-cloud-texttospeech>=2.38.0",
     "kokoro-onnx>=0.6.1",
@@ -32,6 +35,7 @@ packages = ["src/jarvis_voice"]
 # Smart App Control blocks uv's unsigned managed interpreters; use the
 # PSF-signed Python from the official installer (`py install 3.12`).
 python-preference = "only-system"
+default-groups = ["dev", "tts-offline"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

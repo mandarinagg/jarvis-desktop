@@ -45,7 +45,7 @@
 - **Electron oculto no se repinta:** el modo smoke usa `showInactive()` para que `capturePage` funcione.
 - **SDK 1.x** autentica con `Authorization: Bearer` y no con `x-api-key`. Tenelo en cuenta en los mocks.
 - **pnpm 10:** los argumentos se pasan sin `--` (`pnpm --filter @jarvis/evals eval --dry-run`).
-- **Credenciales:** la API key de Google TTS está en la variable de usuario `JARVIS_GOOGLE_TTS_API_KEY`. Hay que migrarla al Credential Manager (`google-tts-api-key`) en la Fase 2.
+- **Credenciales:** la API key de Google TTS ya está en el Credential Manager (`google-tts-api-key`, migrada el 2026-11-19). La variable de usuario `JARVIS_GOOGLE_TTS_API_KEY` sigue existiendo como fallback de desarrollo y el owner puede borrarla.
 
 ## Cómo verificar el estado
 ```powershell

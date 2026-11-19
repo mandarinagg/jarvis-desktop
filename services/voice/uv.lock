@@ -303,7 +303,9 @@ wheels = [
 name = "jarvis-voice"
 version = "0.1.0"
 source = { editable = "." }
+default-groups = ["dev", "tts-offline"]
 dependencies = [
+    { name = "google-cloud-texttospeech" },
     { name = "numpy" },
     { name = "sounddevice" },
 ]
@@ -317,9 +319,13 @@ tts-bench = [
     { name = "kokoro-onnx" },
     { name = "piper-tts" },
 ]
+tts-offline = [
+    { name = "piper-tts" },
+]
 
 [package.metadata]
 requires-dist = [
+    { name = "google-cloud-texttospeech", specifier = ">=2.38.0" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "sounddevice", specifier = ">=0.5" },
 ]
@@ -331,6 +337,7 @@ tts-bench = [
     { name = "kokoro-onnx", specifier = ">=0.6.1" },
     { name = "piper-tts", specifier = ">=1.8.0" },
 ]
+tts-offline = [{ name = "piper-tts", specifier = ">=1.8.0" }]
 
 [[package]]
 name = "joblib"
