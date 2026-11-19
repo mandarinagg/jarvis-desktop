@@ -70,7 +70,9 @@
 8. Fin de turno              ──▶ Audit Log + memoria episódica + costo
 ```
 
-## 4. Contratos de IPC (borrador)
+## 4. Contratos de IPC
+
+> Voz: esquema formal en `packages/shared/src/voice-protocol.ts` (ADR-013), verificado contra fixtures compartidos con Python. Los ejemplos de abajo son el diseño de los mensajes que se agregan durante la Fase 2.
 
 Mensajes JSON con `type`, `id`, `ts`. Ejemplos:
 

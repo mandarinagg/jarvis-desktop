@@ -15,6 +15,8 @@ import { KeyringSecretStore } from "./secrets.js";
 import { AlreadyRunningError, CoreServer } from "./server.js";
 import { ConversationStore } from "./store.js";
 import { newSessionToken, writeSessionToken } from "./token.js";
+import { createVoiceSpawner } from "./voice/spawn.js";
+import { VoiceSupervisor } from "./voice/supervisor.js";
 
 export const CORE_VERSION = "0.1.0";
 const EFFORTS: readonly Effort[] = ["low", "medium", "high", "xhigh", "max"];
@@ -51,9 +53,13 @@ async function main(): Promise<number> {
     logger,
   });
 
+  // Voice is on by default (Phase 2); JARVIS_VOICE=0 keeps the Core text-only.
+  const voice = env.JARVIS_VOICE === "0" ? undefined : new VoiceSupervisor({ spawn: createVoiceSpawner(env), logger });
+
   const stop = async (reason: string) => {
     logger.log("info", "core.stopping", { reason });
     chat.cancelAll();
+    await voice?.stop();
     await server.close();
     db.close();
     await rm(tokenPath(home), { force: true });
@@ -88,6 +94,7 @@ async function main(): Promise<number> {
   // The token is written only after we own the pipe, so a second instance never overwrites it.
   await writeSessionToken(tokenPath(home), token);
   logger.log("info", "core.ready", { pipe, version: CORE_VERSION, dailyBudgetUsd: budget });
+  voice?.start();
 
   process.on("SIGINT", () => void stop("SIGINT"));
   process.on("SIGTERM", () => void stop("SIGTERM"));

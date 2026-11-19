@@ -1,0 +1,32 @@
+{
+  "toVoice": {
+    "valid": [
+      { "type": "voice.configure", "id": "c1", "protocolVersion": "1.0" },
+      { "type": "voice.ping", "id": "p1" },
+      { "type": "voice.shutdown", "id": "s1" }
+    ],
+    "invalid": [
+      { "type": "voice.ping" },
+      { "type": "voice.ping", "id": "" },
+      { "type": "voice.ping", "id": "p1", "extra": true },
+      { "type": "voice.configure", "id": "c1" },
+      { "type": "voice.unknown", "id": "x" },
+      { "id": "x" },
+      []
+    ]
+  },
+  "fromVoice": {
+    "valid": [
+      { "type": "voice.ready", "id": "c1", "protocolVersion": "1.0", "serviceVersion": "0.1.0" },
+      { "type": "voice.pong", "id": "p1" },
+      { "type": "voice.error", "code": "invalid_json", "message": "bad line" },
+      { "type": "voice.error", "id": "c1", "code": "incompatible_version", "message": "need 1.x" }
+    ],
+    "invalid": [
+      { "type": "voice.ready", "id": "c1", "protocolVersion": "1.0" },
+      { "type": "voice.error", "code": "nope", "message": "x" },
+      { "type": "voice.pong", "id": 3 },
+      { "type": "voice.error", "code": "internal", "message": "x", "stack": "y" }
+    ]
+  }
+}
