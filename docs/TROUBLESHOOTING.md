@@ -10,6 +10,9 @@ Se completa a medida que aparecen problemas reales. Formato: **Síntoma → Caus
 - **`uv` falla con "Una directiva de Control de aplicaciones bloqueó este archivo" (os error 4551)** → Smart App Control bloquea los intérpretes sin firmar que descarga `uv` → Instalar el Python 3.12 firmado de la PSF (`py install 3.12`) y borrar `.venv`; `services/voice/pyproject.toml` ya fija `python-preference = "only-system"`.
 - **`uv run jarvis-tts-bench` falla con os error 4551** → Smart App Control bloquea el lanzador `.exe` que `uv` acaba de generar para el script (cada uno es un binario distinto, sin reputación) → Correrlo con el intérprete firmado: `uv run --group tts-bench python -m jarvis_voice.diagnostics.tts_bench …`.
 - **STT lento** → whisper.cpp corriendo en CPU (no aparece `ggml_vulkan: Found 1 Vulkan devices`) → Verificar que `ggml-vulkan.dll` esté junto a `whisper-cli.exe` (`jarvis-stt-bench setup`) y los drivers AMD.
+- **El fallback de Piper falla con `AttributeError: 'Wave_write' object has no attribute '_file'`** → `python -m piper -f -` reabre por nombre un `NamedTemporaryFile`, y Windows no lo permite → Usar `--output-raw` (PCM16 crudo) y tomar la frecuencia de muestreo del `.onnx.json` del modelo. Así lo hace `PiperEngine`.
+- **Piper habla solo por los parlantes en vez de devolver audio** → Sin `-f` ni `--output-raw`, la CLI de Piper reproduce el audio ella misma → Pasar siempre `--output-raw`.
+- **La voz queda `degradado` al arrancar el Core** → No se encontró `uv`, o el servicio se cayó 5 veces en 10 minutos → Ver los eventos `voice.*` en el log del Core. Para probar el servicio a mano: `uv run --project services/voice --locked python -m jarvis_voice.service`. `JARVIS_VOICE=0` deja solo el texto.
 - **Whisper repite la misma frase 2–4 veces** → `audio_ctx` demasiado chico (≤ 384) → Usar un piso de 512 (ADR-009).
 
 ## API

@@ -10,6 +10,7 @@ import {
   type FromVoiceMessage,
   LineDecoder,
   type ToVoiceMessage,
+  type TtsConfig,
   VOICE_PROTOCOL_VERSION,
   encodeLine,
   isCompatibleVersion,
@@ -34,6 +35,8 @@ export type VoiceSpawner = () => VoiceChild;
 
 export interface VoiceSupervisorOptions {
   spawn: VoiceSpawner;
+  /** Read on every (re)start, so a key stored while the Core runs is picked up on the next launch. */
+  tts?: () => TtsConfig | undefined;
   logger?: Logger;
   onState?: (state: VoiceState, detail?: string) => void;
   onMessage?: (message: FromVoiceMessage) => void;
@@ -180,7 +183,13 @@ export class VoiceSupervisor {
       this.crashed();
     });
 
-    this.write(child, { type: "voice.configure", id: configureId, protocolVersion: VOICE_PROTOCOL_VERSION });
+    const tts = this.opts.tts?.();
+    this.write(child, {
+      type: "voice.configure",
+      id: configureId,
+      protocolVersion: VOICE_PROTOCOL_VERSION,
+      ...(tts ? { tts } : {}),
+    });
   }
 
   private receive(child: VoiceChild, line: string, configureId: string, handshake: NodeJS.Timeout): void {

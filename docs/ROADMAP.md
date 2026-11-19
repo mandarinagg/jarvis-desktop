@@ -40,8 +40,9 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 
 ## Fase 2 — L1: Voz (en curso)
 - [x] Voice Service (Python 3.12 / uv) como proceso hijo del Core: protocolo por stdio, supervisor con backoff y estado degradado (ADR-013)
+- [x] TTS por frases: segmentador en el Core, Neural2 con timeout de 2.5 s y reintento, fallback a Piper, caché de acuses, síntesis superpuesta y corte con fade de 30 ms (ADR-011)
 - Push-to-talk con atajo global + overlay de estado
-- STT streaming local; TTS por frases; barge-in
+- STT local (Parakeet); barge-in
 - Métricas de latencia por turno
 
 **Exit:** p50 voz→primer audio < 2.0 s; barge-in < 300 ms; 20 conversaciones reales sin fallos bloqueantes.

@@ -55,3 +55,58 @@ def test_oversized_frame_is_skipped():
 
 def test_stdin_eof_exits_cleanly():
     assert run() == (0, [])
+
+
+class FakeTts:
+    def __init__(self):
+        self.spoken, self.cancelled, self.closed = [], [], False
+
+    def speak(self, msg):
+        self.spoken.append(msg["text"])
+
+    def cancel(self, turn_id):
+        self.cancelled.append(turn_id)
+
+    def close(self):
+        self.closed = True
+
+
+def test_tts_messages_need_tts_configured():
+    _, out = run(
+        line({"type": "voice.configure", "id": "c1", "protocolVersion": "1.0"}),
+        line({"type": "tts.speak", "id": "s1", "turnId": "t", "seq": 0, "text": "Hola.", "final": True}),
+    )
+    assert out[1] == {"type": "voice.error", "id": "s1", "code": "not_configured", "message": "TTS is not configured"}
+
+
+def test_tts_messages_are_routed_to_the_pipeline():
+    from jarvis_voice.service import VoiceService
+
+    fake, configs, sent = FakeTts(), [], []
+
+    def factory(cfg, send):
+        configs.append(cfg)
+        return fake
+
+    svc = VoiceService(sent.append, tts_factory=factory)
+    tts = {"engine": "google", "voice": "es-US-Neural2-B", "googleApiKey": "k"}
+    svc.handle({"type": "voice.configure", "id": "c1", "protocolVersion": "1.0", "tts": tts})
+    svc.handle({"type": "tts.speak", "id": "s1", "turnId": "t", "seq": 0, "text": "Hola.", "final": False})
+    svc.handle({"type": "tts.cancel", "id": "x1", "turnId": "t"})
+    svc.close()
+    assert configs == [tts]
+    assert fake.spoken == ["Hola."] and fake.cancelled == ["t"] and fake.closed
+    assert sent[0]["type"] == "voice.ready"
+
+
+def test_tts_factory_failure_keeps_the_service_up():
+    from jarvis_voice.service import VoiceService
+
+    def factory(cfg, send):
+        raise FileNotFoundError("no model")
+
+    sent = []
+    svc = VoiceService(sent.append, tts_factory=factory)
+    svc.handle({"type": "voice.configure", "id": "c1", "protocolVersion": "1.0", "tts": {"engine": "piper", "voice": "v"}})
+    assert [m["type"] for m in sent] == ["voice.error", "voice.ready"]
+    assert sent[0]["code"] == "tts_failed" and svc.tts is None

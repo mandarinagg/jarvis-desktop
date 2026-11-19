@@ -27,7 +27,21 @@ def _enum(*values: str) -> Check:
     return lambda v: isinstance(v, str) and v in values
 
 
+def _int(min_v: int, max_v: int) -> Check:
+    # bool is a subclass of int in Python; JSON true must not pass as 1.
+    return lambda v: isinstance(v, int) and not isinstance(v, bool) and min_v <= v <= max_v
+
+
+def _bool(v: Any) -> bool:
+    return isinstance(v, bool)
+
+
+def _nonneg_number(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0
+
+
 _ID = _str(1, 64)
+_SEQ = _int(0, 10_000)
 
 
 @dataclass(frozen=True)
@@ -36,18 +50,40 @@ class Schema:
     optional: dict[str, Check]
 
 
+def _object(schema: Schema) -> Check:
+    def check(v: Any) -> bool:
+        try:
+            _check_fields(v, schema)
+        except ProtocolError:
+            return False
+        return True
+
+    return check
+
+
+TTS_CONFIG = Schema(
+    {"engine": _enum("google", "piper"), "voice": _str(1, 64)},
+    {"googleApiKey": _str(1, 256)},
+)
+
 TO_VOICE: dict[str, Schema] = {
-    "voice.configure": Schema({"id": _ID, "protocolVersion": _str(0, 16)}, {}),
+    "voice.configure": Schema({"id": _ID, "protocolVersion": _str(0, 16)}, {"tts": _object(TTS_CONFIG)}),
     "voice.ping": Schema({"id": _ID}, {}),
     "voice.shutdown": Schema({"id": _ID}, {}),
+    "tts.speak": Schema({"id": _ID, "turnId": _ID, "seq": _SEQ, "text": _str(1, 2000), "final": _bool}, {}),
+    "tts.cancel": Schema({"id": _ID, "turnId": _ID}, {}),
 }
 
-ERROR_CODES = ("invalid_json", "invalid_message", "incompatible_version", "not_configured", "internal")
+ERROR_CODES = ("invalid_json", "invalid_message", "incompatible_version", "not_configured", "tts_failed", "internal")
 
 FROM_VOICE: dict[str, Schema] = {
     "voice.ready": Schema({"id": _ID, "protocolVersion": _str(0, 16), "serviceVersion": _str(0, 32)}, {}),
     "voice.pong": Schema({"id": _ID}, {}),
     "voice.error": Schema({"code": _enum(*ERROR_CODES), "message": _str(0, 2000)}, {"id": _ID}),
+    "tts.started": Schema(
+        {"turnId": _ID, "seq": _SEQ, "engine": _enum("google", "piper", "cache"), "latencyMs": _nonneg_number}, {}
+    ),
+    "tts.finished": Schema({"turnId": _ID, "interrupted": _bool}, {}),
 }
 
 
@@ -65,7 +101,14 @@ def validate(raw: Any, schemas: dict[str, Schema]) -> dict[str, Any]:
     schema = schemas.get(kind) if isinstance(kind, str) else None
     if schema is None:
         raise ProtocolError("invalid_message", "type: unknown message type")
-    allowed = {"type", *schema.required, *schema.optional}
+    _check_fields(raw, schema, extra_allowed={"type"})
+    return raw
+
+
+def _check_fields(raw: Any, schema: Schema, extra_allowed: set[str] | frozenset[str] = frozenset()) -> None:
+    if not isinstance(raw, dict):
+        raise ProtocolError("invalid_message", "(root): expected object")
+    allowed = {*extra_allowed, *schema.required, *schema.optional}
     extra = sorted(set(raw) - allowed)
     if extra:
         raise ProtocolError("invalid_message", f"(root): unrecognized keys {extra}")
@@ -75,7 +118,6 @@ def validate(raw: Any, schemas: dict[str, Schema]) -> dict[str, Any]:
     for name, check in schema.optional.items():
         if name in raw and not check(raw[name]):
             raise ProtocolError("invalid_message", f"{name}: invalid")
-    return raw
 
 
 def parse_line(line: str | bytes, schemas: dict[str, Schema]) -> dict[str, Any]:

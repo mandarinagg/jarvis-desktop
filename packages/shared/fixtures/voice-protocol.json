@@ -1,32 +1,260 @@
 {
   "toVoice": {
     "valid": [
-      { "type": "voice.configure", "id": "c1", "protocolVersion": "1.0" },
-      { "type": "voice.ping", "id": "p1" },
-      { "type": "voice.shutdown", "id": "s1" }
+      {
+        "type": "voice.configure",
+        "id": "c1",
+        "protocolVersion": "1.0"
+      },
+      {
+        "type": "voice.ping",
+        "id": "p1"
+      },
+      {
+        "type": "voice.shutdown",
+        "id": "s1"
+      },
+      {
+        "type": "voice.configure",
+        "id": "c2",
+        "protocolVersion": "1.0",
+        "tts": {
+          "engine": "google",
+          "voice": "es-US-Neural2-B",
+          "googleApiKey": "k"
+        }
+      },
+      {
+        "type": "voice.configure",
+        "id": "c3",
+        "protocolVersion": "1.0",
+        "tts": {
+          "engine": "piper",
+          "voice": "es_AR-daniela-high"
+        }
+      },
+      {
+        "type": "tts.speak",
+        "id": "s1",
+        "turnId": "t1",
+        "seq": 0,
+        "text": "Hola.",
+        "final": false
+      },
+      {
+        "type": "tts.speak",
+        "id": "s2",
+        "turnId": "t1",
+        "seq": 1,
+        "text": "Listo.",
+        "final": true
+      },
+      {
+        "type": "tts.cancel",
+        "id": "x1",
+        "turnId": "t1"
+      }
     ],
     "invalid": [
-      { "type": "voice.ping" },
-      { "type": "voice.ping", "id": "" },
-      { "type": "voice.ping", "id": "p1", "extra": true },
-      { "type": "voice.configure", "id": "c1" },
-      { "type": "voice.unknown", "id": "x" },
-      { "id": "x" },
-      []
+      {
+        "type": "voice.ping"
+      },
+      {
+        "type": "voice.ping",
+        "id": ""
+      },
+      {
+        "type": "voice.ping",
+        "id": "p1",
+        "extra": true
+      },
+      {
+        "type": "voice.configure",
+        "id": "c1"
+      },
+      {
+        "type": "voice.unknown",
+        "id": "x"
+      },
+      {
+        "id": "x"
+      },
+      [],
+      {
+        "type": "voice.configure",
+        "id": "c2",
+        "protocolVersion": "1.0",
+        "tts": {
+          "engine": "azure",
+          "voice": "v"
+        }
+      },
+      {
+        "type": "voice.configure",
+        "id": "c2",
+        "protocolVersion": "1.0",
+        "tts": {
+          "engine": "google"
+        }
+      },
+      {
+        "type": "voice.configure",
+        "id": "c2",
+        "protocolVersion": "1.0",
+        "tts": {
+          "engine": "google",
+          "voice": "v",
+          "extra": 1
+        }
+      },
+      {
+        "type": "voice.configure",
+        "id": "c2",
+        "protocolVersion": "1.0",
+        "tts": "google"
+      },
+      {
+        "type": "tts.speak",
+        "id": "s1",
+        "turnId": "t1",
+        "seq": -1,
+        "text": "Hola.",
+        "final": false
+      },
+      {
+        "type": "tts.speak",
+        "id": "s1",
+        "turnId": "t1",
+        "seq": 1.5,
+        "text": "Hola.",
+        "final": false
+      },
+      {
+        "type": "tts.speak",
+        "id": "s1",
+        "turnId": "t1",
+        "seq": 0,
+        "text": "",
+        "final": false
+      },
+      {
+        "type": "tts.speak",
+        "id": "s1",
+        "turnId": "t1",
+        "seq": 0,
+        "text": "Hola.",
+        "final": 1
+      },
+      {
+        "type": "tts.speak",
+        "id": "s1",
+        "turnId": "t1",
+        "seq": true,
+        "text": "Hola.",
+        "final": false
+      },
+      {
+        "type": "tts.speak",
+        "id": "s1",
+        "turnId": "t1",
+        "seq": 0,
+        "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "final": false
+      },
+      {
+        "type": "tts.cancel",
+        "id": "x1"
+      }
     ]
   },
   "fromVoice": {
     "valid": [
-      { "type": "voice.ready", "id": "c1", "protocolVersion": "1.0", "serviceVersion": "0.1.0" },
-      { "type": "voice.pong", "id": "p1" },
-      { "type": "voice.error", "code": "invalid_json", "message": "bad line" },
-      { "type": "voice.error", "id": "c1", "code": "incompatible_version", "message": "need 1.x" }
+      {
+        "type": "voice.ready",
+        "id": "c1",
+        "protocolVersion": "1.0",
+        "serviceVersion": "0.1.0"
+      },
+      {
+        "type": "voice.pong",
+        "id": "p1"
+      },
+      {
+        "type": "voice.error",
+        "code": "invalid_json",
+        "message": "bad line"
+      },
+      {
+        "type": "voice.error",
+        "id": "c1",
+        "code": "incompatible_version",
+        "message": "need 1.x"
+      },
+      {
+        "type": "tts.started",
+        "turnId": "t1",
+        "seq": 0,
+        "engine": "google",
+        "latencyMs": 1180.5
+      },
+      {
+        "type": "tts.started",
+        "turnId": "t1",
+        "seq": 1,
+        "engine": "cache",
+        "latencyMs": 0
+      },
+      {
+        "type": "tts.finished",
+        "turnId": "t1",
+        "interrupted": true
+      },
+      {
+        "type": "voice.error",
+        "id": "s1",
+        "code": "tts_failed",
+        "message": "timeout"
+      }
     ],
     "invalid": [
-      { "type": "voice.ready", "id": "c1", "protocolVersion": "1.0" },
-      { "type": "voice.error", "code": "nope", "message": "x" },
-      { "type": "voice.pong", "id": 3 },
-      { "type": "voice.error", "code": "internal", "message": "x", "stack": "y" }
+      {
+        "type": "voice.ready",
+        "id": "c1",
+        "protocolVersion": "1.0"
+      },
+      {
+        "type": "voice.error",
+        "code": "nope",
+        "message": "x"
+      },
+      {
+        "type": "voice.pong",
+        "id": 3
+      },
+      {
+        "type": "voice.error",
+        "code": "internal",
+        "message": "x",
+        "stack": "y"
+      },
+      {
+        "type": "tts.started",
+        "turnId": "t1",
+        "seq": 0,
+        "engine": "google",
+        "latencyMs": -1
+      },
+      {
+        "type": "tts.started",
+        "turnId": "t1",
+        "seq": 0,
+        "engine": "kokoro",
+        "latencyMs": 1
+      },
+      {
+        "type": "tts.finished",
+        "turnId": "t1"
+      }
     ]
   }
 }

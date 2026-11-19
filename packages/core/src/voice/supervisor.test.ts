@@ -76,6 +76,17 @@ describe("VoiceSupervisor", () => {
     expect(states).toEqual(["starting", "ready"]);
   });
 
+  it("includes the TTS config, read on every launch", async () => {
+    let key = "k1";
+    const { sup, child } = setup({ tts: () => ({ engine: "google", voice: "es-US-Neural2-B", googleApiKey: key }) });
+    sup.start();
+    expect(child(0).received[0]).toMatchObject({ tts: { engine: "google", googleApiKey: "k1" } });
+    key = "k2";
+    child(0).exit(1);
+    vi.advanceTimersByTime(1_000);
+    expect(child(1).received[0]).toMatchObject({ tts: { googleApiKey: "k2" } });
+  });
+
   it("only sends messages once ready", async () => {
     const { sup, child } = setup();
     sup.start();
