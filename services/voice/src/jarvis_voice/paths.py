@@ -27,6 +27,11 @@ def parakeet_model() -> Path:
     return jarvis_home() / "models" / "parakeet" / "ggml-parakeet-tdt-0.6b-v3-q8_0.bin"
 
 
+def vad_model() -> Path:
+    """Silero VAD v5 (MIT), from snakers4/silero-vad v5.1.2 (sha256 2623a2953f6f...788f)."""
+    return jarvis_home() / "models" / "vad" / "silero_vad.onnx"
+
+
 def stt_vocabulary() -> Path:
     return jarvis_home() / "stt" / "vocabulary.txt"
 

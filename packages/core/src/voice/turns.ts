@@ -5,6 +5,8 @@
  * emits is broadcast to the UI (so the reply also shows up as text) and its deltas are cut into
  * phrases for the voice service. Pressing push-to-talk while Jarvis thinks or speaks interrupts
  * it (barge-in): the Claude stream and the audio are cancelled and a new utterance starts.
+ * With `vadBargeIn` the voice service also watches the mic while Jarvis speaks (ADR-016): talking
+ * over him (vad.speech) interrupts him the same way, and the VAD ends that utterance on silence.
  */
 import { randomUUID } from "node:crypto";
 import type {
@@ -52,6 +54,8 @@ export interface VoiceTurnsOptions {
   now?: () => number;
   /** A new utterance without conversationId continues the last voice conversation within this window. */
   continueWithinMs?: number;
+  /** Barge-in by voice: watch the mic (VAD) while Jarvis speaks. Off = only push-to-talk interrupts. */
+  vadBargeIn?: boolean;
 }
 
 interface Utterance {
@@ -87,6 +91,8 @@ export class VoiceTurns {
   private current: Turn | undefined;
   private readonly turns = new Map<string, Turn>();
   private lastConversation: { id: string; at: number } | undefined;
+  /** VAD watch while a turn is spoken: `id` becomes the utterance if the owner talks over Jarvis. */
+  private armed: { id: string; turnId: string } | undefined;
   private readonly logger: Logger;
   private readonly now: () => number;
 
@@ -108,6 +114,7 @@ export class VoiceTurns {
     }
     this.utterance = undefined;
     this.current = undefined;
+    this.armed = undefined;
     this.turns.clear();
     this.micOpen = false;
     this.setPhase("unavailable", state === "degraded" ? (detail ?? "la voz no está disponible") : undefined);
@@ -128,9 +135,20 @@ export class VoiceTurns {
 
   onVoiceMessage(msg: FromVoiceMessage): void {
     switch (msg.type) {
-      case "stt.listening":
+      case "stt.listening": {
         this.micOpen = msg.open;
+        const u = this.utterance;
+        if (!msg.open && u?.id === msg.id && u.releasedAt === undefined) {
+          // The VAD closed the utterance on silence: same as releasing push-to-talk.
+          u.releasedAt = this.now();
+          this.setPhase("transcribing");
+          return;
+        }
         this.broadcastState();
+        return;
+      }
+      case "vad.speech":
+        this.vadSpeech(msg.id);
         return;
       case "stt.final":
         this.sttFinal(msg.id, msg.text, msg.audioMs, msg.sttMs);
@@ -142,7 +160,10 @@ export class VoiceTurns {
           turn.firstAudioAt = this.now();
           turn.engine = msg.engine;
         }
-        if (turn === this.current) this.setPhase("speaking");
+        if (turn === this.current) {
+          this.setPhase("speaking");
+          this.arm(turn);
+        }
         return;
       }
       case "tts.finished":
@@ -164,6 +185,7 @@ export class VoiceTurns {
 
   private pressed(conversationId: string | undefined): void {
     if (this.utterance && this.utterance.releasedAt === undefined) return; // key repeat
+    this.disarm();
     if (this.current) this.bargeIn(this.current);
     this.utterance = { id: randomUUID(), conversationId };
     this.voice({ type: "stt.start", id: this.utterance.id });
@@ -176,6 +198,32 @@ export class VoiceTurns {
     u.releasedAt = this.now();
     this.voice({ type: "stt.stop", id: u.id });
     this.setPhase("transcribing");
+  }
+
+  private arm(turn: Turn): void {
+    if (!this.opts.vadBargeIn || this.armed || this.utterance) return;
+    this.armed = { id: randomUUID(), turnId: turn.id };
+    this.voice({ type: "vad.arm", id: this.armed.id });
+  }
+
+  private disarm(): void {
+    if (!this.armed) return;
+    this.voice({ type: "vad.disarm", id: this.armed.id });
+    this.armed = undefined;
+  }
+
+  /** The owner talked over Jarvis: interrupt him and let the VAD capture the new utterance. */
+  private vadSpeech(id: string): void {
+    if (this.armed?.id !== id || this.utterance) {
+      this.voice({ type: "stt.cancel", id }); // stale watch (the turn already ended): drop it
+      return;
+    }
+    const turn = this.turns.get(this.armed.turnId);
+    this.armed = undefined;
+    if (turn && turn === this.current) this.bargeIn(turn);
+    this.utterance = { id, conversationId: turn?.conversationId };
+    this.setPhase("listening");
+    this.logger.log("info", "voice.vad_barge_in", { turnId: turn?.id });
   }
 
   private bargeIn(turn: Turn): void {
@@ -302,6 +350,7 @@ export class VoiceTurns {
     const turn = this.turns.get(turnId);
     if (!turn) return;
     this.turns.delete(turnId);
+    if (this.armed?.turnId === turnId) this.disarm();
     const at = this.now();
     if (interrupted) turn.outcome = "interrupted";
     const diff = (a: number | undefined, b: number | undefined) => (a !== undefined && b !== undefined ? Math.max(0, a - b) : undefined);

@@ -46,6 +46,7 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 - [x] STT local: Parakeet en proceso vía `parakeet.dll` (~100 ms), micrófono abierto solo durante el push-to-talk, corrección post-STT (ADR-014)
 - [x] Turno de voz orquestado por el Core (push-to-talk → STT → Claude → frases → TTS), barge-in al volver a apretar el atajo, métricas por turno en SQLite y `voice-stats` (ADR-013)
 - [x] Modo voz del prompt (`prompts/voice.md`) y 4 evals de voz (ADR-015); falta correrlas con la API real
+- [x] Barge-in por voz: Silero VAD mientras Jarvis habla, sin AEC porque el owner usa auriculares (ADR-016)
 
 **Exit:** p50 voz→primer audio < 2.0 s; barge-in < 300 ms; 20 conversaciones reales sin fallos bloqueantes.
 

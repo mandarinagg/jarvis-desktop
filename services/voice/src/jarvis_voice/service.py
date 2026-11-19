@@ -75,11 +75,15 @@ class VoiceService:
                 self.tts.end(msg["turnId"])
             else:
                 self.tts.cancel(msg["turnId"])
-        elif kind in ("stt.start", "stt.stop", "stt.cancel"):
+        elif kind in ("stt.start", "stt.stop", "stt.cancel", "vad.arm", "vad.disarm"):
             if self.stt is None:
                 self.error("not_configured", "STT is not configured", id_)
             elif kind == "stt.start":
                 self.stt.start(id_)
+            elif kind == "vad.arm":
+                self.stt.arm(id_)
+            elif kind == "vad.disarm":
+                self.stt.disarm(id_)
             elif kind == "stt.stop":
                 self.stt.stop(id_)
             else:
@@ -119,10 +123,11 @@ class VoiceService:
 
 def build_stt(_config: dict[str, Any], send: Writer) -> SttController:
     """Parakeet loads in the background (~1 s with Vulkan); stt.start works meanwhile."""
-    from .paths import parakeet_model, stt_bin_dir, stt_vocabulary
+    from .paths import parakeet_model, stt_bin_dir, stt_vocabulary, vad_model
     from .stt.controller import SoundDeviceMicrophone
     from .stt.corrections import Corrector
     from .stt.parakeet import ParakeetEngine
+    from .stt.vad import SileroVad
 
     bin_dir, model = stt_bin_dir(), parakeet_model()
     if not (bin_dir / "parakeet.dll").exists() or not model.exists():
@@ -133,6 +138,7 @@ def build_stt(_config: dict[str, Any], send: Writer) -> SttController:
         send,
         corrector=Corrector.from_file(stt_vocabulary()),
         log=log,
+        load_vad=lambda: SileroVad(vad_model()),  # loaded on the first vad.arm; no model = no barge-in by voice
     )
 
 

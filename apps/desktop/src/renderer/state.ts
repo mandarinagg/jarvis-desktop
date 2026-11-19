@@ -45,6 +45,12 @@ export function pttPressed(voice: State["voice"]): boolean {
   return voice.state !== "listening";
 }
 
+/** Chip and overlay text. The mic indicator always wins; while Jarvis speaks it may be listening for barge-in. */
+export function voiceLabel(voice: Pick<State["voice"], "state" | "micOpen">): string {
+  if (!voice.micOpen) return VOICE_LABELS[voice.state];
+  return voice.state === "speaking" ? "Hablando · te escucho" : "Micrófono abierto";
+}
+
 export const VOICE_LABELS: Record<VoiceStateName, string> = {
   unavailable: "Voz no disponible",
   idle: "Listo",
