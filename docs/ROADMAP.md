@@ -53,7 +53,7 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 ## Fase 3 — L2: Proyectos y contexto (en curso, ADR-017)
 - [x] Registro de proyectos y carpetas autorizadas (solo el owner; guardia de rutas y denylist de secretos)
 - [x] Indexado FTS5 sin copia del contenido + watcher de cambios + exclusiones (280 archivos en 79 ms)
-- Tools de solo lectura: buscar, leer, resumir, estado git
+- [x] Tools de solo lectura (servidor MCP `projects` en proceso): listar, buscar, leer, listar carpetas y estado git. Resumir lo hace Claude. Pasan por el Permission Engine v0 y el audit log append-only
 - Armado de contexto por proyecto activo
 
 **Exit:** responde correctamente 10/10 preguntas sobre documentación de un proyecto real.

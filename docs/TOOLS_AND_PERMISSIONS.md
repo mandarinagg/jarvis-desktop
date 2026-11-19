@@ -14,6 +14,8 @@
 
 ## 2. Permission Engine
 
+> **Estado (Fase 3, ADR-017):** la versión 0 está en `packages/core/src/tools/`. La clase de riesgo de cada herramienta la registra el Core, no se toma de las anotaciones MCP. La clase lectura se permite y se audita, y el resto se rechaza hasta que exista el flujo de confirmación de la Fase 4. Las rutas pasan la guardia de `projects/guard.ts` (`realpath` y denylist de secretos). El audit log (`audit_log`, migración 004) es append-only por triggers y nunca guarda el contenido devuelto, solo su tamaño.
+
 Para cada tool call evalúa en orden:
 1. ¿El servidor MCP y la tool están habilitados?
 2. ¿Los argumentos validan contra el esquema? (Zod)

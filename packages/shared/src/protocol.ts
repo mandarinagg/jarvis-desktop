@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.1"; // 1.1: voice.* messages (Phase 2)
+export const PROTOCOL_VERSION = "1.2"; // 1.1: voice.* messages (Phase 2); 1.2: chat.tool (Phase 3)
 
 const Id = z.string().min(1).max(64);
 const SessionToken = z.string().regex(/^[0-9a-f]{64}$/, "token must be 256-bit lowercase hex");
@@ -119,6 +119,16 @@ export type ChatStarted = z.infer<typeof ChatStarted>;
 export const ChatDelta = z.strictObject({ type: z.literal("chat.delta"), turnId: Id, text: z.string() });
 export type ChatDelta = z.infer<typeof ChatDelta>;
 
+/** Jarvis used a tool during a turn (Phase 3): what it did, in words, for the UI. Never the result. */
+export const ChatTool = z.strictObject({
+  type: z.literal("chat.tool"),
+  turnId: Id,
+  tool: z.string().min(1).max(128),
+  summary: z.string().max(300),
+  status: z.enum(["started", "done", "error", "denied"]),
+});
+export type ChatTool = z.infer<typeof ChatTool>;
+
 export const ChatDone = z.strictObject({
   type: z.literal("chat.done"),
   turnId: Id,
@@ -193,6 +203,7 @@ export const CoreMessage = z.discriminatedUnion("type", [
   CoreError,
   ChatStarted,
   ChatDelta,
+  ChatTool,
   ChatDone,
   ConversationsListResult,
   ConversationHistory,

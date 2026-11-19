@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 import type { BudgetGet, ChatCancel, ChatSend, ConversationsGet, ConversationsList } from "@jarvis/shared";
 import { type ChatModel, TurnCancelledError, UpstreamError } from "./claude/model.js";
+import type { ToolRuntime } from "./tools/hub.js";
 import { costOf } from "./claude/pricing.js";
 import { localDay } from "./db.js";
 import { type Logger, silentLogger } from "./log.js";
@@ -18,6 +19,10 @@ export interface ChatServiceOptions {
   systemPrompt: string;
   /** Extra instructions for spoken turns (prompts/voice.md). */
   voicePrompt?: string;
+  /** Read tools over registered projects (ADR-017). */
+  tools?: ToolRuntime;
+  /** Active-project card for a conversation, appended to the system prompt (ADR-017). */
+  projectContext?: (conversationId: string) => Promise<string | undefined>;
   dailyBudgetUsd: number;
   logger?: Logger;
   now?: () => Date;
@@ -77,9 +82,14 @@ export class ChatService {
       session.send({ type: "chat.started", id: msg.id, turnId, conversationId: conversation.id });
 
       const history = store.messages(conversation.id).map((m) => ({ role: m.role, content: m.content }));
+      const card = await this.opts.projectContext?.(conversation.id);
+      const suffix = [card, mode === "voice" ? this.opts.voicePrompt : undefined].filter(Boolean).join("\n\n");
       const result = await model.complete({
         system: this.opts.systemPrompt,
-        systemSuffix: mode === "voice" ? this.opts.voicePrompt : undefined,
+        systemSuffix: suffix || undefined,
+        tools: this.opts.tools,
+        turnId,
+        onTool: (e) => session.send({ type: "chat.tool", turnId, tool: e.name, summary: e.summary.slice(0, 300), status: e.status }),
         messages: history,
         signal: controller.signal,
         onText: (text) => session.send({ type: "chat.delta", turnId, text }),

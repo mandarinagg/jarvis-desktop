@@ -80,6 +80,30 @@ describe("ChatService.chatSend", () => {
     expect(model.requests[1]?.systemSuffix).toBeUndefined();
   });
 
+  it("passes tools, the active-project card and reports tool use to the client", async () => {
+    const model = new FakeModel(async (req) => {
+      req.onTool?.({ name: "projects__search", summary: "Buscando «pagos»", status: "started" });
+      req.onTool?.({ name: "projects__search", summary: "Buscando «pagos»", status: "done" });
+      return "Está en docs.";
+    });
+    const store = new ConversationStore(openDatabase(":memory:"));
+    const tools = { definitions: () => [], describe: () => "", call: async () => ({ content: "", isError: false }) };
+    const service = new ChatService({
+      store,
+      model: () => model,
+      systemPrompt: "SYS",
+      voicePrompt: "VOZ",
+      tools,
+      projectContext: async () => "Proyecto activo: App",
+      dailyBudgetUsd: 3,
+    });
+    const { session, sent } = fakeSession();
+    await service.chatSend(session, { type: "chat.send", id: "m1", text: "¿dónde está?" }, "voice");
+    expect(model.requests[0]).toMatchObject({ system: "SYS", systemSuffix: "Proyecto activo: App\n\nVOZ", tools });
+    expect(model.requests[0]?.turnId).toEqual(expect.any(String));
+    expect(sent.filter((m) => m.type === "chat.tool").map((m) => (m as { status: string }).status)).toEqual(["started", "done"]);
+  });
+
   it("refuses when the daily budget is exhausted, before calling Claude", async () => {
     const model = new FakeModel();
     const { store, service } = setup(model, 0.5);
