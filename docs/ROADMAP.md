@@ -41,7 +41,8 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 ## Fase 2 — L1: Voz (en curso)
 - [x] Voice Service (Python 3.12 / uv) como proceso hijo del Core: protocolo por stdio, supervisor con backoff y estado degradado (ADR-013)
 - [x] TTS por frases: segmentador en el Core, Neural2 con timeout de 2.5 s y reintento, fallback a Piper, caché de acuses, síntesis superpuesta y corte con fade de 30 ms (ADR-011)
-- Push-to-talk con atajo global + overlay de estado
+- [x] Push-to-talk: atajo global `Ctrl+Shift+Space` (interruptor) y botón «Mantené para hablar»; overlay siempre visible con el micrófono abierto
+- [ ] Validación: 20 conversaciones reales y p50 voz→primer audio < 2.0 s con `voice-stats` (requiere la key de Anthropic)
 - [x] STT local: Parakeet en proceso vía `parakeet.dll` (~100 ms), micrófono abierto solo durante el push-to-talk, corrección post-STT (ADR-014)
 - [x] Turno de voz orquestado por el Core (push-to-talk → STT → Claude → frases → TTS), barge-in al volver a apretar el atajo, métricas por turno en SQLite y `voice-stats` (ADR-013)
 - Métricas de latencia por turno

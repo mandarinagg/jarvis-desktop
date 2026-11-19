@@ -33,5 +33,7 @@ Un panel de instrumentos sobrio:
 ## Prueba de humo (desarrollo)
 ```powershell
 electron apps/desktop --smoke-screenshot=C:\ruta\captura.png --smoke-open-first
+electron apps/desktop --smoke-screenshot=C:\ruta\app.png --smoke-overlay=C:\ruta\overlay.png
 ```
+`--smoke-overlay` captura el overlay con un estado simulado de micrófono abierto: el smoke nunca abre el micrófono real. No uses `Start-Process -Wait`: espera también al Core desacoplado y no vuelve nunca.
 Abre la app, carga los datos, abre la primera conversación, saca una captura y sale.
