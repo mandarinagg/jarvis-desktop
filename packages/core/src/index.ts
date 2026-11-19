@@ -10,3 +10,6 @@ export * from "./chat.js";
 export * from "./claude/model.js";
 export * from "./claude/pricing.js";
 export * from "./prompt.js";
+export * from "./projects/guard.js";
+export * from "./projects/indexer.js";
+export * from "./projects/store.js";

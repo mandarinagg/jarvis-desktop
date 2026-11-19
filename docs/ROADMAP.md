@@ -50,9 +50,9 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 
 **Exit:** p50 voz→primer audio < 2.0 s; barge-in < 300 ms; 20 conversaciones reales sin fallos bloqueantes.
 
-## Fase 3 — L2: Proyectos y contexto
-- Registro de proyectos y carpetas autorizadas
-- Indexado FTS5 + watcher de cambios + exclusiones
+## Fase 3 — L2: Proyectos y contexto (en curso, ADR-017)
+- [x] Registro de proyectos y carpetas autorizadas (solo el owner; guardia de rutas y denylist de secretos)
+- [x] Indexado FTS5 sin copia del contenido + watcher de cambios + exclusiones (280 archivos en 79 ms)
 - Tools de solo lectura: buscar, leer, resumir, estado git
 - Armado de contexto por proyecto activo
 
