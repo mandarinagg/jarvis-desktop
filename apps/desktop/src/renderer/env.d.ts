@@ -7,6 +7,7 @@ export interface JarvisBridge {
   onStatus(listener: (status: { connected: boolean; hotkey?: string | null; error?: string }) => void): () => void;
   status(): Promise<{ connected: boolean; hotkey?: string | null }>;
   onHotkey(listener: () => void): () => void;
+  createProject(info: { name: string; description?: string; goals?: string }): Promise<{ canceled: boolean; id?: string; root?: string }>;
 }
 
 declare global {

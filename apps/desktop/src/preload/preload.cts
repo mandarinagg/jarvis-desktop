@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld("jarvis", {
   status(): Promise<unknown> {
     return ipcRenderer.invoke("jarvis:status");
   },
+  /** Opens the native folder picker; the main process registers the project with the chosen folder. */
+  createProject(info: unknown): Promise<unknown> {
+    return ipcRenderer.invoke("jarvis:create-project", info);
+  },
   /** The global push-to-talk shortcut was pressed (the renderer decides start/stop). */
   onHotkey(listener: () => void): () => void {
     const wrapped = () => listener();

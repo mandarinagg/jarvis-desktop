@@ -13,6 +13,7 @@ import { createLogger } from "./log.js";
 import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
 import { projectCard } from "./projects/context.js";
 import { ProjectIndex } from "./projects/indexer.js";
+import { ProjectsService } from "./projects/service.js";
 import { ProjectStore } from "./projects/store.js";
 import { loadSystemPrompt, loadVoicePrompt } from "./prompt.js";
 import { KeyringSecretStore } from "./secrets.js";
@@ -77,6 +78,7 @@ async function main(): Promise<number> {
     systemPrompt: loadSystemPrompt(),
     voicePrompt: loadVoicePrompt(),
     tools,
+    projects,
     projectContext: async (conversationId) => {
       const p = projects.conversationProject(conversationId);
       return p ? projectCard(p) : undefined;
@@ -87,6 +89,14 @@ async function main(): Promise<number> {
 
   // The server is created below; voice events only flow once it is listening.
   let broadcast: (m: CoreMessage) => void = () => {};
+  const projectsService = new ProjectsService({
+    projects,
+    index,
+    jarvisHome: home,
+    broadcast: (m) => broadcast(m),
+    conversationsChanged: (s, id) => chat.conversationsList(s, { type: "conversations.list", id }),
+    logger,
+  });
   const turns = new VoiceTurns({
     voice: { send: (m) => voice?.send(m) ?? false },
     chat,
@@ -136,6 +146,7 @@ async function main(): Promise<number> {
       budgetGet: (s, m) => chat.budgetGet(s, m),
       voicePtt: (s, m) => turns.ptt(s, m),
       voiceStatusGet: (s, m) => turns.statusGet(s, m),
+      projects: (s, m) => projectsService.handle(s, m),
       shutdown: () => stop("core.shutdown"),
     },
   });
@@ -155,16 +166,7 @@ async function main(): Promise<number> {
   logger.log("info", "core.ready", { pipe, version: CORE_VERSION, dailyBudgetUsd: budget });
   voice?.start();
   // Phase 3: bring every registered project's index up to date, then follow changes (ADR-017).
-  void (async () => {
-    for (const project of projects.list()) {
-      try {
-        await index.scan(project);
-        index.watch(project);
-      } catch (err) {
-        logger.log("warn", "index.startup_failed", { project: project.id, error: err instanceof Error ? err.message : String(err) });
-      }
-    }
-  })();
+  for (const project of projects.list()) projectsService.reindex(project.id);
 
   process.on("SIGINT", () => void stop("SIGINT"));
   process.on("SIGTERM", () => void stop("SIGTERM"));

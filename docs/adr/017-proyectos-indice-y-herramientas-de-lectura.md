@@ -18,7 +18,7 @@ Restricciones que ya existen:
 
 ### Registro de proyectos
 - Tabla `projects`: nombre único, descripción, objetivos, `root` canonizado con `realpath` y fecha de última actividad. `conversations.project_id` es opcional y marca el **proyecto activo** de cada conversación.
-- **Solo el owner registra carpetas**, desde la UI o el IPC autenticado. El modelo nunca puede agregar ni ampliar una raíz.
+- **Solo el owner registra carpetas**, desde la UI o el IPC autenticado. El modelo nunca puede agregar ni ampliar una raíz. En la app de escritorio la carpeta se elige en el diálogo nativo del proceso principal: el renderer (que muestra la salida del modelo y no es confiable) no puede mandar `projects.create` ni ninguna ruta.
 - Se rechazan como raíz:
   - la raíz de una unidad;
   - `%WINDIR%`, `Program Files` y la carpeta de usuario entera;

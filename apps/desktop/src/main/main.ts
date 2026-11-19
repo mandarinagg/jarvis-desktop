@@ -8,8 +8,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CoreClient } from "@jarvis/core/client";
 import type { CoreMessage } from "@jarvis/shared";
-import { BrowserWindow, app, globalShortcut, ipcMain, screen, shell } from "electron";
-import { parseRendererMessage } from "./bridge.js";
+import { randomUUID } from "node:crypto";
+import { BrowserWindow, app, dialog, globalShortcut, ipcMain, screen, shell } from "electron";
+import { CreateProjectRequest, parseRendererMessage } from "./bridge.js";
 import { ensureCore } from "./core-connection.js";
 import { overlayVisible } from "./overlay.js";
 
@@ -137,6 +138,26 @@ ipcMain.on("jarvis:send", (event, raw: unknown) => {
 });
 
 ipcMain.handle("jarvis:status", () => ({ connected: core !== undefined, hotkey }));
+
+/**
+ * Registering a project (ADR-017): the renderer sends name and notes; the folder is chosen by the
+ * owner in the native dialog shown here. Returns the request id so the renderer can match errors.
+ */
+ipcMain.handle("jarvis:create-project", async (event, raw: unknown) => {
+  if (event.senderFrame?.url && !event.senderFrame.url.startsWith("file://")) return { canceled: true };
+  const req = CreateProjectRequest.safeParse(raw);
+  if (!req.success || !core || !win) return { canceled: true };
+  const picked = await dialog.showOpenDialog(win, {
+    title: `Carpeta del proyecto «${req.data.name}»`,
+    buttonLabel: "Autorizar esta carpeta",
+    properties: ["openDirectory"],
+  });
+  const root = picked.filePaths[0];
+  if (picked.canceled || !root) return { canceled: true };
+  const id = randomUUID();
+  core.send({ type: "projects.create", id, root, ...req.data });
+  return { canceled: false, id, root };
+});
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();

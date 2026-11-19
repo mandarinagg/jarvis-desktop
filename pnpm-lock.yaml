@@ -35,6 +35,9 @@ importers:
       '@jarvis/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@types/react':
         specifier: 19.3.0

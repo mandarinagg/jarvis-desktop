@@ -9,6 +9,8 @@ export interface Conversation {
   title: string;
   createdAt: string;
   updatedAt: string;
+  /** Active project (Phase 3), null when none. */
+  projectId?: string | null;
 }
 
 export interface StoredMessage {
@@ -45,7 +47,7 @@ export class ConversationStore {
 
   getConversation(id: string): Conversation | undefined {
     const row = this.db
-      .prepare("SELECT id, title, created_at AS createdAt, updated_at AS updatedAt FROM conversations WHERE id = ?")
+      .prepare("SELECT id, title, created_at AS createdAt, updated_at AS updatedAt, project_id AS projectId FROM conversations WHERE id = ?")
       .get(id);
     return row as Conversation | undefined;
   }
@@ -53,7 +55,7 @@ export class ConversationStore {
   listConversations(limit = 50): Conversation[] {
     return this.db
       .prepare(
-        "SELECT id, title, created_at AS createdAt, updated_at AS updatedAt FROM conversations ORDER BY updated_at DESC, rowid DESC LIMIT ?",
+        "SELECT id, title, created_at AS createdAt, updated_at AS updatedAt, project_id AS projectId FROM conversations ORDER BY updated_at DESC, rowid DESC LIMIT ?",
       )
       .all(limit) as unknown as Conversation[];
   }

@@ -31,6 +31,16 @@ describe("voice from the renderer", () => {
   });
 });
 
+describe("projects from the renderer", () => {
+  it("can list, edit, delete, reindex and link conversations, but never register a folder", () => {
+    expect(parseRendererMessage({ type: "projects.list", id: "1" })).toBeDefined();
+    expect(parseRendererMessage({ type: "projects.update", id: "1", projectId: "p", goals: "x" })).toBeDefined();
+    expect(parseRendererMessage({ type: "projects.delete", id: "1", projectId: "p" })).toBeDefined();
+    expect(parseRendererMessage({ type: "conversations.setProject", id: "1", conversationId: "c", projectId: null })).toBeDefined();
+    expect(parseRendererMessage({ type: "projects.create", id: "1", name: "x", root: "C:\\Users" })).toBeUndefined();
+  });
+});
+
 describe("overlayVisible", () => {
   it("is shown during a voice turn and always while the mic is open", async () => {
     const { overlayVisible } = await import("./overlay.js");

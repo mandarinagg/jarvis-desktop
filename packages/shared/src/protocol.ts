@@ -30,6 +30,8 @@ export const ChatSend = z.strictObject({
   type: z.literal("chat.send"),
   id: Id,
   conversationId: Id.optional(),
+  /** Phase 3: active project for a new conversation (ignored when continuing one). */
+  projectId: Id.optional(),
   text: z.string().min(1).max(32_000),
 });
 export type ChatSend = z.infer<typeof ChatSend>;
@@ -45,6 +47,50 @@ export type ConversationsGet = z.infer<typeof ConversationsGet>;
 
 export const BudgetGet = z.strictObject({ type: z.literal("budget.get"), id: Id });
 export type BudgetGet = z.infer<typeof BudgetGet>;
+
+// Phase 3 (ADR-017): projects are registered only by the owner, through an authenticated client.
+const ProjectName = z.string().trim().min(1).max(80);
+const ProjectText = (max: number) => z.string().max(max);
+
+export const ProjectsList = z.strictObject({ type: z.literal("projects.list"), id: Id });
+export type ProjectsList = z.infer<typeof ProjectsList>;
+
+export const ProjectsCreate = z.strictObject({
+  type: z.literal("projects.create"),
+  id: Id,
+  name: ProjectName,
+  root: z.string().min(3).max(1_000),
+  description: ProjectText(500).optional(),
+  goals: ProjectText(1_000).optional(),
+});
+export type ProjectsCreate = z.infer<typeof ProjectsCreate>;
+
+export const ProjectsUpdate = z.strictObject({
+  type: z.literal("projects.update"),
+  id: Id,
+  projectId: Id,
+  name: ProjectName.optional(),
+  description: ProjectText(500).optional(),
+  goals: ProjectText(1_000).optional(),
+});
+export type ProjectsUpdate = z.infer<typeof ProjectsUpdate>;
+
+export const ProjectsDelete = z.strictObject({ type: z.literal("projects.delete"), id: Id, projectId: Id });
+export type ProjectsDelete = z.infer<typeof ProjectsDelete>;
+
+export const ProjectsReindex = z.strictObject({ type: z.literal("projects.reindex"), id: Id, projectId: Id });
+export type ProjectsReindex = z.infer<typeof ProjectsReindex>;
+
+/** Links a conversation to a project (its active project), or unlinks it with null. */
+export const ConversationsSetProject = z.strictObject({
+  type: z.literal("conversations.setProject"),
+  id: Id,
+  conversationId: Id,
+  projectId: Id.nullable(),
+});
+export type ConversationsSetProject = z.infer<typeof ConversationsSetProject>;
+
+export type ProjectsMessage = ProjectsList | ProjectsCreate | ProjectsUpdate | ProjectsDelete | ProjectsReindex | ConversationsSetProject;
 
 /** Push-to-talk key pressed/released (Phase 2). Pressing while Jarvis speaks interrupts it (barge-in). */
 export const VoicePtt = z.strictObject({
@@ -69,6 +115,12 @@ export const ClientMessage = z.discriminatedUnion("type", [
   ConversationsList,
   ConversationsGet,
   BudgetGet,
+  ProjectsList,
+  ProjectsCreate,
+  ProjectsUpdate,
+  ProjectsDelete,
+  ProjectsReindex,
+  ConversationsSetProject,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
@@ -138,7 +190,7 @@ export const ChatDone = z.strictObject({
 });
 export type ChatDone = z.infer<typeof ChatDone>;
 
-export const ConversationSummary = z.strictObject({ id: Id, title: z.string(), updatedAt: z.string() });
+export const ConversationSummary = z.strictObject({ id: Id, title: z.string(), updatedAt: z.string(), projectId: Id.optional() });
 export type ConversationSummary = z.infer<typeof ConversationSummary>;
 
 export const ConversationsListResult = z.strictObject({
@@ -161,9 +213,30 @@ export const ConversationHistory = z.strictObject({
   id: Id,
   conversationId: Id,
   title: z.string(),
+  projectId: Id.optional(),
   messages: z.array(HistoryMessage),
 });
 export type ConversationHistory = z.infer<typeof ConversationHistory>;
+
+export const ProjectInfo = z.strictObject({
+  id: Id,
+  name: z.string(),
+  description: z.string(),
+  goals: z.string(),
+  root: z.string(),
+  indexedAt: z.string().nullable(),
+  files: z.number().int().nonnegative(),
+  indexing: z.boolean(),
+});
+export type ProjectInfo = z.infer<typeof ProjectInfo>;
+
+/** Reply to projects.* (with the request id) and broadcast to every client when projects change. */
+export const ProjectsListResult = z.strictObject({
+  type: z.literal("projects.list.result"),
+  id: Id.optional(),
+  projects: z.array(ProjectInfo).max(500),
+});
+export type ProjectsListResult = z.infer<typeof ProjectsListResult>;
 
 export const BudgetStatus = z.strictObject({
   type: z.literal("budget.status"),
@@ -208,6 +281,7 @@ export const CoreMessage = z.discriminatedUnion("type", [
   ConversationsListResult,
   ConversationHistory,
   BudgetStatus,
+  ProjectsListResult,
 ]);
 export type CoreMessage = z.infer<typeof CoreMessage>;
 

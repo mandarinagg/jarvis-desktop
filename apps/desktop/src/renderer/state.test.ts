@@ -139,3 +139,36 @@ describe("voice", () => {
     expect(core(s, { type: "voice.transcript", utteranceId: "u1", text: "x" })).toBe(s);
   });
 });
+
+describe("projects", () => {
+  const project = { id: "p1", name: "Pagos", description: "", goals: "", root: "C:\\dev\\pagos", indexedAt: null, files: 3, indexing: false };
+  const conv = (projectId?: string) => ({ id: "c1", title: "t", updatedAt: "2026-11-19T10:00:00Z", ...(projectId ? { projectId } : {}) });
+
+  it("follows the active conversation's project and forgets deleted projects", () => {
+    let s = reduce(initialState, { kind: "core", message: { type: "projects.list.result", projects: [project] } });
+    s = reduce(s, { kind: "core", message: { type: "conversations.list.result", id: "l", conversations: [conv("p1")] } });
+    s = reduce(s, { kind: "select", conversationId: "c1" });
+    expect(s.projectId).toBe("p1");
+    s = reduce(s, { kind: "core", message: { type: "conversations.list.result", id: "l", conversations: [conv()] } });
+    expect(s.projectId).toBeUndefined();
+    s = reduce(s, { kind: "setProject", projectId: "p1" });
+    s = reduce(s, { kind: "new" });
+    expect(s.projectId).toBe("p1");
+    s = reduce(s, { kind: "core", message: { type: "projects.list.result", projects: [] } });
+    expect(s.projectId).toBeUndefined();
+  });
+
+  it("shows tool activity on the reply being written", () => {
+    let s = reduce(initialState, { kind: "send", requestId: "r", text: "¿dónde está?" });
+    s = reduce(s, { kind: "core", message: { type: "chat.started", id: "r", turnId: "t", conversationId: "c" } });
+    const tool = { type: "chat.tool", turnId: "t", tool: "projects__search", summary: "Buscando «pagos»" } as const;
+    s = reduce(s, { kind: "core", message: { ...tool, status: "started" } });
+    s = reduce(s, { kind: "core", message: { ...tool, status: "done" } });
+    s = reduce(s, { kind: "core", message: { ...tool, summary: "Leyendo Pagos/README.md", status: "started" } });
+    s = reduce(s, { kind: "core", message: { ...tool, summary: "Otro turno", turnId: "x", status: "started" } });
+    expect(s.messages.at(-1)?.tools).toEqual([
+      { summary: "Buscando «pagos»", status: "done" },
+      { summary: "Leyendo Pagos/README.md", status: "started" },
+    ]);
+  });
+});
