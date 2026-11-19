@@ -3,6 +3,7 @@
  * client messages; auth and shutdown stay in the main process. Every payload is re-validated here.
  */
 import { ClientMessage } from "@jarvis/shared";
+import { z } from "zod";
 
 export const RENDERER_ALLOWED = [
   "chat.send",
@@ -12,6 +13,13 @@ export const RENDERER_ALLOWED = [
   "budget.get",
   "voice.ptt",
   "voice.status.get",
+  // Phase 3. projects.create is NOT here: the folder comes only from the native picker in the main
+  // process (createProjectRequest), so a compromised renderer can never authorize a path.
+  "projects.list",
+  "projects.update",
+  "projects.delete",
+  "projects.reindex",
+  "conversations.setProject",
 ] as const;
 
 export type RendererMessage = Extract<ClientMessage, { type: (typeof RENDERER_ALLOWED)[number] }>;
@@ -22,3 +30,11 @@ export function parseRendererMessage(raw: unknown): RendererMessage | undefined 
   const msg = parsed.data;
   return (RENDERER_ALLOWED as readonly string[]).includes(msg.type) ? (msg as RendererMessage) : undefined;
 }
+
+/** What the renderer may say about a new project: everything except its folder. */
+export const CreateProjectRequest = z.strictObject({
+  name: z.string().trim().min(1).max(80),
+  description: z.string().max(500).optional(),
+  goals: z.string().max(1_000).optional(),
+});
+export type CreateProjectRequest = z.infer<typeof CreateProjectRequest>;

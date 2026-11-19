@@ -1,4 +1,5 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useReducer, useRef, useState } from "react";
+import { Projects } from "./Projects.js";
 import { budgetLevel, initialState, pttPressed, reduce, voiceLabel } from "./state.js";
 
 const usd = (n: number) => `US$ ${n.toFixed(2)}`;
@@ -31,6 +32,7 @@ export function App() {
       jarvis.send({ type: "conversations.list", id: nextId("l") });
       jarvis.send({ type: "budget.get", id: nextId("b") });
       jarvis.send({ type: "voice.status.get", id: nextId("v") });
+      jarvis.send({ type: "projects.list", id: nextId("pl") });
     };
     const offHotkey = jarvis.onHotkey(() => {
       const s = latest.current;
@@ -80,7 +82,12 @@ export function App() {
     if (!text || busy || !state.connected) return;
     const requestId = nextId("m");
     dispatch({ kind: "send", requestId, text });
-    jarvis.send({ type: "chat.send", id: requestId, text, ...(state.activeId ? { conversationId: state.activeId } : {}) });
+    jarvis.send({
+      type: "chat.send",
+      id: requestId,
+      text,
+      ...(state.activeId ? { conversationId: state.activeId } : state.projectId ? { projectId: state.projectId } : {}),
+    });
     setDraft("");
   };
 
@@ -97,6 +104,14 @@ export function App() {
     if (busy) return;
     dispatch({ kind: "select", conversationId });
     jarvis.send({ type: "conversations.get", id: nextId("g"), conversationId });
+  };
+
+  /** Active project: saved on the open conversation, or kept for the next new one. */
+  const chooseProject = (projectId: string) => {
+    dispatch({ kind: "setProject", ...(projectId ? { projectId } : {}) });
+    if (state.activeId) {
+      jarvis.send({ type: "conversations.setProject", id: nextId("sp"), conversationId: state.activeId, projectId: projectId || null });
+    }
   };
 
   const startNew = () => {
@@ -130,6 +145,7 @@ export function App() {
             </button>
           ))}
         </nav>
+        <Projects projects={state.projects} connected={state.connected} onError={(m) => dispatch({ kind: "core", message: { type: "error", code: "internal", message: m } })} />
       </aside>
 
       <main className="stage">
@@ -142,6 +158,19 @@ export function App() {
             <span>{voiceLabel(state.voice)}</span>
             {shortcut && voiceReady && <kbd>{shortcut}</kbd>}
           </div>
+          {state.projects.length > 0 && (
+            <label className="project-picker" title="Jarvis busca primero en este proyecto">
+              <span>Proyecto</span>
+              <select value={state.projectId ?? ""} onChange={(e) => chooseProject(e.target.value)} disabled={busy}>
+                <option value="">Ninguno</option>
+                {state.projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {state.budget ? (
             <div className={`meter ${level}`} title="Gasto de hoy en la API de Claude">
               <div className="meter-track">
@@ -180,6 +209,16 @@ export function App() {
               </p>
             ) : (
               <div key={i} className={`said jarvis ${m.pending ? "live" : ""}`}>
+                {m.tools && m.tools.length > 0 && (
+                  <ul className="tool-trail" aria-label="Lo que consultó Jarvis">
+                    {m.tools.map((t, j) => (
+                      <li key={j} className={`tool ${t.status}`}>
+                        {t.summary}
+                        {t.status === "started" ? "…" : t.status === "denied" ? " (sin permiso)" : t.status === "error" ? " (falló)" : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <p>
                   {m.content}
                   {m.pending && <span className="caret" aria-hidden="true" />}
