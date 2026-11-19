@@ -9,9 +9,10 @@ const usage = { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0, cacheWri
 describe("conversation cases", () => {
   const cases = loadCases();
 
-  it("has the 15 Phase 1 cases, all valid, with unique ids", () => {
-    expect(cases).toHaveLength(15);
-    expect(new Set(cases.map((c) => c.id)).size).toBe(15);
+  it("has the 15 Phase 1 cases plus 4 voice cases, all valid, with unique ids", () => {
+    expect(cases).toHaveLength(19);
+    expect(new Set(cases.map((c) => c.id)).size).toBe(19);
+    expect(cases.filter((c) => c.mode === "voice")).toHaveLength(4);
   });
 
   it("covers the behaviours Phase 1 cares about", () => {
@@ -79,14 +80,14 @@ describe("runAll", () => {
 
   it("runs multi-turn cases, combines checks and verdict, and adds up cost", async () => {
     const cases = loadCases().filter((c) => c.id.startsWith("011"));
-    const s = await runAll(cases, model, judge(true), "SYS", { maxCostUsd: 10 });
+    const s = await runAll(cases, model, judge(true), { system: "SYS" }, { maxCostUsd: 10 });
     expect(s).toMatchObject({ passed: 1, total: 1, score: 1 });
     expect(s.costUsd).toBeGreaterThan(0);
   });
 
   it("stops spending once the run cost cap is reached", async () => {
     const cases = loadCases().slice(0, 3);
-    const s = await runAll(cases, model, judge(true), "SYS", { maxCostUsd: 0.000001 });
+    const s = await runAll(cases, model, judge(true), { system: "SYS" }, { maxCostUsd: 0.000001 });
     expect(s.results.filter((r) => r.error?.includes("tope"))).toHaveLength(2);
   });
 });

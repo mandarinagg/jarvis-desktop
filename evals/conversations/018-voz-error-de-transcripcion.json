@@ -1,0 +1,26 @@
+{
+  "id": "018-voz-error-de-transcripcion",
+  "category": "voz",
+  "mode": "voice",
+  "turns": [
+    "Jarvis, ¿qué es un neim paip en Windows y para qué sirve?"
+  ],
+  "checks": {
+    "maxChars": 600,
+    "mustNotMatch": [
+      "(^|\\n)\\s*([-*•]|\\d+[.)])\\s",
+      "\\*\\*",
+      "(^|\\n)#",
+      "https?://",
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})quieres(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Interpreta que el owner preguntó por un named pipe (error de reconocimiento de voz) sin hacer un problema del error.",
+    "Explica correctamente qué es un named pipe y un uso típico.",
+    "Es corta y apta para escucharse."
+  ]
+}

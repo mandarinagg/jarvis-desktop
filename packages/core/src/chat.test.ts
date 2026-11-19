@@ -32,7 +32,7 @@ function fakeSession() {
 
 function setup(model: ChatModel | null = new FakeModel(), budget = 3) {
   const store = new ConversationStore(openDatabase(":memory:"));
-  const service = new ChatService({ store, model: () => model ?? undefined, systemPrompt: "SYS", dailyBudgetUsd: budget });
+  const service = new ChatService({ store, model: () => model ?? undefined, systemPrompt: "SYS", voicePrompt: "VOZ", dailyBudgetUsd: budget });
   return { store, service };
 }
 
@@ -66,6 +66,18 @@ describe("ChatService.chatSend", () => {
       { role: "assistant", content: "Hola" },
       { role: "user", content: "dos" },
     ]);
+  });
+
+  it("adds the voice instructions only to spoken turns, after the cached system prompt", async () => {
+    const model = new FakeModel();
+    const { service } = setup(model);
+    const { session, sent } = fakeSession();
+    await service.chatSend(session, { type: "chat.send", id: "m1", text: "uno" }, "voice");
+    const conversationId = (sent[0] as Extract<CoreMessage, { type: "chat.started" }>).conversationId;
+    await service.chatSend(session, { type: "chat.send", id: "m2", conversationId, text: "dos" });
+    expect(model.requests[0]).toMatchObject({ system: "SYS", systemSuffix: "VOZ" });
+    expect(model.requests[1]?.system).toBe("SYS");
+    expect(model.requests[1]?.systemSuffix).toBeUndefined();
   });
 
   it("refuses when the daily budget is exhausted, before calling Claude", async () => {

@@ -6,10 +6,10 @@ import { VoiceMetricsStore } from "./metrics.js";
 import { PHRASES, VoiceTurns } from "./turns.js";
 
 class FakeChat {
-  sent: { session: Session; msg: ChatSend }[] = [];
+  sent: { session: Session; msg: ChatSend; mode: string }[] = [];
   cancelled: ChatCancel[] = [];
-  async chatSend(session: Session, msg: ChatSend) {
-    this.sent.push({ session, msg });
+  async chatSend(session: Session, msg: ChatSend, mode: string) {
+    this.sent.push({ session, msg, mode });
   }
   chatCancel(_s: Session, msg: ChatCancel) {
     this.cancelled.push(msg);
@@ -87,6 +87,12 @@ describe("VoiceTurns", () => {
     // the UI also gets the chat stream
     expect(t.broadcast.some((m) => m.type === "chat.delta")).toBe(true);
     expect(t.states()).toEqual(["idle", "listening", "transcribing", "thinking"]);
+  });
+
+  it("sends spoken turns to the chat in voice mode", () => {
+    const t = setup();
+    talk(t);
+    expect(t.chat.sent.at(-1)?.mode).toBe("voice");
   });
 
   it("measures voice -> first audio and records the turn when playback ends", () => {

@@ -1,0 +1,26 @@
+{
+  "id": "016-voz-sin-markdown",
+  "category": "voz",
+  "mode": "voice",
+  "turns": [
+    "Jarvis, ¿cómo arranco a aprender Rust si tengo un mes?"
+  ],
+  "checks": {
+    "maxChars": 600,
+    "mustNotMatch": [
+      "(^|\\n)\\s*([-*•]|\\d+[.)])\\s",
+      "\\*\\*",
+      "(^|\\n)#",
+      "https?://",
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})quieres(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Da una orientación concreta y útil para empezar.",
+    "Es corta (pocas oraciones) y suena natural dicha en voz alta: sin listas, viñetas, encabezados ni links.",
+    "Ofrece ampliar o detallar un plan si el owner quiere."
+  ]
+}
