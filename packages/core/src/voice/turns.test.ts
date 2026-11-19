@@ -136,6 +136,17 @@ describe("VoiceTurns", () => {
     expect(t.metrics.stats().outcomes.interrupted).toBe(1);
   });
 
+  it("says a cached acknowledgement when the turn starts by using a tool", () => {
+    const t = setup();
+    talk(t);
+    const tool = { type: "chat.tool", turnId: "chat-1", tool: "projects__search", summary: "Buscando", status: "started" } as const;
+    t.chat.emit(tool);
+    t.chat.emit({ ...tool, status: "done" });
+    t.chat.emit(tool); // a second lookup: already acknowledged
+    t.chat.emit({ type: "chat.delta", turnId: "chat-1", text: "Está en el README. " });
+    expect(t.of("tts.speak").map((s) => s.text)).toEqual([PHRASES.lookup, "Está en el README."]);
+  });
+
   it("without VAD barge-in the mic stays closed while Jarvis speaks", () => {
     const t = setup();
     talk(t);

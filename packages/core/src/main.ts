@@ -11,6 +11,7 @@ import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.
 import { openDatabase } from "./db.js";
 import { createLogger } from "./log.js";
 import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
+import { projectCard } from "./projects/context.js";
 import { ProjectIndex } from "./projects/indexer.js";
 import { ProjectStore } from "./projects/store.js";
 import { loadSystemPrompt, loadVoicePrompt } from "./prompt.js";
@@ -18,6 +19,9 @@ import { KeyringSecretStore } from "./secrets.js";
 import { AlreadyRunningError, CoreServer } from "./server.js";
 import { ConversationStore } from "./store.js";
 import { newSessionToken, writeSessionToken } from "./token.js";
+import { ToolHub } from "./tools/hub.js";
+import { AuditLog, PermissionEngine } from "./tools/permissions.js";
+import { PROJECTS_SERVER, PROJECTS_TOOLS, createProjectsServer } from "./tools/projects-server.js";
 import { VoiceMetricsStore } from "./voice/metrics.js";
 import { createVoiceSpawner } from "./voice/spawn.js";
 import { VoiceSupervisor } from "./voice/supervisor.js";
@@ -64,11 +68,19 @@ async function main(): Promise<number> {
   const store = new ConversationStore(db);
   const projects = new ProjectStore(db);
   const index = new ProjectIndex(db, projects, logger);
+  // Tools (ADR-003, ADR-017): model -> Permission Engine -> MCP server -> Audit Log.
+  const tools = new ToolHub(new PermissionEngine(), new AuditLog(db), logger);
+  await tools.addInProcess(PROJECTS_SERVER, createProjectsServer({ projects, index }), PROJECTS_TOOLS);
   const chat = new ChatService({
     store,
     model: modelResolver(env),
     systemPrompt: loadSystemPrompt(),
     voicePrompt: loadVoicePrompt(),
+    tools,
+    projectContext: async (conversationId) => {
+      const p = projects.conversationProject(conversationId);
+      return p ? projectCard(p) : undefined;
+    },
     dailyBudgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 3,
     logger,
   });
@@ -102,6 +114,7 @@ async function main(): Promise<number> {
     logger.log("info", "core.stopping", { reason });
     chat.cancelAll();
     index.close();
+    await tools.close();
     await voice?.stop();
     await server.close();
     db.close();

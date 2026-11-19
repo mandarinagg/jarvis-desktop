@@ -29,6 +29,7 @@ export const VOICE_SESSION_ID = "voice";
 
 /** Pre-synthesized by the voice service (tts/cache.py ACKNOWLEDGEMENTS): keep in sync. */
 export const PHRASES = {
+  lookup: "Dale, ya lo miro.",
   notHeard: "No te escuché bien, ¿me lo repetís?",
   budget: "Llegué al tope de gasto de hoy. Seguimos mañana o subí el tope.",
   upstream: "No pude hablar con Claude. Te dejé el detalle en pantalla.",
@@ -308,6 +309,10 @@ export class VoiceTurns {
         turn.chatTurnId = m.turnId;
         turn.conversationId = m.conversationId;
         this.lastConversation = { id: m.conversationId, at: this.now() };
+        return;
+      case "chat.tool":
+        // Tools take a while: an instant cached acknowledgement beats silence (VOICE_PIPELINE §2).
+        if (live && m.status === "started" && turn.seq === 0) this.speak(turn, PHRASES.lookup);
         return;
       case "chat.delta":
         turn.firstTokenAt ??= this.now();

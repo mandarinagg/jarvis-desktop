@@ -5,6 +5,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import type { Usage } from "@jarvis/shared";
+import type { ToolRuntime } from "../tools/hub.js";
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -15,7 +16,20 @@ export interface ChatTurnRequest {
   messages: { role: "user" | "assistant"; content: string }[];
   signal: AbortSignal;
   onText: (delta: string) => void;
+  /** Read tools (ADR-017). The adapter runs the tool loop; every call goes through the runtime's gate. */
+  tools?: ToolRuntime | undefined;
+  turnId?: string | undefined;
+  onTool?: ((event: ToolEvent) => void) | undefined;
 }
+
+export interface ToolEvent {
+  name: string;
+  summary: string;
+  status: "started" | "done" | "error" | "denied";
+}
+
+/** Tool rounds per turn; the last round is forced to answer with what it has (tool_choice none). */
+export const MAX_TOOL_ROUNDS = 8;
 
 export interface ChatTurnResult {
   text: string;
@@ -57,6 +71,8 @@ export interface AnthropicChatModelOptions {
   maxTokens?: number;
   timeoutMs?: number;
   maxRetries?: number;
+  /** Tests only: a stand-in for the SDK client. */
+  client?: Anthropic;
 }
 
 export class AnthropicChatModel implements ChatModel {
@@ -69,7 +85,7 @@ export class AnthropicChatModel implements ChatModel {
     this.model = opts.model ?? "claude-opus-5-5";
     this.effort = opts.effort ?? "low";
     this.maxTokens = opts.maxTokens ?? 16_000;
-    this.client = new Anthropic({
+    this.client = opts.client ?? new Anthropic({
       apiKey: opts.apiKey,
       timeout: opts.timeoutMs ?? 120_000,
       maxRetries: opts.maxRetries ?? 2,
@@ -78,41 +94,70 @@ export class AnthropicChatModel implements ChatModel {
 
   async complete(req: ChatTurnRequest): Promise<ChatTurnResult> {
     let text = "";
+    const usage: Usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+    const messages: Anthropic.Beta.BetaMessageParam[] = req.messages.map((m) => ({ role: m.role, content: m.content }));
+    // Fixed for the whole turn: system and tools never change between rounds (history-editing check).
+    const tools = req.tools?.definitions() ?? [];
+    const system: Anthropic.Beta.BetaTextBlockParam[] = [
+      { type: "text", text: req.system, cache_control: { type: "ephemeral" } },
+      ...(req.systemSuffix ? [{ type: "text" as const, text: req.systemSuffix }] : []),
+    ];
+    let model: string;
+    let stopReason: string;
     try {
-      const stream = this.client.beta.messages.stream(
-        {
-          model: this.model,
-          max_tokens: this.maxTokens,
-          // Stable prefix first so it is cached across turns (CLAUDE_API.md §3).
-          system: [
-            { type: "text", text: req.system, cache_control: { type: "ephemeral" } },
-            ...(req.systemSuffix ? [{ type: "text" as const, text: req.systemSuffix }] : []),
-          ],
-          messages: req.messages,
-          cache_control: { type: "ephemeral" }, // also cache the growing conversation history
-          output_config: { effort: this.effort },
-          betas: ["server-side-fallback-2026-07-01"],
-          fallbacks: "default",
-        },
-        { signal: req.signal },
-      );
-      stream.on("text", (delta) => {
-        text += delta;
-        req.onText(delta);
-      });
-      const message = await stream.finalMessage();
-      const u = message.usage;
-      return {
-        text,
-        stopReason: message.stop_reason ?? "unknown",
-        model: message.model,
-        usage: {
-          inputTokens: u.input_tokens,
-          outputTokens: u.output_tokens,
-          cacheReadTokens: u.cache_read_input_tokens ?? 0,
-          cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
-        },
-      };
+      for (let round = 0; ; round++) {
+        const lastRound = round >= MAX_TOOL_ROUNDS;
+        const stream = this.client.beta.messages.stream(
+          {
+            model: this.model,
+            max_tokens: this.maxTokens,
+            // Stable prefix first so it is cached across turns (CLAUDE_API.md §3).
+            system,
+            messages,
+            ...(tools.length ? { tools, ...(lastRound ? { tool_choice: { type: "none" as const } } : {}) } : {}),
+            cache_control: { type: "ephemeral" }, // also cache the growing conversation history
+            output_config: { effort: this.effort },
+            betas: ["server-side-fallback-2026-07-01"],
+            fallbacks: "default",
+          },
+          { signal: req.signal },
+        );
+        let firstDelta = true;
+        stream.on("text", (delta) => {
+          if (firstDelta && round > 0 && text && !/\s$/.test(text)) {
+            text += "\n\n";
+            req.onText("\n\n");
+          }
+          firstDelta = false;
+          text += delta;
+          req.onText(delta);
+        });
+        const message = await stream.finalMessage();
+        const u = message.usage;
+        usage.inputTokens += u.input_tokens;
+        usage.outputTokens += u.output_tokens;
+        usage.cacheReadTokens += u.cache_read_input_tokens ?? 0;
+        usage.cacheWriteTokens += u.cache_creation_input_tokens ?? 0;
+        model = message.model;
+        stopReason = message.stop_reason ?? "unknown";
+
+        const uses = message.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
+        if (message.stop_reason !== "tool_use" || !uses.length || !req.tools) break;
+
+        // Append-only: the assistant turn goes back unchanged, thinking blocks included.
+        messages.push({ role: "assistant", content: message.content as Anthropic.Beta.BetaContentBlockParam[] });
+        const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
+        for (const use of uses) {
+          const summary = req.tools.describe(use.name, use.input);
+          req.onTool?.({ name: use.name, summary, status: "started" });
+          const r = await req.tools.call(use.name, use.input, { turnId: req.turnId, signal: req.signal });
+          const status = !r.isError ? "done" : r.content.startsWith("Permiso denegado") ? "denied" : "error";
+          req.onTool?.({ name: use.name, summary, status });
+          results.push({ type: "tool_result", tool_use_id: use.id, content: r.content, ...(r.isError ? { is_error: true } : {}) });
+        }
+        messages.push({ role: "user", content: results });
+      }
+      return { text, stopReason, model, usage };
     } catch (err) {
       if (req.signal.aborted || err instanceof Anthropic.APIUserAbortError) throw new TurnCancelledError(text);
       throw toUpstreamError(err);
