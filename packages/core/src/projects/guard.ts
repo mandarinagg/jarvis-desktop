@@ -133,6 +133,26 @@ export async function resolveInside(root: string, requested: string): Promise<{ 
 }
 
 /**
+ * Canonical form of a path that may not exist yet: realpath of its deepest existing ancestor plus
+ * the rest. Needed to compare against realpath'd roots (8.3 short names like RUNNER~1, junctions).
+ */
+export function canonical(p: string): string {
+  const abs = path.resolve(p);
+  const rest: string[] = [];
+  let cur = abs;
+  for (;;) {
+    try {
+      return path.join(realpathSync.native(cur), ...rest.reverse());
+    } catch {
+      const parent = path.dirname(cur);
+      if (parent === cur) return abs;
+      rest.push(path.basename(cur));
+      cur = parent;
+    }
+  }
+}
+
+/**
  * Validates a folder the owner wants to authorize. Returns its canonical path. Rejects drive roots,
  * system folders, the whole user profile and Jarvis' own data folder.
  */
@@ -156,12 +176,12 @@ export function validateRoot(folder: string, jarvisHome: string, env: NodeJS.Pro
     env.LOCALAPPDATA,
   ].filter((p): p is string => Boolean(p));
   for (const f of forbidden) {
-    if (norm(path.resolve(f)) === norm(real)) throw new PathDeniedError("no se puede autorizar una carpeta del sistema o el perfil entero");
+    if (norm(canonical(f)) === norm(real)) throw new PathDeniedError("no se puede autorizar una carpeta del sistema o el perfil entero");
   }
   for (const f of [env.WINDIR ?? env.SystemRoot, env.ProgramFiles, env["ProgramFiles(x86)"]].filter((p): p is string => Boolean(p))) {
-    if (isInside(path.resolve(f), real)) throw new PathDeniedError("no se puede autorizar una carpeta del sistema");
+    if (isInside(canonical(f), real)) throw new PathDeniedError("no se puede autorizar una carpeta del sistema");
   }
-  const home = path.resolve(jarvisHome);
+  const home = canonical(jarvisHome);
   if (isInside(real, home) || isInside(home, real)) throw new PathDeniedError("no se puede autorizar la carpeta de datos de Jarvis");
   return real;
 }
