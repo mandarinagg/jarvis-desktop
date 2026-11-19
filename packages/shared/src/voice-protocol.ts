@@ -65,7 +65,12 @@ export type SttStop = z.infer<typeof SttStop>;
 export const SttCancel = z.strictObject({ type: z.literal("stt.cancel"), id: Id });
 export type SttCancel = z.infer<typeof SttCancel>;
 
+/** No more phrases for this turn: tts.finished fires once everything queued has played. */
+export const TtsEnd = z.strictObject({ type: z.literal("tts.end"), id: Id, turnId: Id });
+export type TtsEnd = z.infer<typeof TtsEnd>;
+
 export const ToVoiceMessage = z.discriminatedUnion("type", [
+  TtsEnd,
   VoiceConfigure,
   VoicePing,
   VoiceShutdown,

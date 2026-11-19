@@ -77,6 +77,7 @@ TO_VOICE: dict[str, Schema] = {
     "voice.shutdown": Schema({"id": _ID}, {}),
     "tts.speak": Schema({"id": _ID, "turnId": _ID, "seq": _SEQ, "text": _str(1, 2000), "final": _bool}, {}),
     "tts.cancel": Schema({"id": _ID, "turnId": _ID}, {}),
+    "tts.end": Schema({"id": _ID, "turnId": _ID}, {}),
     "stt.start": Schema({"id": _ID}, {}),
     "stt.stop": Schema({"id": _ID}, {}),
     "stt.cancel": Schema({"id": _ID}, {}),

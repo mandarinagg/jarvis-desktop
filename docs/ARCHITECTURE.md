@@ -72,6 +72,8 @@
 
 ## 4. Contratos de IPC
 
+> Clientes: `voice.ptt` y `voice.status.get` → Core; `voice.state` (con `micOpen`) y `voice.transcript` → todos los clientes, más el stream `chat.*` de los turnos de voz (protocolo 1.1).
+
 > Voz: esquema formal en `packages/shared/src/voice-protocol.ts` (ADR-013), verificado contra fixtures compartidos con Python. Los ejemplos de abajo son el diseño de los mensajes que se agregan durante la Fase 2.
 
 Mensajes JSON con `type`, `id`, `ts`. Ejemplos:

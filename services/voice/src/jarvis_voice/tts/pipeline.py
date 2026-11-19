@@ -84,6 +84,12 @@ class TtsPipeline:
             return
         self._jobs.put(job)
 
+    def end(self, turn_id: str) -> None:
+        """The Core has no more phrases for this turn (same as a speak with final=True)."""
+        if self._turn(turn_id).cancelled:
+            return
+        self._jobs.put(Job("end", turn_id, -1, "", True, self._clock()))
+
     def cancel(self, turn_id: str) -> None:
         state = self._turn(turn_id)
         with self._lock:
@@ -157,7 +163,7 @@ class TtsPipeline:
         state = self._turn(job.turn_id)
         if state.cancelled:
             return
-        result = self._synthesize(job)
+        result = self._synthesize(job) if job.text else None
         if state.cancelled:
             return
         if result is not None:

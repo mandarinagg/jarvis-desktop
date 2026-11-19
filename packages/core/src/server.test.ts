@@ -156,3 +156,34 @@ describe("single instance", () => {
     );
   });
 });
+
+describe("CoreServer voice", () => {
+  it("broadcasts to every authenticated client and routes voice.ptt", async () => {
+    const opts = { pipe: pipe(), token: newSessionToken(), coreVersion: "0.0.0-test" };
+    const ptts: boolean[] = [];
+    const server = new CoreServer({ ...opts, handlers: { voicePtt: (_s, m) => void ptts.push(m.pressed) } });
+    await server.listen();
+    servers.push(server);
+    const a = await CoreClient.connect({ pipe: opts.pipe, token: opts.token, client: "desktop" });
+    const b = await CoreClient.connect({ pipe: opts.pipe, token: opts.token, client: "cli" });
+    const isState = (m: CoreMessage): m is Extract<CoreMessage, { type: "voice.state" }> => m.type === "voice.state";
+    const got = Promise.all([a.waitFor(isState), b.waitFor(isState)]);
+    server.broadcast({ type: "voice.state", state: "listening", micOpen: true });
+    expect((await got).map((m) => m.state)).toEqual(["listening", "listening"]);
+    a.send({ type: "voice.ptt", id: "p1", pressed: true });
+    a.send({ type: "core.ping", id: "sync" });
+    await a.waitFor((m): m is Extract<CoreMessage, { type: "core.pong" }> => m.type === "core.pong");
+    expect(ptts).toEqual([true]);
+    a.close();
+    b.close();
+  });
+
+  it("reports voice as unavailable when there is no voice handler", async () => {
+    const { pipe, token } = await start();
+    const c = await CoreClient.connect({ pipe, token, client: "desktop" });
+    c.send({ type: "voice.status.get", id: "s1" });
+    const err = await c.waitFor((m): m is Extract<CoreMessage, { type: "error" }> => m.type === "error");
+    expect(err).toMatchObject({ id: "s1", code: "upstream_error" });
+    c.close();
+  });
+});

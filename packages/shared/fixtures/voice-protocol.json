@@ -73,6 +73,11 @@
       {
         "type": "stt.cancel",
         "id": "u1"
+      },
+      {
+        "type": "tts.end",
+        "id": "e1",
+        "turnId": "t1"
       }
     ],
     "invalid": [
@@ -206,6 +211,10 @@
         "type": "stt.stop",
         "id": "u1",
         "text": "x"
+      },
+      {
+        "type": "tts.end",
+        "id": "e1"
       }
     ]
   },

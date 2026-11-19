@@ -58,6 +58,11 @@ export class ConversationStore {
       .all(limit) as unknown as Conversation[];
   }
 
+  /** The owner cut the spoken reply short (barge-in after the text had already been stored). */
+  markInterrupted(turnId: string): void {
+    this.db.prepare("UPDATE messages SET interrupted = 1 WHERE turn_id = ? AND role = 'assistant'").run(turnId);
+  }
+
   appendMessage(m: {
     conversationId: string;
     turnId: string;

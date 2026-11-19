@@ -4,7 +4,7 @@
  * Owns the per-user named pipe (single instance), the SQLite database and the Claude adapter.
  */
 import { rm } from "node:fs/promises";
-import type { TtsConfig } from "@jarvis/shared";
+import type { CoreMessage, TtsConfig } from "@jarvis/shared";
 import path from "node:path";
 import { ChatService } from "./chat.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
@@ -16,8 +16,10 @@ import { KeyringSecretStore } from "./secrets.js";
 import { AlreadyRunningError, CoreServer } from "./server.js";
 import { ConversationStore } from "./store.js";
 import { newSessionToken, writeSessionToken } from "./token.js";
+import { VoiceMetricsStore } from "./voice/metrics.js";
 import { createVoiceSpawner } from "./voice/spawn.js";
 import { VoiceSupervisor } from "./voice/supervisor.js";
+import { VoiceTurns } from "./voice/turns.js";
 
 export const CORE_VERSION = "0.1.0";
 const EFFORTS: readonly Effort[] = ["low", "medium", "high", "xhigh", "max"];
@@ -57,16 +59,37 @@ async function main(): Promise<number> {
   const budget = Number(env.JARVIS_DAILY_BUDGET_USD || 3);
 
   const db = openDatabase(path.join(home, "jarvis.db"));
+  const store = new ConversationStore(db);
   const chat = new ChatService({
-    store: new ConversationStore(db),
+    store,
     model: modelResolver(env),
     systemPrompt: loadSystemPrompt(),
     dailyBudgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 3,
     logger,
   });
 
+  // The server is created below; voice events only flow once it is listening.
+  let broadcast: (m: CoreMessage) => void = () => {};
+  const turns = new VoiceTurns({
+    voice: { send: (m) => voice?.send(m) ?? false },
+    chat,
+    broadcast: (m) => broadcast(m),
+    metrics: new VoiceMetricsStore(db),
+    markInterrupted: (turnId) => store.markInterrupted(turnId),
+    logger,
+  });
   // Voice is on by default (Phase 2); JARVIS_VOICE=0 keeps the Core text-only.
-  const voice = env.JARVIS_VOICE === "0" ? undefined : new VoiceSupervisor({ spawn: createVoiceSpawner(env), tts: ttsResolver(env), stt: env.JARVIS_STT !== "0", logger });
+  const voice: VoiceSupervisor | undefined =
+    env.JARVIS_VOICE === "0"
+      ? undefined
+      : new VoiceSupervisor({
+          spawn: createVoiceSpawner(env),
+          tts: ttsResolver(env),
+          stt: env.JARVIS_STT !== "0",
+          logger,
+          onState: (state, detail) => turns.supervisorState(state, detail),
+          onMessage: (m) => turns.onVoiceMessage(m),
+        });
 
   const stop = async (reason: string) => {
     logger.log("info", "core.stopping", { reason });
@@ -90,6 +113,8 @@ async function main(): Promise<number> {
       conversationsList: (s, m) => chat.conversationsList(s, m),
       conversationsGet: (s, m) => chat.conversationsGet(s, m),
       budgetGet: (s, m) => chat.budgetGet(s, m),
+      voicePtt: (s, m) => turns.ptt(s, m),
+      voiceStatusGet: (s, m) => turns.statusGet(s, m),
       shutdown: () => stop("core.shutdown"),
     },
   });
@@ -105,6 +130,7 @@ async function main(): Promise<number> {
   }
   // The token is written only after we own the pipe, so a second instance never overwrites it.
   await writeSessionToken(tokenPath(home), token);
+  broadcast = (m) => server.broadcast(m);
   logger.log("info", "core.ready", { pipe, version: CORE_VERSION, dailyBudgetUsd: budget });
   voice?.start();
 

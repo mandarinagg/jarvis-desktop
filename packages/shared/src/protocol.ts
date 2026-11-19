@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.0";
+export const PROTOCOL_VERSION = "1.1"; // 1.1: voice.* messages (Phase 2)
 
 const Id = z.string().min(1).max(64);
 const SessionToken = z.string().regex(/^[0-9a-f]{64}$/, "token must be 256-bit lowercase hex");
@@ -46,7 +46,21 @@ export type ConversationsGet = z.infer<typeof ConversationsGet>;
 export const BudgetGet = z.strictObject({ type: z.literal("budget.get"), id: Id });
 export type BudgetGet = z.infer<typeof BudgetGet>;
 
+/** Push-to-talk key pressed/released (Phase 2). Pressing while Jarvis speaks interrupts it (barge-in). */
+export const VoicePtt = z.strictObject({
+  type: z.literal("voice.ptt"),
+  id: Id,
+  pressed: z.boolean(),
+  conversationId: Id.optional(),
+});
+export type VoicePtt = z.infer<typeof VoicePtt>;
+
+export const VoiceStatusGet = z.strictObject({ type: z.literal("voice.status.get"), id: Id });
+export type VoiceStatusGet = z.infer<typeof VoiceStatusGet>;
+
 export const ClientMessage = z.discriminatedUnion("type", [
+  VoicePtt,
+  VoiceStatusGet,
   AuthHello,
   CorePing,
   CoreShutdown,
@@ -149,7 +163,31 @@ export const BudgetStatus = z.strictObject({
 });
 export type BudgetStatus = z.infer<typeof BudgetStatus>;
 
+/** Overlay states (VOICE_PIPELINE §3). `micOpen` drives the mandatory microphone indicator. */
+export const VoiceStateName = z.enum(["unavailable", "idle", "listening", "transcribing", "thinking", "speaking"]);
+export type VoiceStateName = z.infer<typeof VoiceStateName>;
+
+export const VoiceStateMessage = z.strictObject({
+  type: z.literal("voice.state"),
+  id: Id.optional(),
+  state: VoiceStateName,
+  micOpen: z.boolean(),
+  conversationId: Id.optional(),
+  detail: z.string().max(500).optional(),
+});
+export type VoiceStateMessage = z.infer<typeof VoiceStateMessage>;
+
+/** What Jarvis understood, before answering. */
+export const VoiceTranscript = z.strictObject({
+  type: z.literal("voice.transcript"),
+  utteranceId: Id,
+  text: z.string().max(8_000),
+});
+export type VoiceTranscript = z.infer<typeof VoiceTranscript>;
+
 export const CoreMessage = z.discriminatedUnion("type", [
+  VoiceStateMessage,
+  VoiceTranscript,
   AuthOk,
   CorePong,
   CoreError,
