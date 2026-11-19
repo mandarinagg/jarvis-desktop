@@ -87,6 +87,12 @@ describe("VoiceSupervisor", () => {
     expect(child(1).received[0]).toMatchObject({ tts: { googleApiKey: "k2" } });
   });
 
+  it("asks for Parakeet STT when enabled", () => {
+    const { sup, child } = setup({ stt: true });
+    sup.start();
+    expect(child(0).received[0]).toMatchObject({ stt: { engine: "parakeet" } });
+  });
+
   it("only sends messages once ready", async () => {
     const { sup, child } = setup();
     sup.start();

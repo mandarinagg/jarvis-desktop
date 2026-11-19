@@ -27,6 +27,9 @@ Observaciones:
 - **Alternativo:** whisper large-v3-turbo con **contexto completo**, greedy y prompt de vocabulario, para dictados largos o si Parakeet falla. **Nunca** con `audio_ctx` reducido.
 - **Fase 2:** capa de corrección post-STT con un diccionario de términos del owner (Jarvis, Claude, API, MCP, nombres de proyectos) con matching difuso, medida con el mismo benchmark.
 
+## Nota (2026-11-19)
+La CLI tarda 4.7 s por llamada porque recarga el modelo. El servicio usa `parakeet.dll` dentro del proceso y tarda ~100 ms por frase (ADR-014).
+
 ## Consecuencias
 - (+) Al STT le quedan ~100 ms de margen dentro del presupuesto de latencia (meta: 300 ms).
 - (+) Un solo runtime (ggml de whisper.cpp) para ambos motores; cambiar de motor es cambiar de modelo y CLI.

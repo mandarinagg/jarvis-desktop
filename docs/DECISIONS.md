@@ -18,3 +18,4 @@ Estados: **Propuesta** → **Aceptada** / **Rechazada** → (**Reemplazada por A
 | [011](adr/011-motor-tts-google-neural2.md) | Motor de TTS: Google Neural2 (nube) + Piper daniela como fallback offline; reemplaza la parte TTS de ADR-004 | Aceptada |
 | [012](adr/012-toolchain-del-monorepo.md) | Toolchain: TypeScript 6 estricto, ESLint 10 flat, Vitest 5, CI en windows-latest | Aceptada |
 | [013](adr/013-protocolo-de-voz-y-orquestacion.md) | Protocolo Core↔Voz (fixtures compartidos TS/Python), el Core orquesta el turno, secretos por stdio, push-to-talk primero | Aceptada |
+| [014](adr/014-stt-en-proceso-con-parakeet-dll.md) | STT en proceso con `parakeet.dll` vía ctypes (~100 ms, la CLI tardaba 4.7 s), push-to-talk y corrección post-STT | Aceptada |

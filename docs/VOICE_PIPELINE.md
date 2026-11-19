@@ -45,6 +45,16 @@ Técnicas: STT parcial mientras habla, prompt caching, TTS por frase (no esperar
 
 Primera medición real (2026-11-19, en frío, con el prewarm compitiendo por el canal): la primera frase arrancó a los 1.8 s y la segunda empalmó sin hueco. Piper genera 2.5 s de audio en 1.7 s, carga del modelo incluida.
 
+## 2.2 STT implementado (Fase 2, ADR-014)
+
+| Pieza | Dónde | Detalle |
+|-------|-------|---------|
+| Motor | `services/voice/src/jarvis_voice/stt/parakeet.py` | `parakeet.dll` por ctypes, con el modelo cargado una vez en la GPU y warm-up al arrancar. 93–110 ms por frase de ~5 s (la CLI tardaba 4.7 s) |
+| Captura | `stt/controller.py` | Push-to-talk: `stt.start` abre el micrófono y `stt.stop` lo cierra y transcribe. Cada apertura y cierre se avisa con `stt.listening`. Tope de 60 s; lo que dura menos de 250 ms devuelve texto vacío |
+| Corrección | `stt/corrections.py` | Reglas por frase y vocabulario difuso conservador. Se amplía en `%APPDATA%/Jarvis/stt/vocabulary.txt` (`mal => bien` o un término por línea) |
+
+Los logs registran la duración y la latencia de cada frase, pero **nunca el texto transcripto**.
+
 ## 3. Estados (visibles en overlay)
 
 `inactivo` → `escuchando` → `transcribiendo` → `pensando` → `hablando` → `inactivo`, más `muteado` y `error`.

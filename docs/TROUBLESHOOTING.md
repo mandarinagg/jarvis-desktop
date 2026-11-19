@@ -13,6 +13,8 @@ Se completa a medida que aparecen problemas reales. Formato: **Síntoma → Caus
 - **El fallback de Piper falla con `AttributeError: 'Wave_write' object has no attribute '_file'`** → `python -m piper -f -` reabre por nombre un `NamedTemporaryFile`, y Windows no lo permite → Usar `--output-raw` (PCM16 crudo) y tomar la frecuencia de muestreo del `.onnx.json` del modelo. Así lo hace `PiperEngine`.
 - **Piper habla solo por los parlantes en vez de devolver audio** → Sin `-f` ni `--output-raw`, la CLI de Piper reproduce el audio ella misma → Pasar siempre `--output-raw`.
 - **La voz queda `degradado` al arrancar el Core** → No se encontró `uv`, o el servicio se cayó 5 veces en 10 minutos → Ver los eventos `voice.*` en el log del Core. Para probar el servicio a mano: `uv run --project services/voice --locked python -m jarvis_voice.service`. `JARVIS_VOICE=0` deja solo el texto.
+- **`GGML_ASSERT(device) failed` al cargar `parakeet.dll`** → No hay backends de ggml registrados → Llamar a `ggml_backend_load_all_from_path(<bin>)` de `ggml.dll` antes de crear el contexto (ADR-014).
+- **El STT en proceso tarda ~700 ms y el log dice `use gpu = 112` / `no GPU found`** → `parakeet_context_params` se pasó como puntero: es un struct de 8 bytes que viaja por valor → Declararlo como `ctypes.Structure` (ADR-014).
 - **Whisper repite la misma frase 2–4 veces** → `audio_ctx` demasiado chico (≤ 384) → Usar un piso de 512 (ADR-009).
 
 ## API
