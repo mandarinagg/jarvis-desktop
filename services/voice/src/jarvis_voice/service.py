@@ -19,10 +19,12 @@ from typing import Any, BinaryIO
 
 from . import __version__
 from .protocol import MAX_LINE_BYTES, VOICE_PROTOCOL_VERSION, ProtocolError, encode, is_compatible_version, parse_to_voice
+from .stt.controller import SttController
 from .tts.pipeline import TtsPipeline
 
 Writer = Callable[[dict[str, Any]], None]
 TtsFactory = Callable[[dict[str, Any], Writer], TtsPipeline]
+SttFactory = Callable[[dict[str, Any], Writer], SttController]
 
 
 def log(level: str, msg: str, **fields: Any) -> None:
@@ -33,10 +35,12 @@ def log(level: str, msg: str, **fields: Any) -> None:
 class VoiceService:
     """Message handling, independent of the transport so it can be tested in-process."""
 
-    def __init__(self, send: Writer, tts_factory: TtsFactory | None = None) -> None:
+    def __init__(self, send: Writer, tts_factory: TtsFactory | None = None, stt_factory: SttFactory | None = None) -> None:
         self._send = send
         self._tts_factory = tts_factory or build_tts
+        self._stt_factory = stt_factory or build_stt
         self.tts: TtsPipeline | None = None
+        self.stt: SttController | None = None
         self.configured = False
         self.running = True
 
@@ -69,13 +73,28 @@ class VoiceService:
                 self.tts.speak(msg)
             else:
                 self.tts.cancel(msg["turnId"])
+        elif kind in ("stt.start", "stt.stop", "stt.cancel"):
+            if self.stt is None:
+                self.error("not_configured", "STT is not configured", id_)
+            elif kind == "stt.start":
+                self.stt.start(id_)
+            elif kind == "stt.stop":
+                self.stt.stop(id_)
+            else:
+                self.stt.cancel(id_)
         elif kind == "voice.configure":
             if not is_compatible_version(msg["protocolVersion"]):
                 self.error("incompatible_version", f"voice protocol {VOICE_PROTOCOL_VERSION} required", id_)
                 self.running = False
                 return
+            self.close()
+            if "stt" in msg:
+                try:
+                    self.stt = self._stt_factory(msg["stt"], self._send)
+                except Exception as exc:
+                    log("error", "voice.stt_unavailable", error=repr(exc))
+                    self.error("stt_failed", f"STT unavailable: {type(exc).__name__}", id_)
             if "tts" in msg:
-                self.close()
                 try:
                     self.tts = self._tts_factory(msg["tts"], self._send)
                 except Exception as exc:  # missing model, bad audio device: voice stays text-less
@@ -88,9 +107,31 @@ class VoiceService:
 
 
     def close(self) -> None:
+        if self.stt is not None:
+            self.stt.close()
+            self.stt = None
         if self.tts is not None:
             self.tts.close()
             self.tts = None
+
+
+def build_stt(_config: dict[str, Any], send: Writer) -> SttController:
+    """Parakeet loads in the background (~1 s with Vulkan); stt.start works meanwhile."""
+    from .paths import parakeet_model, stt_bin_dir, stt_vocabulary
+    from .stt.controller import SoundDeviceMicrophone
+    from .stt.corrections import Corrector
+    from .stt.parakeet import ParakeetEngine
+
+    bin_dir, model = stt_bin_dir(), parakeet_model()
+    if not (bin_dir / "parakeet.dll").exists() or not model.exists():
+        raise FileNotFoundError("parakeet.dll or the Parakeet model is missing: run jarvis-stt-bench setup")
+    return SttController(
+        lambda: ParakeetEngine(bin_dir, model),
+        SoundDeviceMicrophone(),
+        send,
+        corrector=Corrector.from_file(stt_vocabulary()),
+        log=log,
+    )
 
 
 def build_tts(config: dict[str, Any], send: Writer) -> TtsPipeline:

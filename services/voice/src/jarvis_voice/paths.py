@@ -17,5 +17,19 @@ def piper_model(name: str = "es_AR-daniela-high") -> Path:
     return jarvis_home() / "models" / "tts" / "piper" / f"{name}.onnx"
 
 
+def stt_bin_dir() -> Path:
+    from .diagnostics.stt_bench import LLAMA_TAG, WHISPER_TAG  # pinned binaries (ADR-009)
+
+    return jarvis_home() / "bin" / f"stt-whisper-{WHISPER_TAG}-vk-{LLAMA_TAG}"
+
+
+def parakeet_model() -> Path:
+    return jarvis_home() / "models" / "parakeet" / "ggml-parakeet-tdt-0.6b-v3-q8_0.bin"
+
+
+def stt_vocabulary() -> Path:
+    return jarvis_home() / "stt" / "vocabulary.txt"
+
+
 def tts_cache_dir() -> Path:
     return jarvis_home() / "cache" / "tts"

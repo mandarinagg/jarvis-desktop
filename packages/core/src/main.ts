@@ -66,7 +66,7 @@ async function main(): Promise<number> {
   });
 
   // Voice is on by default (Phase 2); JARVIS_VOICE=0 keeps the Core text-only.
-  const voice = env.JARVIS_VOICE === "0" ? undefined : new VoiceSupervisor({ spawn: createVoiceSpawner(env), tts: ttsResolver(env), logger });
+  const voice = env.JARVIS_VOICE === "0" ? undefined : new VoiceSupervisor({ spawn: createVoiceSpawner(env), tts: ttsResolver(env), stt: env.JARVIS_STT !== "0", logger });
 
   const stop = async (reason: string) => {
     logger.log("info", "core.stopping", { reason });

@@ -37,6 +37,8 @@ export interface VoiceSupervisorOptions {
   spawn: VoiceSpawner;
   /** Read on every (re)start, so a key stored while the Core runs is picked up on the next launch. */
   tts?: () => TtsConfig | undefined;
+  /** Push-to-talk STT with Parakeet (ADR-010); off when false. */
+  stt?: boolean;
   logger?: Logger;
   onState?: (state: VoiceState, detail?: string) => void;
   onMessage?: (message: FromVoiceMessage) => void;
@@ -189,6 +191,7 @@ export class VoiceSupervisor {
       id: configureId,
       protocolVersion: VOICE_PROTOCOL_VERSION,
       ...(tts ? { tts } : {}),
+      ...(this.opts.stt ? { stt: { engine: "parakeet" as const } } : {}),
     });
   }
 

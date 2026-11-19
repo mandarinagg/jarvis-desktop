@@ -66,15 +66,23 @@ TTS_CONFIG = Schema(
     {"googleApiKey": _str(1, 256)},
 )
 
+STT_CONFIG = Schema({"engine": _enum("parakeet")}, {})
+
 TO_VOICE: dict[str, Schema] = {
-    "voice.configure": Schema({"id": _ID, "protocolVersion": _str(0, 16)}, {"tts": _object(TTS_CONFIG)}),
+    "voice.configure": Schema(
+        {"id": _ID, "protocolVersion": _str(0, 16)},
+        {"tts": _object(TTS_CONFIG), "stt": _object(STT_CONFIG)},
+    ),
     "voice.ping": Schema({"id": _ID}, {}),
     "voice.shutdown": Schema({"id": _ID}, {}),
     "tts.speak": Schema({"id": _ID, "turnId": _ID, "seq": _SEQ, "text": _str(1, 2000), "final": _bool}, {}),
     "tts.cancel": Schema({"id": _ID, "turnId": _ID}, {}),
+    "stt.start": Schema({"id": _ID}, {}),
+    "stt.stop": Schema({"id": _ID}, {}),
+    "stt.cancel": Schema({"id": _ID}, {}),
 }
 
-ERROR_CODES = ("invalid_json", "invalid_message", "incompatible_version", "not_configured", "tts_failed", "internal")
+ERROR_CODES = ("invalid_json", "invalid_message", "incompatible_version", "not_configured", "tts_failed", "stt_failed", "internal")
 
 FROM_VOICE: dict[str, Schema] = {
     "voice.ready": Schema({"id": _ID, "protocolVersion": _str(0, 16), "serviceVersion": _str(0, 32)}, {}),
@@ -84,6 +92,8 @@ FROM_VOICE: dict[str, Schema] = {
         {"turnId": _ID, "seq": _SEQ, "engine": _enum("google", "piper", "cache"), "latencyMs": _nonneg_number}, {}
     ),
     "tts.finished": Schema({"turnId": _ID, "interrupted": _bool}, {}),
+    "stt.listening": Schema({"id": _ID, "open": _bool}, {}),
+    "stt.final": Schema({"id": _ID, "text": _str(0, 8000), "audioMs": _nonneg_number, "sttMs": _nonneg_number}, {}),
 }
 
 

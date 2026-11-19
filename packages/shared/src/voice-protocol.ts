@@ -28,6 +28,7 @@ export const VoiceConfigure = z.strictObject({
   id: Id,
   protocolVersion: z.string().max(16),
   tts: TtsConfig.optional(),
+  stt: z.strictObject({ engine: z.literal("parakeet") }).optional(),
 });
 export type VoiceConfigure = z.infer<typeof VoiceConfigure>;
 
@@ -52,7 +53,28 @@ export type TtsSpeak = z.infer<typeof TtsSpeak>;
 export const TtsCancel = z.strictObject({ type: z.literal("tts.cancel"), id: Id, turnId: Id });
 export type TtsCancel = z.infer<typeof TtsCancel>;
 
-export const ToVoiceMessage = z.discriminatedUnion("type", [VoiceConfigure, VoicePing, VoiceShutdown, TtsSpeak, TtsCancel]);
+/** Push-to-talk pressed: open the microphone and record. `id` names the utterance. */
+export const SttStart = z.strictObject({ type: z.literal("stt.start"), id: Id });
+export type SttStart = z.infer<typeof SttStart>;
+
+/** Push-to-talk released: close the microphone and transcribe. */
+export const SttStop = z.strictObject({ type: z.literal("stt.stop"), id: Id });
+export type SttStop = z.infer<typeof SttStop>;
+
+/** Discard the utterance being recorded (no transcription). */
+export const SttCancel = z.strictObject({ type: z.literal("stt.cancel"), id: Id });
+export type SttCancel = z.infer<typeof SttCancel>;
+
+export const ToVoiceMessage = z.discriminatedUnion("type", [
+  VoiceConfigure,
+  VoicePing,
+  VoiceShutdown,
+  TtsSpeak,
+  TtsCancel,
+  SttStart,
+  SttStop,
+  SttCancel,
+]);
 export type ToVoiceMessage = z.infer<typeof ToVoiceMessage>;
 
 // ------------------------------------------------------------------ voice -> core
@@ -63,6 +85,7 @@ export const VoiceErrorCode = z.enum([
   "incompatible_version",
   "not_configured",
   "tts_failed",
+  "stt_failed",
   "internal",
 ]);
 export type VoiceErrorCode = z.infer<typeof VoiceErrorCode>;
@@ -100,7 +123,29 @@ export type TtsStarted = z.infer<typeof TtsStarted>;
 export const TtsFinished = z.strictObject({ type: z.literal("tts.finished"), turnId: Id, interrupted: z.boolean() });
 export type TtsFinished = z.infer<typeof TtsFinished>;
 
-export const FromVoiceMessage = z.discriminatedUnion("type", [VoiceReady, VoicePong, VoiceError, TtsStarted, TtsFinished]);
+/** The microphone is open (or closed again): the UI shows the mandatory mic indicator. */
+export const SttListening = z.strictObject({ type: z.literal("stt.listening"), id: Id, open: z.boolean() });
+export type SttListening = z.infer<typeof SttListening>;
+
+/** Final transcription of an utterance. Empty text means nothing intelligible was said. */
+export const SttFinal = z.strictObject({
+  type: z.literal("stt.final"),
+  id: Id,
+  text: z.string().max(8_000),
+  audioMs: z.number().nonnegative(),
+  sttMs: z.number().nonnegative(),
+});
+export type SttFinal = z.infer<typeof SttFinal>;
+
+export const FromVoiceMessage = z.discriminatedUnion("type", [
+  VoiceReady,
+  VoicePong,
+  VoiceError,
+  TtsStarted,
+  TtsFinished,
+  SttListening,
+  SttFinal,
+]);
 export type FromVoiceMessage = z.infer<typeof FromVoiceMessage>;
 
 // ------------------------------------------------------------------ helpers

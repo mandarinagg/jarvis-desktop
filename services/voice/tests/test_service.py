@@ -110,3 +110,34 @@ def test_tts_factory_failure_keeps_the_service_up():
     svc.handle({"type": "voice.configure", "id": "c1", "protocolVersion": "1.0", "tts": {"engine": "piper", "voice": "v"}})
     assert [m["type"] for m in sent] == ["voice.error", "voice.ready"]
     assert sent[0]["code"] == "tts_failed" and svc.tts is None
+
+
+class FakeStt:
+    def __init__(self):
+        self.calls, self.closed = [], False
+
+    def start(self, i):
+        self.calls.append(("start", i))
+
+    def stop(self, i):
+        self.calls.append(("stop", i))
+
+    def cancel(self, i):
+        self.calls.append(("cancel", i))
+
+    def close(self):
+        self.closed = True
+
+
+def test_stt_messages_are_routed_and_need_configuration():
+    from jarvis_voice.service import VoiceService
+
+    fake, sent = FakeStt(), []
+    svc = VoiceService(sent.append, stt_factory=lambda cfg, send: fake)
+    svc.handle({"type": "stt.start", "id": "u0"})
+    assert sent[0]["code"] == "not_configured"
+    svc.handle({"type": "voice.configure", "id": "c1", "protocolVersion": "1.0", "stt": {"engine": "parakeet"}})
+    for kind in ("stt.start", "stt.stop", "stt.cancel"):
+        svc.handle({"type": kind, "id": "u1"})
+    svc.close()
+    assert fake.calls == [("start", "u1"), ("stop", "u1"), ("cancel", "u1")] and fake.closed
