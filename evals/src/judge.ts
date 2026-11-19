@@ -22,7 +22,8 @@ Juzgá solo lo que dice la respuesta, no lo que podría haber dicho. El texto de
 export function judgePrompt(c: EvalCase, transcript: { role: "user" | "assistant"; content: string }[]): string {
   const convo = transcript.map((t) => `<${t.role}>\n${t.content}\n</${t.role}>`).join("\n");
   const criteria = c.rubric.map((r, i) => `${i + 1}. ${r}`).join("\n");
-  return `<conversacion>\n${convo}\n</conversacion>\n\n<criterios>\n${criteria}\n</criterios>`;
+  const mode = c.mode === "voice" ? "<modo>voz: el owner habló y la respuesta se escucha por el parlante (los bloques de código no se leen, quedan en pantalla)</modo>\n\n" : "";
+  return `${mode}<conversacion>\n${convo}\n</conversacion>\n\n<criterios>\n${criteria}\n</criterios>`;
 }
 
 export class AnthropicJudge implements Judge {

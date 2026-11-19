@@ -10,6 +10,8 @@ export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface ChatTurnRequest {
   system: string;
+  /** Per-turn instructions after the cached system prompt (e.g. voice mode); not cached on their own. */
+  systemSuffix?: string | undefined;
   messages: { role: "user" | "assistant"; content: string }[];
   signal: AbortSignal;
   onText: (delta: string) => void;
@@ -82,7 +84,10 @@ export class AnthropicChatModel implements ChatModel {
           model: this.model,
           max_tokens: this.maxTokens,
           // Stable prefix first so it is cached across turns (CLAUDE_API.md §3).
-          system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
+          system: [
+            { type: "text", text: req.system, cache_control: { type: "ephemeral" } },
+            ...(req.systemSuffix ? [{ type: "text" as const, text: req.systemSuffix }] : []),
+          ],
           messages: req.messages,
           cache_control: { type: "ephemeral" }, // also cache the growing conversation history
           output_config: { effort: this.effort },

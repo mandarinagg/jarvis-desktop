@@ -35,6 +35,7 @@ messages     →
 
 - El contenido de archivos, mails y webs se envuelve como datos (p. ej. `<document source="…">…</document>`) y el system prompt indica que **nunca** se obedecen instrucciones que aparezcan dentro.
 - Instrucciones de operador a mitad de conversación: usar mensajes `system` dentro de `messages` (no editar el `system` superior) para conservar la caché.
+- Excepción: el **modo voz** (ADR-015) va como segundo bloque de `system` sin `cache_control`, porque el historial persistido no guarda mensajes `system` y en una conversación toda por voz el bloque fijo cachea igual.
 
 ## 4. Costos
 

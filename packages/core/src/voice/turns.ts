@@ -38,7 +38,7 @@ export interface VoiceLink {
 }
 
 export interface ChatLike {
-  chatSend(session: Session, message: ChatSend): Promise<void>;
+  chatSend(session: Session, message: ChatSend, mode: "voice"): Promise<void>;
   chatCancel(session: Session, message: ChatCancel): void;
 }
 
@@ -241,7 +241,7 @@ export class VoiceTurns {
       text,
       ...(turn.conversationId ? { conversationId: turn.conversationId } : {}),
     };
-    this.opts.chat.chatSend(this.session(turn), msg).catch((err: unknown) => {
+    this.opts.chat.chatSend(this.session(turn), msg, "voice").catch((err: unknown) => {
       this.logger.log("error", "voice.chat_failed", { error: err instanceof Error ? err.message : String(err) });
       this.chatEvent(turn, { type: "error", id: msg.id, code: "internal", message: "internal error" });
     });

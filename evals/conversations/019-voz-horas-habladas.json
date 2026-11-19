@@ -1,0 +1,24 @@
+{
+  "id": "019-voz-horas-habladas",
+  "category": "voz",
+  "mode": "voice",
+  "turns": [
+    "Si salgo a las dos y media de la tarde y tardo una hora cuarenta, ¿a qué hora llego?"
+  ],
+  "checks": {
+    "maxChars": 300,
+    "mustNotMatch": [
+      "\\d{1,2}:\\d{2}",
+      "(?<!\\p{L})hs\\.?(?!\\p{L})",
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})quieres(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "La hora es correcta: llega a las cuatro y diez de la tarde (16:10).",
+    "Dice la hora como se habla, no en formato de reloj digital.",
+    "Responde en una o dos oraciones."
+  ]
+}
