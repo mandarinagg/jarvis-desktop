@@ -9,10 +9,13 @@ const usage = { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0, cacheWri
 describe("conversation cases", () => {
   const cases = loadCases();
 
-  it("has the 15 Phase 1 cases plus 4 voice cases, all valid, with unique ids", () => {
-    expect(cases).toHaveLength(19);
-    expect(new Set(cases.map((c) => c.id)).size).toBe(19);
+  it("has the Phase 1 cases, 4 voice cases and the 10 Phase 3 exit cases, all valid, with unique ids", () => {
+    expect(cases).toHaveLength(29);
+    expect(new Set(cases.map((c) => c.id)).size).toBe(29);
     expect(cases.filter((c) => c.mode === "voice")).toHaveLength(4);
+    const exit = cases.filter((c) => c.project === "jarvis-docs");
+    expect(exit).toHaveLength(10); // ROADMAP Phase 3 exit: 10/10 questions about a real project's docs
+    expect(exit.every((c) => c.checks.minToolCalls === 1)).toBe(true);
   });
 
   it("covers the behaviours Phase 1 cares about", () => {
@@ -89,5 +92,33 @@ describe("runAll", () => {
     const cases = loadCases().slice(0, 3);
     const s = await runAll(cases, model, judge(true), { system: "SYS" }, { maxCostUsd: 0.000001 });
     expect(s.results.filter((r) => r.error?.includes("tope"))).toHaveLength(2);
+  });
+});
+
+describe("project workspace (Phase 3)", () => {
+  it("registers docs/ only: every exit answer is findable and the eval cases are not", async () => {
+    const { createWorkspace } = await import("./workspace.js");
+    const c = loadCases().find((x) => x.project === "jarvis-docs");
+    if (!c) throw new Error("no project case");
+    const ws = await createWorkspace(c);
+    try {
+      expect(ws.card).toContain("Proyecto activo de esta conversación: «Jarvis»");
+      for (const [query, file] of [
+        ["parakeet dll", "adr/014"],
+        ["Neural2 Piper fallback", "adr/011"],
+        ["caídas degradado backoff", "adr/008"],
+        ["Silero barge-in auriculares", "adr/016"],
+        ["FTS5 contentless", "adr/017"],
+      ] as const) {
+        const r = await ws.tools.call("projects__search", { query, project: "Jarvis" }, {});
+        expect(r.content, query).toContain(file);
+      }
+      const leak = await ws.tools.call("projects__read_file", { project: "Jarvis", path: "../evals/conversations/020-docs-motor-stt.json" }, {});
+      expect(leak.isError).toBe(true);
+      const rubric = await ws.tools.call("projects__search", { query: "minToolCalls rubric" }, {});
+      expect(rubric.content).not.toContain("evals/");
+    } finally {
+      await ws.close();
+    }
   });
 });

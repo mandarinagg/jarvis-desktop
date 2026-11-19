@@ -1,0 +1,25 @@
+{
+  "id": "029-docs-barge-in",
+  "category": "proyectos",
+  "project": "jarvis-docs",
+  "turns": [
+    "¿Qué pasa si le hablo encima a Jarvis mientras está hablando?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "mustMatch": [
+      "vad|silero"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Explica que un detector de voz (Silero VAD) escucha mientras Jarvis habla y, con unos 250 ms de voz, lo interrumpe y pasa a escucharte.",
+    "Menciona que hace falta usar auriculares (con parlantes se interrumpiría solo) o que se puede apagar con JARVIS_BARGE_IN=0.",
+    "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
+    "No inventa datos que no estén en la documentación."
+  ]
+}

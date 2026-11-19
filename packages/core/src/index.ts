@@ -13,3 +13,7 @@ export * from "./prompt.js";
 export * from "./projects/guard.js";
 export * from "./projects/indexer.js";
 export * from "./projects/store.js";
+export * from "./projects/context.js";
+export * from "./tools/hub.js";
+export * from "./tools/permissions.js";
+export * from "./tools/projects-server.js";

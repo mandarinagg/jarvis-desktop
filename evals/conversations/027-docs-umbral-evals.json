@@ -1,0 +1,24 @@
+{
+  "id": "027-docs-umbral-evals",
+  "category": "proyectos",
+  "project": "jarvis-docs",
+  "turns": [
+    "¿Qué porcentaje de las evals tiene que aprobar Jarvis para cerrar una fase?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "mustMatch": [
+      "80"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Dice que el umbral es 80%.",
+    "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
+    "No inventa datos que no estén en la documentación."
+  ]
+}

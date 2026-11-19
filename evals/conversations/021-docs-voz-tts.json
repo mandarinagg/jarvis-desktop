@@ -1,0 +1,26 @@
+{
+  "id": "021-docs-voz-tts",
+  "category": "proyectos",
+  "project": "jarvis-docs",
+  "turns": [
+    "¿Con qué voz habla Jarvis y qué pasa si no hay internet?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "mustMatch": [
+      "neural2",
+      "piper"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Dice que usa Google Cloud Neural2 (es-US-Neural2-B).",
+    "Explica que sin conexión cae a Piper (voz es_AR-daniela-high), local y de menor calidad.",
+    "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
+    "No inventa datos que no estén en la documentación."
+  ]
+}
