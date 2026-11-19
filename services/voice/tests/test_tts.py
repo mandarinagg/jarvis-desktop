@@ -320,3 +320,16 @@ def test_end_without_phrases_still_finishes():
     p.wait_idle()
     player.drain()
     assert sent == [{"type": "tts.finished", "turnId": "t9", "interrupted": False}]
+
+
+def test_core_spoken_phrases_are_prewarmed():
+    """VoiceTurns (TS) speaks these; they must be in the cache list so they play in ~0 ms."""
+    import re
+    from pathlib import Path
+
+    from jarvis_voice.tts.cache import ACKNOWLEDGEMENTS
+
+    src = (Path(__file__).resolve().parents[3] / "packages/core/src/voice/turns.ts").read_text(encoding="utf-8")
+    block = src[src.index("export const PHRASES") : src.index("} as const")]
+    phrases = re.findall(r':\s*"([^"]+)"', block)
+    assert phrases and set(phrases) <= set(ACKNOWLEDGEMENTS)
