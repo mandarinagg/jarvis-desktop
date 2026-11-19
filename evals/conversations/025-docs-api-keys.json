@@ -1,0 +1,25 @@
+{
+  "id": "025-docs-api-keys",
+  "category": "proyectos",
+  "project": "jarvis-docs",
+  "turns": [
+    "¿Dónde guarda Jarvis las API keys?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "mustMatch": [
+      "credential|administrador de credenciales"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Dice que las guarda en el Windows Credential Manager (con @napi-rs/keyring), nunca en archivos del repo ni en .env.",
+    "Si menciona la key de Google TTS, dice que el Core se la pasa al servicio de voz por stdio (voice.configure).",
+    "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
+    "No inventa datos que no estén en la documentación."
+  ]
+}

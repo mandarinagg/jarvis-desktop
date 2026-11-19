@@ -56,6 +56,9 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 - [x] Tools de solo lectura (servidor MCP `projects` en proceso): listar, buscar, leer, listar carpetas y estado git. Resumir lo hace Claude. Pasan por el Permission Engine v0 y el audit log append-only
 - [x] Armado de contexto por proyecto activo (tarjeta del proyecto en el `system`, proyecto por conversación) + panel de Proyectos en la app
 
+- [x] 10 evals de salida sobre la documentación de este repo (`project: jarvis-docs`)
+- [ ] Validación: 10/10 con la API real y probarlo con un proyecto propio del owner (requiere la key de Anthropic)
+
 **Exit:** responde correctamente 10/10 preguntas sobre documentación de un proyecto real.
 
 ## Fase 4 — L3: Manos

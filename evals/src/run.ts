@@ -16,19 +16,21 @@ import { PASS_THRESHOLD, runAll } from "./runner.js";
 
 const out = (s: string) => process.stdout.write(s + "\n");
 const EST_COST_PER_TURN_USD = 0.02; // generation + judge, effort low (CLAUDE_API.md §4.1)
+const EST_COST_PER_PROJECT_TURN_USD = 0.08; // a few tool rounds reading docs
 
 async function main(): Promise<number> {
   const { values } = parseArgs({
     options: {
       "dry-run": { type: "boolean", default: false },
       case: { type: "string" },
-      "max-cost": { type: "string", default: "1.5" },
+      "max-cost": { type: "string", default: "3" },
     },
   });
   const all = loadCases();
   const cases = values.case ? all.filter((c) => c.id.startsWith(values.case ?? "")) : all;
   const turns = cases.reduce((n, c) => n + c.turns.length, 0);
-  out(`${cases.length} casos, ${turns} turnos. Costo estimado: ~US$ ${(turns * EST_COST_PER_TURN_USD).toFixed(2)}.`);
+  const estimate = cases.reduce((usd, c) => usd + c.turns.length * (c.project ? EST_COST_PER_PROJECT_TURN_USD : EST_COST_PER_TURN_USD), 0);
+  out(`${cases.length} casos, ${turns} turnos. Costo estimado: ~US$ ${estimate.toFixed(2)}.`);
   if (values["dry-run"]) {
     out("Dry run: casos válidos, no se llamó a la API.");
     return 0;
@@ -42,11 +44,12 @@ async function main(): Promise<number> {
   const maxCostUsd = Number(values["max-cost"]);
   const model = new AnthropicChatModel({ apiKey, effort: "low" });
   const summary = await runAll(cases, model, new AnthropicJudge(apiKey), { system: loadSystemPrompt(), voice: loadVoicePrompt() }, {
-    maxCostUsd: Number.isFinite(maxCostUsd) ? maxCostUsd : 1.5,
+    maxCostUsd: Number.isFinite(maxCostUsd) ? maxCostUsd : 3,
     onResult: (r) => {
       out(`${r.passed ? "✓" : "✗"} ${r.id}  (US$ ${r.costUsd.toFixed(4)})`);
       for (const f of r.checkFailures) out(`    chequeo: ${f}`);
       for (const c of r.criteria.filter((x) => !x.met)) out(`    criterio: ${c.criterion} → ${c.reason}`);
+      if (r.toolCalls.length) out(`    herramientas: ${r.toolCalls.join(" · ")}`);
       if (r.error) out(`    error: ${r.error}`);
     },
   });

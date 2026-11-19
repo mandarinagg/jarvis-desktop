@@ -1,0 +1,26 @@
+{
+  "id": "023-docs-atajo",
+  "category": "proyectos",
+  "project": "jarvis-docs",
+  "turns": [
+    "¿Con qué atajo de teclado le hablo a Jarvis y por qué no es Ctrl+Alt+Space?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "mustMatch": [
+      "shift"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Dice que el atajo es Ctrl+Shift+Space (con Ctrl+Alt+J como alternativa o JARVIS_PTT_SHORTCUT para cambiarlo, si lo menciona).",
+    "Explica que Ctrl+Alt+Space ya lo usaba otra app en la PC del owner.",
+    "Si menciona cómo funciona, dice que es un interruptor (una vez empieza, otra termina) porque Electron no informa cuándo se suelta la tecla.",
+    "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
+    "No inventa datos que no estén en la documentación."
+  ]
+}
