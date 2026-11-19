@@ -1,6 +1,6 @@
 import type { CoreMessage } from "@jarvis/shared";
 import { describe, expect, it } from "vitest";
-import { type State, budgetLevel, initialState, pttPressed, reduce } from "./state.js";
+import { type State, budgetLevel, initialState, pttPressed, reduce, voiceLabel } from "./state.js";
 
 const usage = { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 };
 
@@ -92,6 +92,9 @@ describe("voice", () => {
     expect(pttPressed({ state: "idle", micOpen: false })).toBe(true);
     expect(pttPressed({ state: "listening", micOpen: true })).toBe(false);
     expect(pttPressed({ state: "speaking", micOpen: false })).toBe(true);
+    expect(voiceLabel({ state: "speaking", micOpen: false })).toBe("Hablando");
+    expect(voiceLabel({ state: "speaking", micOpen: true })).toBe("Hablando · te escucho");
+    expect(voiceLabel({ state: "listening", micOpen: true })).toBe("Micrófono abierto");
   });
 
   it("shows a spoken turn as a user message and streams the reply", () => {

@@ -15,6 +15,8 @@ Se completa a medida que aparecen problemas reales. Formato: **Síntoma → Caus
 - **La voz queda `degradado` al arrancar el Core** → No se encontró `uv`, o el servicio se cayó 5 veces en 10 minutos → Ver los eventos `voice.*` en el log del Core. Para probar el servicio a mano: `uv run --project services/voice --locked python -m jarvis_voice.service`. `JARVIS_VOICE=0` deja solo el texto.
 - **`GGML_ASSERT(device) failed` al cargar `parakeet.dll`** → No hay backends de ggml registrados → Llamar a `ggml_backend_load_all_from_path(<bin>)` de `ggml.dll` antes de crear el contexto (ADR-014).
 - **El STT en proceso tarda ~700 ms y el log dice `use gpu = 112` / `no GPU found`** → `parakeet_context_params` se pasó como puntero: es un struct de 8 bytes que viaja por valor → Declararlo como `ctypes.Structure` (ADR-014).
+- **Jarvis se interrumpe solo apenas empieza a hablar** → Se usan parlantes: el micrófono capta su voz y el VAD la toma como barge-in (ADR-016) → Usar auriculares o arrancar el Core con `JARVIS_BARGE_IN=0`, que deja solo el barge-in por atajo, hasta que haya AEC.
+- **El barge-in por voz no hace nada y el log dice `stt.vad_failed`** → Falta `%APPDATA%\Jarvis\models\vad\silero_vad.onnx` → Correr `uv run python -m jarvis_voice.diagnostics.stt_bench setup`.
 - **Whisper repite la misma frase 2–4 veces** → `audio_ctx` demasiado chico (≤ 384) → Usar un piso de 512 (ADR-009).
 
 ## API

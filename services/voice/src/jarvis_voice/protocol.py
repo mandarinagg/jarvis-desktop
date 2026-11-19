@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-VOICE_PROTOCOL_VERSION = "1.0"
+VOICE_PROTOCOL_VERSION = "1.1"
 MAX_LINE_BYTES = 1024 * 1024
 
 Check = Callable[[Any], bool]
@@ -81,6 +81,8 @@ TO_VOICE: dict[str, Schema] = {
     "stt.start": Schema({"id": _ID}, {}),
     "stt.stop": Schema({"id": _ID}, {}),
     "stt.cancel": Schema({"id": _ID}, {}),
+    "vad.arm": Schema({"id": _ID}, {}),
+    "vad.disarm": Schema({"id": _ID}, {}),
 }
 
 ERROR_CODES = ("invalid_json", "invalid_message", "incompatible_version", "not_configured", "tts_failed", "stt_failed", "internal")
@@ -94,6 +96,7 @@ FROM_VOICE: dict[str, Schema] = {
     ),
     "tts.finished": Schema({"turnId": _ID, "interrupted": _bool}, {}),
     "stt.listening": Schema({"id": _ID, "open": _bool}, {}),
+    "vad.speech": Schema({"id": _ID}, {}),
     "stt.final": Schema({"id": _ID, "text": _str(0, 8000), "audioMs": _nonneg_number, "sttMs": _nonneg_number}, {}),
 }
 

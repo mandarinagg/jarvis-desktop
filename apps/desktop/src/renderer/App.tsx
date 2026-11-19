@@ -1,5 +1,5 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useReducer, useRef, useState } from "react";
-import { VOICE_LABELS, budgetLevel, initialState, pttPressed, reduce } from "./state.js";
+import { budgetLevel, initialState, pttPressed, reduce, voiceLabel } from "./state.js";
 
 const usd = (n: number) => `US$ ${n.toFixed(2)}`;
 let seq = 0;
@@ -139,7 +139,7 @@ export function App() {
             title={state.voice.detail ?? (shortcut ? `Atajo global: ${shortcut}` : "Atajo global no disponible")}
           >
             <span className="voice-dot" aria-hidden="true" />
-            <span>{state.voice.micOpen ? "Micrófono abierto" : VOICE_LABELS[state.voice.state]}</span>
+            <span>{voiceLabel(state.voice)}</span>
             {shortcut && voiceReady && <kbd>{shortcut}</kbd>}
           </div>
           {state.budget ? (

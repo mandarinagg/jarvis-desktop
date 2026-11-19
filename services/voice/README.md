@@ -15,6 +15,7 @@ uv run --project services/voice --locked python -m jarvis_voice.service
 - Si se cierra stdin, el servicio sale: nunca queda huérfano.
 - **TTS** (`src/jarvis_voice/tts/`): con `tts` en `voice.configure`, el servicio acepta `tts.speak` y `tts.cancel` y emite `tts.started` y `tts.finished`. La key de Google llega del Core, que la lee del Credential Manager (`google-tts-api-key`). Sin key, usa Piper `es_AR-daniela-high`.
 - **STT** (`src/jarvis_voice/stt/`): con `stt` en `voice.configure`, el servicio carga Parakeet en segundo plano y acepta `stt.start`, `stt.stop` y `stt.cancel`. Emite `stt.listening` y `stt.final`. Necesita los binarios y el modelo de `jarvis-stt-bench setup`. Vocabulario propio: `%APPDATA%\Jarvis\stt\vocabulary.txt`.
+- **Barge-in por voz** (`stt/vad.py`, ADR-016): `vad.arm` abre el micrófono mientras Jarvis habla y corre Silero VAD (onnxruntime). Con ≥ 250 ms de voz emite `vad.speech` y graba la frase hasta 700 ms de silencio. Si nadie habló, `vad.disarm` cierra el micrófono. El modelo se baja con `jarvis-stt-bench setup` (`models\vad\silero_vad.onnx`).
 - Para probarlo a mano: `{"type":"voice.configure","id":"c1","protocolVersion":"1.0"}` → `voice.ready`.
 - En el Core: `JARVIS_VOICE=0` desactiva la voz; `JARVIS_VOICE_DIR` y `JARVIS_UV` cambian las rutas.
 

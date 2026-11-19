@@ -80,6 +80,12 @@ ASSETS = [
         "4d64e9e96c2792186d072fde0034df0ad670cf680a2f53069052ead827fd600e",
         "models/parakeet/ggml-parakeet-tdt-0.6b-v3-q8_0.bin",
     ),
+    Asset(
+        "silero vad v5 (barge-in by voice, ADR-016)",
+        "https://raw.githubusercontent.com/snakers4/silero-vad/v5.1.2/src/silero_vad/data/silero_vad.onnx",
+        "2623a2953f6ff3d2c1e61740c6cdb7168133479b267dfef114a4a3cc5bdd788f",
+        "models/vad/silero_vad.onnx",
+    ),
 ]
 
 

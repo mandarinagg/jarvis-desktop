@@ -20,3 +20,4 @@ Estados: **Propuesta** → **Aceptada** / **Rechazada** → (**Reemplazada por A
 | [013](adr/013-protocolo-de-voz-y-orquestacion.md) | Protocolo Core↔Voz (fixtures compartidos TS/Python), el Core orquesta el turno, secretos por stdio, push-to-talk primero | Aceptada |
 | [014](adr/014-stt-en-proceso-con-parakeet-dll.md) | STT en proceso con `parakeet.dll` vía ctypes (~100 ms, la CLI tardaba 4.7 s), push-to-talk y corrección post-STT | Aceptada |
 | [015](adr/015-modo-voz-del-prompt.md) | Modo voz del prompt: `prompts/voice.md` como segundo bloque de `system` sin caché en los turnos hablados; evals con `mode: voice` | Aceptada |
+| [016](adr/016-barge-in-por-voz-con-silero.md) | Barge-in por voz: Silero VAD (onnxruntime) mientras Jarvis habla, protocolo de voz 1.1 (`vad.*`), sin AEC por los auriculares; `JARVIS_BARGE_IN=0` lo apaga | Aceptada |

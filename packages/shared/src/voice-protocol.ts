@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { type ParseResult, parseWith } from "./protocol.js";
 
-export const VOICE_PROTOCOL_VERSION = "1.0";
+export const VOICE_PROTOCOL_VERSION = "1.1";
 
 const Id = z.string().min(1).max(64);
 
@@ -65,6 +65,17 @@ export type SttStop = z.infer<typeof SttStop>;
 export const SttCancel = z.strictObject({ type: z.literal("stt.cancel"), id: Id });
 export type SttCancel = z.infer<typeof SttCancel>;
 
+/**
+ * Barge-in by voice (ADR-016): while Jarvis speaks, open the mic and watch for the owner talking.
+ * `id` names the utterance the VAD will record if it hears speech (reported with `vad.speech`).
+ */
+export const VadArm = z.strictObject({ type: z.literal("vad.arm"), id: Id });
+export type VadArm = z.infer<typeof VadArm>;
+
+/** Stop watching (Jarvis finished, or push-to-talk took over). An utterance already started finishes. */
+export const VadDisarm = z.strictObject({ type: z.literal("vad.disarm"), id: Id });
+export type VadDisarm = z.infer<typeof VadDisarm>;
+
 /** No more phrases for this turn: tts.finished fires once everything queued has played. */
 export const TtsEnd = z.strictObject({ type: z.literal("tts.end"), id: Id, turnId: Id });
 export type TtsEnd = z.infer<typeof TtsEnd>;
@@ -79,6 +90,8 @@ export const ToVoiceMessage = z.discriminatedUnion("type", [
   SttStart,
   SttStop,
   SttCancel,
+  VadArm,
+  VadDisarm,
 ]);
 export type ToVoiceMessage = z.infer<typeof ToVoiceMessage>;
 
@@ -132,6 +145,13 @@ export type TtsFinished = z.infer<typeof TtsFinished>;
 export const SttListening = z.strictObject({ type: z.literal("stt.listening"), id: Id, open: z.boolean() });
 export type SttListening = z.infer<typeof SttListening>;
 
+/**
+ * The owner started talking over Jarvis (>= 250 ms of speech). The voice service keeps recording
+ * utterance `id` until 700 ms of silence, then closes the mic (`stt.listening`) and sends `stt.final`.
+ */
+export const VadSpeech = z.strictObject({ type: z.literal("vad.speech"), id: Id });
+export type VadSpeech = z.infer<typeof VadSpeech>;
+
 /** Final transcription of an utterance. Empty text means nothing intelligible was said. */
 export const SttFinal = z.strictObject({
   type: z.literal("stt.final"),
@@ -150,6 +170,7 @@ export const FromVoiceMessage = z.discriminatedUnion("type", [
   TtsFinished,
   SttListening,
   SttFinal,
+  VadSpeech,
 ]);
 export type FromVoiceMessage = z.infer<typeof FromVoiceMessage>;
 
