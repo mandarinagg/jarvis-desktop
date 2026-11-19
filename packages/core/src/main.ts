@@ -11,6 +11,8 @@ import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.
 import { openDatabase } from "./db.js";
 import { createLogger } from "./log.js";
 import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
+import { ProjectIndex } from "./projects/indexer.js";
+import { ProjectStore } from "./projects/store.js";
 import { loadSystemPrompt, loadVoicePrompt } from "./prompt.js";
 import { KeyringSecretStore } from "./secrets.js";
 import { AlreadyRunningError, CoreServer } from "./server.js";
@@ -60,6 +62,8 @@ async function main(): Promise<number> {
 
   const db = openDatabase(path.join(home, "jarvis.db"));
   const store = new ConversationStore(db);
+  const projects = new ProjectStore(db);
+  const index = new ProjectIndex(db, projects, logger);
   const chat = new ChatService({
     store,
     model: modelResolver(env),
@@ -97,6 +101,7 @@ async function main(): Promise<number> {
   const stop = async (reason: string) => {
     logger.log("info", "core.stopping", { reason });
     chat.cancelAll();
+    index.close();
     await voice?.stop();
     await server.close();
     db.close();
@@ -136,6 +141,17 @@ async function main(): Promise<number> {
   broadcast = (m) => server.broadcast(m);
   logger.log("info", "core.ready", { pipe, version: CORE_VERSION, dailyBudgetUsd: budget });
   voice?.start();
+  // Phase 3: bring every registered project's index up to date, then follow changes (ADR-017).
+  void (async () => {
+    for (const project of projects.list()) {
+      try {
+        await index.scan(project);
+        index.watch(project);
+      } catch (err) {
+        logger.log("warn", "index.startup_failed", { project: project.id, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+  })();
 
   process.on("SIGINT", () => void stop("SIGINT"));
   process.on("SIGTERM", () => void stop("SIGTERM"));

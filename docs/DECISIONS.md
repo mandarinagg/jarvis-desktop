@@ -21,3 +21,4 @@ Estados: **Propuesta** → **Aceptada** / **Rechazada** → (**Reemplazada por A
 | [014](adr/014-stt-en-proceso-con-parakeet-dll.md) | STT en proceso con `parakeet.dll` vía ctypes (~100 ms, la CLI tardaba 4.7 s), push-to-talk y corrección post-STT | Aceptada |
 | [015](adr/015-modo-voz-del-prompt.md) | Modo voz del prompt: `prompts/voice.md` como segundo bloque de `system` sin caché en los turnos hablados; evals con `mode: voice` | Aceptada |
 | [016](adr/016-barge-in-por-voz-con-silero.md) | Barge-in por voz: Silero VAD (onnxruntime) mientras Jarvis habla, protocolo de voz 1.1 (`vad.*`), sin AEC por los auriculares; `JARVIS_BARGE_IN=0` lo apaga | Aceptada |
+| [017](adr/017-proyectos-indice-y-herramientas-de-lectura.md) | Fase 3: proyectos registrados por el owner, guardia de rutas, FTS5 sin copia del contenido, herramientas de lectura como servidor MCP propio, Permission Engine v0 y audit log | Aceptada |
