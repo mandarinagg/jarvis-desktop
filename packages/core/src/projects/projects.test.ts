@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase } from "../db.js";
 import { ConversationStore } from "../store.js";
-import { PathDeniedError, deniedReason, isTextFile, resolveInside, validateRoot } from "./guard.js";
+import { PathDeniedError, canonical, deniedReason, isTextFile, resolveInside, validateRoot } from "./guard.js";
 import { ProjectIndex, matchExpression, queryTerms } from "./indexer.js";
 import { ProjectConflictError, ProjectStore } from "./store.js";
 
@@ -85,6 +85,14 @@ describe("path guard", () => {
     expect(() => validateRoot(home, home, {})).toThrow(/datos de Jarvis/);
     expect(() => validateRoot(tmp, path.join(os.tmpdir(), "elsewhere"), { WINDIR: tmp })).toThrow(/sistema/);
     expect(() => validateRoot(os.homedir(), home, {})).toThrow(/perfil/);
+  });
+
+  it("compares canonical paths, also for folders that do not exist yet", () => {
+    const real = canonical(tmp);
+    expect(canonical(path.join(tmp, "a", "b"))).toBe(path.join(real, "a", "b"));
+    // Short 8.3 names (as on CI runners) and long names must compare equal.
+    const short = process.platform === "win32" ? path.join(tmp, "..", path.basename(tmp)) : tmp;
+    expect(() => validateRoot(tmp, path.join(short, "not-yet", "home"), {})).toThrow(/datos de Jarvis/);
   });
 });
 
