@@ -1,5 +1,5 @@
 /** Pure chat state for the renderer: every Core message and UI action goes through `reduce`. */
-import type { DashboardResult, ProactiveState, AuditEntryInfo, BuilderTaskInfo, ConversationSummary, MemoryInfo, ProposalInfo, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
+import type { DashboardResult, ProactiveState, SkillInfo, SkillProposalInfo, AuditEntryInfo, BuilderTaskInfo, ConversationSummary, MemoryInfo, ProposalInfo, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
 
 export interface UiMessage {
   role: "user" | "assistant";
@@ -39,6 +39,9 @@ export interface State {
   thinkingMode?: "sparring" | "brainstorm" | "abogado";
   /** Home panel (Phase 7). */
   dashboard?: Omit<DashboardResult, "type" | "id">;
+  /** Skills panel (Phase 7). */
+  skills?: { skills: SkillInfo[]; proposals: SkillProposalInfo[] };
+  skillsNotice?: string;
   /** Proactivity (Phase 7): rules, pending reminders and today's briefing. */
   proactive?: Omit<ProactiveState, "type" | "id">;
   error?: string;
@@ -239,6 +242,13 @@ function reduceCore(state: State, m: CoreMessage): State {
     }
     case "audit.list.result":
       return { ...state, audit: m.entries };
+    case "skills.list.result": {
+      const next: State = { ...state, skills: { skills: m.skills, proposals: m.proposals } };
+      // Broadcasts (id "skills") refresh the list without replacing this window's notice.
+      if (m.notice) next.skillsNotice = m.notice;
+      else if (m.id !== "skills") delete next.skillsNotice;
+      return next;
+    }
     case "proactive.state": {
       const { type: _type, id: _id, ...proactive } = m;
       return { ...state, proactive };

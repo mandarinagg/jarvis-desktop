@@ -1,6 +1,7 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useReducer, useRef, useState } from "react";
 import { Activity } from "./Activity.js";
 import { Home } from "./Home.js";
+import { Skills, type SkillsAction } from "./Skills.js";
 import { Memory, type MemoryAction } from "./Memory.js";
 import { Projects } from "./Projects.js";
 import { type ToolStatus, budgetLevel, initialState, pttPressed, reduce, voiceLabel } from "./state.js";
@@ -32,7 +33,7 @@ export function App() {
   const [draft, setDraft] = useState("");
   const [hotkey, setHotkey] = useState<string | null>(null);
   const [holding, setHolding] = useState(false);
-  const [view, setView] = useState<"home" | "chat" | "activity" | "memory">("home");
+  const [view, setView] = useState<"home" | "chat" | "activity" | "memory" | "skills">("home");
   const latest = useRef(state);
   latest.current = state;
   const transcriptEnd = useRef<HTMLDivElement>(null);
@@ -147,6 +148,18 @@ export function App() {
     jarvis.send({ type: "proactive.get", id: nextId("pg") });
   };
 
+  const showSkills = () => {
+    setView("skills");
+    jarvis.send({ type: "skills.list", id: nextId("sk") });
+  };
+  const skillsAction = (a: SkillsAction) => {
+    const id = nextId("sk");
+    if (a.type === "list") jarvis.send({ type: "skills.list", id });
+    else if (a.type === "setEnabled") jarvis.send({ type: "skills.setEnabled", id, name: a.name, enabled: a.enabled });
+    else if (a.type === "delete") jarvis.send({ type: "skills.delete", id, name: a.name });
+    else jarvis.send({ type: `skills.${a.type}`, id, proposalId: a.proposalId });
+  };
+
   const showMemory = () => {
     setView("memory");
     jarvis.send({ type: "memory.list", id: nextId("ml") });
@@ -203,6 +216,9 @@ export function App() {
         </button>
         <button className="link activity-link" onClick={showMemory} disabled={!state.connected} aria-pressed={view === "memory"}>
           Memoria
+        </button>
+        <button className="link activity-link" onClick={showSkills} disabled={!state.connected} aria-pressed={view === "skills"}>
+          Skills
         </button>
       </aside>
 
@@ -290,7 +306,9 @@ export function App() {
                 ? jarvis.send({ type: "reminders.cancel", id: nextId("rc"), reminderId: a.reminderId })
                 : jarvis.send({ type: "proactive.set", id: nextId("ps"), ...a.settings })
             }
-            onRefresh={showHome} onOpenConversation={open} onShowMemory={showMemory} onShowActivity={showActivity} />
+            onRefresh={showHome} onOpenConversation={open} onShowMemory={showMemory} onShowActivity={showActivity} onShowSkills={showSkills} />
+        ) : view === "skills" ? (
+          <Skills data={state.skills} notice={state.skillsNotice} onAction={skillsAction} onClose={() => setView("chat")} />
         ) : view === "memory" ? (
           <Memory data={state.memory} notice={state.memoryNotice} onAction={memoryAction} onClose={() => setView("chat")} />
         ) : view === "activity" ? (

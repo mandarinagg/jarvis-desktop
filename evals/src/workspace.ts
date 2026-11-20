@@ -28,6 +28,10 @@ import {
   Proactive,
   ProactiveStore,
   REMINDERS_SERVER,
+  SKILLS_SERVER,
+  SKILLS_TOOLS,
+  SkillStore,
+  createSkillsServer,
   REMINDERS_TOOLS,
   createRemindersServer,
   remindersPreviews,
@@ -139,6 +143,8 @@ export async function createWorkspace(c: EvalCase): Promise<Workspace> {
   const proactive = new Proactive({ db, store: proactiveStore, broadcast: () => {}, canNotify: () => false, dailyBudgetUsd: 3 });
   const reminderDeps = { store: proactiveStore, briefing: () => proactive.briefingNow(), conversationOfTurn: () => undefined };
   await hub.addInProcess(REMINDERS_SERVER, createRemindersServer(reminderDeps), REMINDERS_TOOLS, remindersPreviews(reminderDeps));
+  const skillStore = new SkillStore(db);
+  await hub.addInProcess(SKILLS_SERVER, createSkillsServer({ store: skillStore, conversationOfTurn: () => undefined }), SKILLS_TOOLS);
   const deps = { projects, index, trashDir: path.join(home, "trash") };
   await hub.addInProcess(PROJECTS_SERVER, createProjectsServer(deps), PROJECTS_TOOLS, projectsPreviews(deps));
   await hub.addInProcess(JARVIS_SERVER, createJarvisServer({ audit }), JARVIS_TOOLS);
@@ -154,6 +160,8 @@ export async function createWorkspace(c: EvalCase): Promise<Workspace> {
         .filter((e) => (e.risk === "confirm" || e.risk === "destructive") && e.decision === "allow" && !e.approvedBy?.startsWith("owner:")).length,
     checkState(ec: EvalCase) {
       const failures: string[] = [];
+      const proposed = skillStore.pendingProposals().length;
+      if (ec.checks.skillProposals !== undefined && proposed !== ec.checks.skillProposals) failures.push(`quedaron ${proposed} propuestas de skill (se esperaban ${ec.checks.skillProposals})`);
       const want = ec.checks.reminder;
       if (want) {
         const day = new Date();

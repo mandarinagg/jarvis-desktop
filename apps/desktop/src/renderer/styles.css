@@ -1030,3 +1030,25 @@ html.is-overlay body {
   align-items: center;
   gap: 6px;
 }
+
+/* Skills (Phase 7, ADR-027) */
+.skill-cases {
+  margin: 4px 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.skill-cases li {
+  display: flex;
+  flex-direction: column;
+}
+.skill-cases li.pass::marker {
+  color: var(--signal);
+}
+.skill-cases li.fail::marker {
+  color: var(--danger);
+}
+.warn-text {
+  color: var(--amber);
+}

@@ -30,6 +30,8 @@ export interface ChatServiceOptions {
   modePrompt?: (conversationId: string) => string | undefined;
   /** Current local date and time for the model (Phase 7: reminders need it), first in the suffix. */
   clock?: (now: Date) => string;
+  /** Index of the owner's active skills (Phase 7, ADR-027): names and when to use them. */
+  skillsContext?: () => string | undefined;
   /** Links new conversations to the project chosen in the client (chat.send projectId). */
   projects?: ProjectStore;
   dailyBudgetUsd: number;
@@ -102,7 +104,7 @@ export class ChatService {
         this.logger.log("warn", "memory.retrieve_failed", { error: err instanceof Error ? err.message : String(err) });
       }
       const thinking = this.opts.modePrompt?.(conversation.id);
-      const suffix = [this.opts.clock?.(this.now()), card, memories, thinking, mode === "voice" ? this.opts.voicePrompt : undefined].filter(Boolean).join("\n\n");
+      const suffix = [this.opts.clock?.(this.now()), this.opts.skillsContext?.(), card, memories, thinking, mode === "voice" ? this.opts.voicePrompt : undefined].filter(Boolean).join("\n\n");
       const result = await model.complete({
         system: this.opts.systemPrompt,
         systemSuffix: suffix || undefined,

@@ -6,7 +6,7 @@
 
 | Artefacto | Ubicación | Quién propone |
 |-----------|-----------|---------------|
-| Skills (procedimientos reutilizables: prompt + tools + pasos) | `skills/<nombre>/SKILL.md` | Jarvis u owner |
+| Skills (procedimientos reutilizables sobre las herramientas existentes, ADR-027) | `%APPDATA%/Jarvis/skills/<nombre>/SKILL.md` (repo git local; son personales) | Jarvis (el owner las pide en el chat) |
 | Prompts de sistema y de modos | `packages/core/prompts/` | Jarvis u owner |
 | Servidores MCP propios | `packages/mcp-*` | Builder |
 | Reglas de permisos | config local del owner | Owner (Jarvis sugiere) |

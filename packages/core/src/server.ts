@@ -10,6 +10,7 @@ import {
   type ConversationsSetMode,
   type DashboardGet,
   type ProactiveMessage,
+  type SkillsMessage,
   type MemoryMessage,
   type BudgetGet,
   type PermissionRespond,
@@ -64,6 +65,7 @@ export interface Handlers {
   conversationsSetMode?(session: Session, message: ConversationsSetMode): void;
   dashboardGet?(session: Session, message: DashboardGet): void;
   proactive?(session: Session, message: ProactiveMessage): void;
+  skills?(session: Session, message: SkillsMessage): void | Promise<void>;
   disconnected?(session: Session): void;
 }
 
@@ -310,6 +312,18 @@ export class CoreServer {
         case "proactive.set":
         case "reminders.cancel":
           return this.query(session, message, h.proactive);
+        case "skills.list":
+        case "skills.evaluate":
+        case "skills.approve":
+        case "skills.reject":
+        case "skills.setEnabled":
+        case "skills.delete":
+          if (!h.skills) {
+            session.send({ type: "error", id: message.id, code: "upstream_error", message: `${message.type} is not available` });
+            return;
+          }
+          await h.skills(session, message);
+          return;
       }
     } catch (err) {
       this.logger.log("error", "ipc.handler_failed", {

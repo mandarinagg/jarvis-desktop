@@ -44,7 +44,10 @@ export function dashboard(db: DatabaseSync, o: DashboardOptions): Snapshot {
     );
   const chat = perDay("usage");
   const builder = perDay("builder_tasks");
-  const reflection = perDay("reflections");
+  // Reflection and skill evals share a series: both are Jarvis improving itself.
+  const reflections = perDay("reflections");
+  const skillEvals = perDay("skill_evals");
+  const reflection = new Map([...new Set([...reflections.keys(), ...skillEvals.keys()])].map((d) => [d, (reflections.get(d) ?? 0) + (skillEvals.get(d) ?? 0)]));
   const days: SpendDay[] = keys.map((day) => ({
     day,
     chatUsd: chat.get(day) ?? 0,
@@ -53,7 +56,7 @@ export function dashboard(db: DatabaseSync, o: DashboardOptions): Snapshot {
   }));
 
   const monthOf = (table: string) => num((db.prepare(`SELECT SUM(cost_usd) AS usd FROM ${table} WHERE day >= ?`).get(monthStart) as { usd: number | null }).usd);
-  const month = { chatUsd: monthOf("usage"), builderUsd: monthOf("builder_tasks"), reflectionUsd: monthOf("reflections") };
+  const month = { chatUsd: monthOf("usage"), builderUsd: monthOf("builder_tasks"), reflectionUsd: monthOf("reflections") + monthOf("skill_evals") };
   const monthUsd = month.chatUsd + month.builderUsd + month.reflectionUsd;
   const dayOfMonth = now.getDate();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -121,6 +124,10 @@ export function dashboard(db: DatabaseSync, o: DashboardOptions): Snapshot {
     },
     cloud,
     activity,
+    skills: {
+      active: count("SELECT COUNT(*) AS n FROM skills WHERE status = 'active'"),
+      pendingProposals: count("SELECT COUNT(*) AS n FROM skill_proposals WHERE status = 'pending'"),
+    },
     builder: {
       running: count("SELECT COUNT(*) AS n FROM builder_tasks WHERE status = 'running'"),
       review: count("SELECT COUNT(*) AS n FROM builder_tasks WHERE status = 'review'"),

@@ -40,6 +40,14 @@ Antes de pedir el OK se rechaza todo lo que parezca un secreto. La confirmación
 
 Un recordatorio termina siendo una notificación con la cara de Jarvis, así que ningún mail ni archivo puede programar uno sin que el owner lo vea.
 
+### Skills (servidor `skills`, ADR-027)
+| Herramienta | Clase |
+|---|---|
+| `list_skills`, `use_skill` | lectura |
+| `propose_skill` (solo deja una propuesta inerte) | preparación |
+
+Para activar una skill tienen que pasar sus evals sobre el texto exacto y el owner tiene que aprobarla en el diálogo nativo, que abre el Core desde el panel Skills. Una skill no agrega herramientas ni permisos.
+
 ### Builder (servidor `builder`, ADR-023)
 | Herramienta | Clase |
 |---|---|

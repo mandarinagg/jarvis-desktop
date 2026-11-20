@@ -45,6 +45,14 @@ export const RENDERER_ALLOWED = [
   "proactive.get",
   "proactive.set",
   "reminders.cancel",
+  // Skills. skills.approve only ASKS: the Core opens a native confirmation with the full text, and
+  // only when the skill's own evals passed. The renderer can never activate a skill by itself.
+  "skills.list",
+  "skills.evaluate",
+  "skills.approve",
+  "skills.reject",
+  "skills.setEnabled",
+  "skills.delete",
 ] as const;
 
 export type RendererMessage = Extract<ClientMessage, { type: (typeof RENDERER_ALLOWED)[number] }>;

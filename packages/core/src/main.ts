@@ -15,6 +15,10 @@ import { dashboard } from "./dashboard.js";
 import { nowLine } from "./proactive/schedule.js";
 import { Proactive } from "./proactive/service.js";
 import { ProactiveStore } from "./proactive/store.js";
+import { AnthropicSkillEvalModel } from "./skills/evaluate.js";
+import { SkillsService } from "./skills/service.js";
+import { SkillStore } from "./skills/store.js";
+import { SKILLS_SERVER, SKILLS_TOOLS, createSkillsServer, skillsIndex } from "./tools/skills-server.js";
 import { REMINDERS_SERVER, REMINDERS_TOOLS, createRemindersServer, remindersPreviews } from "./tools/reminders-server.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
 import { openDatabase } from "./db.js";
@@ -163,13 +167,38 @@ async function main(): Promise<number> {
   });
   const remindersDeps = { store: proactiveStore, briefing: () => proactive.briefingNow(), conversationOfTurn: (t: string) => memories.conversationOfTurn(t) };
   await tools.addInProcess(REMINDERS_SERVER, createRemindersServer(remindersDeps), REMINDERS_TOOLS, remindersPreviews(remindersDeps));
+  // Phase 7 (ADR-027): skills Jarvis proposes; active only after their evals pass and the owner approves.
+  const skillStore = new SkillStore(db);
+  await tools.addInProcess(SKILLS_SERVER, createSkillsServer({ store: skillStore, conversationOfTurn: (t) => memories.conversationOfTurn(t) }), SKILLS_TOOLS);
+  const skillKey = anthropicKey(env);
+  let skillModel: { key: string; model: AnthropicSkillEvalModel } | undefined;
+  const systemPrompt = loadSystemPrompt();
+  const skills = new SkillsService({
+    store: skillStore,
+    confirmer: confirmations,
+    audit,
+    model: () => {
+      const key = skillKey();
+      if (!key) return undefined;
+      if (skillModel?.key !== key) skillModel = { key, model: new AnthropicSkillEvalModel(key) };
+      return skillModel.model;
+    },
+    systemPrompt,
+    clock: nowLine,
+    spentToday: () => store.spentOn(localDay(new Date())),
+    dailyBudgetUsd,
+    mirrorDir: path.join(home, "skills"),
+    broadcast: (m) => broadcast(m),
+    logger,
+  });
   const proactiveTimer = setInterval(() => proactive.tick(), 30_000);
   proactiveTimer.unref();
   const auditService = new AuditService(audit, path.join(home, "exports"));
   const chat = new ChatService({
     store,
     model: modelResolver(env),
-    systemPrompt: loadSystemPrompt(),
+    systemPrompt,
+    skillsContext: () => skillsIndex(skillStore),
     voicePrompt: loadVoicePrompt(),
     tools,
     projects,
@@ -258,6 +287,7 @@ async function main(): Promise<number> {
       memory: (s, m) => memoryService.handle(s, m),
       conversationsSetMode: (s, m) => chat.conversationsSetMode(s, m),
       proactive: (s, m) => proactive.handle(s, m),
+      skills: (s, m) => skills.handle(s, m),
       dashboardGet: (s, m) =>
         s.send({ type: "dashboard.result", id: m.id, ...dashboard(db, { dailyBudgetUsd, googleTts: tts().engine === "google" }) }),
       builder: (s, m) => {

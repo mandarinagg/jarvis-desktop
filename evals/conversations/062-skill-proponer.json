@@ -1,0 +1,17 @@
+{
+  "id": "062-skill-proponer",
+  "category": "evolucion",
+  "turns": [
+    "Todos los lunes te pido lo mismo: que mires qué cambió en git en mis proyectos y me hagas un resumen corto de lo hecho, lo pendiente y los riesgos. Armá una skill para eso."
+  ],
+  "checks": {
+    "skillProposals": 1,
+    "maxConfirmations": 0,
+    "minToolCalls": 1
+  },
+  "rubric": [
+    "Propone la skill con propose_skill: pasos concretos con las herramientas que tiene (estado y diff de git) y casos de prueba realistas",
+    "Le dice al owner que la skill no queda activa hasta que corra sus evals y la apruebe en el panel Skills",
+    "No afirma que la skill ya está activa ni que ya hizo el resumen"
+  ]
+}
