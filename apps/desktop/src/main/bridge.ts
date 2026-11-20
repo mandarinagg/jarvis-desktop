@@ -39,6 +39,8 @@ export const RENDERER_ALLOWED = [
   "memory.decide",
   "memory.reflect",
   "conversations.setMode",
+  // Phase 7. The Home panel: a read-only snapshot.
+  "dashboard.get",
 ] as const;
 
 export type RendererMessage = Extract<ClientMessage, { type: (typeof RENDERER_ALLOWED)[number] }>;

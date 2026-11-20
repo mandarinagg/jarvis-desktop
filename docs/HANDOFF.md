@@ -5,6 +5,7 @@
 ## Dónde estamos
 - **Fase 0 (Diagnóstico):** completa, salvo la cuenta de la API de Anthropic, que la tiene que crear el owner.
 - **Fase 1 (L0: Core + chat):** implementada y en `main`. Falta validarla con la API real.
+- **Fase 7 (L5: Socio):** en curso. Panel **Inicio** en el PR #47 (ADR-025, protocolo 1.6): gasto de hoy y del mes con proyección, por uso y por conversación, caché, datos enviados a la nube, pendientes, actividad e ideas abiertas. Falta: proactividad (briefing, recordatorios, horarios silenciosos), skills propuestas con evals y clientes móviles.
 - **Fase 6 (L4b: Memoria que aprende):** **implementada** en los PRs #45–#46 (apilados sobre #44, ADR-024):
   - memoria de datos, preferencias, procedimientos, ideas y episodios que se recupera en cada turno como datos;
   - guardar siempre pide confirmación nativa, con filtro de secretos;
@@ -33,7 +34,7 @@
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.5 (`voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
+| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.6 (`dashboard.get`, `voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
 | Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
 | Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks`, 008 memoria (`memories` + FTS5, `memory_uses`, `memory_proposals`, `reflections`, `settings`) |
 | Secretos | Credential Manager | `anthropic-api-key` (falta) y `google-tts-api-key` (migrada el 2026-11-19) |
@@ -78,7 +79,7 @@
       - cuando llegue la notificación, pedile que la mergee y revisá el diff.
 
 ## Próximos pasos (para quien retome)
-1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → … → #42 → #43 → #44 → #45 → #46. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
+1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → … → #42 → #43 → #44 → #45 → #46 → #47. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
 2. Con la key guardada:
    - correr las evals completas y ajustar `packages/core/prompts/system.md` y `voice.md`;
    - en la Fase 4, revisar sobre todo que una injection nunca genere un pedido de permiso, que anuncie el cambio antes de pedir el OK y que no reintente un rechazo.
@@ -120,7 +121,7 @@
 ## Cómo verificar el estado
 ```powershell
 pnpm install --frozen-lockfile
-pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 322 tests
+pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 327 tests
 pnpm --filter @jarvis/evals memory-eval               # recuperación de memoria, offline: 15/15
 cd services/voice; uv run python -m pytest -q         # 207 tests (en local incluye Parakeet, Silero y openWakeWord reales)
 ```

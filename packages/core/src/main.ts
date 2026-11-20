@@ -11,6 +11,7 @@ import path from "node:path";
 import { Builder } from "./builder/service.js";
 import { BuilderTaskStore } from "./builder/store.js";
 import { ChatService } from "./chat.js";
+import { dashboard } from "./dashboard.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
 import { openDatabase } from "./db.js";
 import { localDay } from "./db.js";
@@ -145,6 +146,7 @@ async function main(): Promise<number> {
   });
   builder.recoverInterrupted();
   await tools.addInProcess(BUILDER_SERVER, createBuilderServer(builder), BUILDER_SERVER_TOOLS, builderPreviews(builder));
+  const tts = ttsResolver(env);
   const auditService = new AuditService(audit, path.join(home, "exports"));
   const chat = new ChatService({
     store,
@@ -196,7 +198,7 @@ async function main(): Promise<number> {
       ? undefined
       : new VoiceSupervisor({
           spawn: createVoiceSpawner(env),
-          tts: ttsResolver(env),
+          tts,
           stt: env.JARVIS_STT !== "0",
           logger,
           onState: (state, detail) => turns.supervisorState(state, detail),
@@ -235,6 +237,8 @@ async function main(): Promise<number> {
       audit: (s, m) => auditService.handle(s, m),
       memory: (s, m) => memoryService.handle(s, m),
       conversationsSetMode: (s, m) => chat.conversationsSetMode(s, m),
+      dashboardGet: (s, m) =>
+        s.send({ type: "dashboard.result", id: m.id, ...dashboard(db, { dailyBudgetUsd, googleTts: tts().engine === "google" }) }),
       builder: (s, m) => {
         if (m.type === "builder.list") s.send({ type: "builder.list.result", id: m.id, tasks: builder.list() });
         else {

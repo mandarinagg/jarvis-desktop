@@ -103,6 +103,7 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 **Exit:** en 2 semanas de uso, ≥ 70% de recuerdos propuestos son aceptados; recuperación correcta en evals de memoria.
 
 ## Fase 7 — L5: Socio (continuo)
+- [x] Panel Inicio: gasto de hoy y del mes, por uso y por conversación, datos enviados a la nube, pendientes y actividad (ADR-025)
 - Proactividad con reglas (briefing, recordatorios, horarios silenciosos)
 - Ciclo de evolución: skills propuestas por Jarvis, gated por evals + aprobación
 - Clientes adicionales (Telegram/móvil vía túnel seguro)
