@@ -185,21 +185,21 @@ describe("memory in chat turns", () => {
 });
 
 describe("memory panel", () => {
-  it("edits, disables, deletes and forgets a range; refuses secrets in edits", () => {
+  it("edits, disables, deletes and forgets a range; refuses secrets in edits", async () => {
     const w = world();
     const a = w.memories.add({ kind: "fact", text: "Dato A", source: "owner" });
     w.memories.add({ kind: "idea", text: "Idea B", source: "owner" });
     const svc = new MemoryService(w.memories, w.projects);
     const sent: CoreMessage[] = [];
     const s: Session = { id: "s", client: "desktop", send: (x) => sent.push(x), close() {} };
-    svc.handle(s, { type: "memory.update", id: "1", memoryId: a.id, text: "Dato A corregido", status: "disabled" });
+    await svc.handle(s, { type: "memory.update", id: "1", memoryId: a.id, text: "Dato A corregido", status: "disabled" });
     expect(sent.at(-1)).toMatchObject({ type: "memory.list.result", enabled: true });
     expect(w.memories.get(a.id)).toMatchObject({ text: "Dato A corregido", status: "disabled" });
-    svc.handle(s, { type: "memory.update", id: "2", memoryId: a.id, text: "password: abc12345" });
+    await svc.handle(s, { type: "memory.update", id: "2", memoryId: a.id, text: "password: abc12345" });
     expect(sent.at(-1)).toMatchObject({ type: "error" });
-    svc.handle(s, { type: "memory.forget", id: "3", since: "2026-11-16T00:00:00.000Z", until: "2026-11-23T00:00:00.000Z" });
+    await svc.handle(s, { type: "memory.forget", id: "3", since: "2026-11-16T00:00:00.000Z", until: "2026-11-23T00:00:00.000Z" });
     expect(sent.at(-1)).toMatchObject({ removed: 2, memories: [] });
-    svc.handle(s, { type: "memory.settings", id: "4", enabled: false });
+    await svc.handle(s, { type: "memory.settings", id: "4", enabled: false });
     expect(sent.at(-1)).toMatchObject({ enabled: false });
   });
 });

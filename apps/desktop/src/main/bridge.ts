@@ -36,6 +36,8 @@ export const RENDERER_ALLOWED = [
   "memory.delete",
   "memory.forget",
   "memory.settings",
+  "memory.decide",
+  "memory.reflect",
   "conversations.setMode",
 ] as const;
 

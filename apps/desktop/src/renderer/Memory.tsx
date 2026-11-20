@@ -1,4 +1,4 @@
-import type { MemoryInfo } from "@jarvis/shared";
+import type { MemoryInfo, ProposalInfo } from "@jarvis/shared";
 import { useState } from "react";
 
 export const KIND_LABEL: Record<MemoryInfo["kind"], string> = {
@@ -31,7 +31,66 @@ export type MemoryAction =
   | { type: "update"; memoryId: number; text?: string; status?: MemoryInfo["status"]; ideaStatus?: MemoryInfo["ideaStatus"] }
   | { type: "delete"; memoryIds: number[] }
   | { type: "forget"; since: string; until: string }
-  | { type: "settings"; enabled: boolean };
+  | { type: "settings"; enabled: boolean }
+  | { type: "decide"; proposalId: number; accept: boolean; text?: string }
+  | { type: "reflect" };
+
+type Acceptance = { accepted: number; decided: number; rate?: number | undefined };
+
+/** Proposals from the daily reflection: accept as is, edit and accept, or reject. */
+function Proposals({ proposals, acceptance, onAction }: { proposals: ProposalInfo[]; acceptance?: Acceptance | undefined; onAction: (a: MemoryAction) => void }) {
+  const [editing, setEditing] = useState<{ id: number; text: string } | undefined>();
+  return (
+    <>
+      <h3>Propuestas para recordar</h3>
+      <p className="hint">
+        Jarvis las sacó de tus conversaciones en la reflexión diaria. Nada se guarda sin tu OK.
+        {acceptance?.decided ? ` Últimos 14 días: aceptaste ${acceptance.accepted} de ${acceptance.decided}${acceptance.rate !== undefined ? ` (${Math.round(acceptance.rate * 100)} %)` : ""}.` : ""}
+      </p>
+      {proposals.length === 0 && <p className="hint">No hay propuestas pendientes.</p>}
+      <ol className="audit-list">
+        {proposals.map((p) => (
+          <li key={p.id} className={`audit memory-item proposal ${p.kind}`}>
+            <div className="project-line">
+              <span className="project-name">
+                {KIND_LABEL[p.kind]}
+                {p.project ? ` · ${p.project}` : ""}
+              </span>
+              <span className="project-meta">{new Date(p.createdAt).toLocaleDateString("es-AR")}</span>
+            </div>
+            {editing?.id === p.id ? (
+              <textarea className="memory-edit-area" value={editing.text} maxLength={1000} onChange={(e) => setEditing({ id: p.id, text: e.target.value })} aria-label="Texto a recordar" />
+            ) : (
+              <p className="memory-text">{p.text}</p>
+            )}
+            <span className="project-meta">Por qué: {p.reason}</span>
+            <div className="project-actions">
+              <button
+                className="action small"
+                disabled={editing?.id === p.id && !editing.text.trim()}
+                onClick={() => {
+                  onAction({ type: "decide", proposalId: p.id, accept: true, ...(editing?.id === p.id ? { text: editing.text } : {}) });
+                  setEditing(undefined);
+                }}
+              >
+                {editing?.id === p.id ? "Guardar editado" : "Recordar"}
+              </button>
+              {editing?.id !== p.id && (
+                <button className="link" onClick={() => setEditing({ id: p.id, text: p.text })}>
+                  Editar
+                </button>
+              )}
+              <button className="link danger" onClick={() => onAction({ type: "decide", proposalId: p.id, accept: false })}>
+                No
+              </button>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <h3>Recuerdos</h3>
+    </>
+  );
+}
 
 /**
  * Memory panel (Phase 6, ADR-024): everything Jarvis remembers, editable by the owner. Memory text
@@ -39,12 +98,12 @@ export type MemoryAction =
  */
 export function Memory({
   data,
-  removed,
+  notice,
   onAction,
   onClose,
 }: {
-  data: { enabled: boolean; memories: MemoryInfo[] } | undefined;
-  removed: number | undefined;
+  data: { enabled: boolean; memories: MemoryInfo[]; proposals: ProposalInfo[]; acceptance?: Acceptance } | undefined;
+  notice: string | undefined;
   onAction: (a: MemoryAction) => void;
   onClose: () => void;
 }) {
@@ -62,6 +121,11 @@ export function Memory({
           {data && (
             <button className="link" onClick={() => onAction({ type: "settings", enabled: !data.enabled })} aria-pressed={data.enabled}>
               {data.enabled ? "Desactivar la memoria" : "Activar la memoria"}
+            </button>
+          )}
+          {data?.enabled && (
+            <button className="link" onClick={() => onAction({ type: "reflect" })} title="Revisa las conversaciones nuevas y propone recuerdos (unos centavos)">
+              Reflexionar ahora
             </button>
           )}
           {confirmForget ? (
@@ -88,7 +152,8 @@ export function Memory({
         Lo que Jarvis recuerda de vos. Usa solo lo activo, y como datos: nunca como órdenes. Solo se guarda lo que aprobás. Los episodios son resúmenes automáticos que vencen solos.
         {data && !data.enabled && " La memoria está desactivada: Jarvis no recuerda ni guarda nada."}
       </p>
-      {removed !== undefined && <p className="hint">Borré {removed} {removed === 1 ? "recuerdo" : "recuerdos"}.</p>}
+      {notice && <p className="hint">{notice}</p>}
+      {data && <Proposals proposals={data.proposals} acceptance={data.acceptance} onAction={onAction} />}
       <form
         className="memory-search"
         onSubmit={(e) => {

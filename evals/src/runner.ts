@@ -53,9 +53,9 @@ export async function runCase(
   let ws: Workspace | undefined;
   try {
     ws = await workspace(c);
-    // Same assembly as ChatService: project card, then voice instructions.
-    const suffix = [ws.card, c.mode === "voice" ? prompts.voice : undefined].filter(Boolean).join("\n\n");
     for (const turn of c.turns) {
+      // Same assembly as ChatService: project card, memories for this message, then voice instructions.
+      const suffix = [ws.card, ws.memory(turn), c.mode === "voice" ? prompts.voice : undefined].filter(Boolean).join("\n\n");
       transcript.push({ role: "user", content: turn });
       const r = await model.complete({
         system: prompts.system,

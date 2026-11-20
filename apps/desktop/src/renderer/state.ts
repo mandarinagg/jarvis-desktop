@@ -1,5 +1,5 @@
 /** Pure chat state for the renderer: every Core message and UI action goes through `reduce`. */
-import type { AuditEntryInfo, BuilderTaskInfo, ConversationSummary, MemoryInfo, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
+import type { AuditEntryInfo, BuilderTaskInfo, ConversationSummary, MemoryInfo, ProposalInfo, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
 
 export interface UiMessage {
   role: "user" | "assistant";
@@ -32,8 +32,9 @@ export interface State {
   /** Builder tasks (Phase 5), newest first. */
   builder?: BuilderTaskInfo[];
   /** Memory panel (Phase 6). */
-  memory?: { enabled: boolean; memories: MemoryInfo[] };
-  memoryRemoved?: number;
+  memory?: { enabled: boolean; memories: MemoryInfo[]; proposals: ProposalInfo[]; acceptance?: { accepted: number; decided: number; rate?: number | undefined } };
+  /** Result of the last memory.delete / memory.forget / memory.reflect. */
+  memoryNotice?: string;
   /** Thinking mode of the open conversation (Phase 6). */
   thinkingMode?: "sparring" | "brainstorm" | "abogado";
   error?: string;
@@ -235,9 +236,13 @@ function reduceCore(state: State, m: CoreMessage): State {
     case "audit.list.result":
       return { ...state, audit: m.entries };
     case "memory.list.result": {
-      const next: State = { ...state, memory: { enabled: m.enabled, memories: m.memories } };
-      if (m.removed !== undefined) next.memoryRemoved = m.removed;
-      else delete next.memoryRemoved;
+      const next: State = {
+        ...state,
+        memory: { enabled: m.enabled, memories: m.memories, proposals: m.proposals, ...(m.acceptance ? { acceptance: m.acceptance } : {}) },
+      };
+      const notice = m.reflection ?? (m.removed !== undefined ? `Borré ${m.removed} ${m.removed === 1 ? "recuerdo" : "recuerdos"}.` : undefined);
+      if (notice) next.memoryNotice = notice;
+      else delete next.memoryNotice;
       return next;
     }
     case "builder.list.result":

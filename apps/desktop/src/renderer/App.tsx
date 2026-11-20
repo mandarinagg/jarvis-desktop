@@ -144,6 +144,8 @@ export function App() {
     else if (a.type === "update") jarvis.send({ ...a, type: "memory.update", id });
     else if (a.type === "delete") jarvis.send({ type: "memory.delete", id, memoryIds: a.memoryIds });
     else if (a.type === "forget") jarvis.send({ type: "memory.forget", id, since: a.since, until: a.until });
+    else if (a.type === "decide") jarvis.send({ type: "memory.decide", id, proposalId: a.proposalId, accept: a.accept, ...(a.text ? { text: a.text } : {}) });
+    else if (a.type === "reflect") jarvis.send({ type: "memory.reflect", id });
     else jarvis.send({ type: "memory.settings", id, enabled: a.enabled });
   };
 
@@ -263,7 +265,7 @@ export function App() {
         </header>
 
         {view === "memory" ? (
-          <Memory data={state.memory} removed={state.memoryRemoved} onAction={memoryAction} onClose={() => setView("chat")} />
+          <Memory data={state.memory} notice={state.memoryNotice} onAction={memoryAction} onClose={() => setView("chat")} />
         ) : view === "activity" ? (
           <Activity
             entries={state.audit}

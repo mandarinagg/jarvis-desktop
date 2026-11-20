@@ -191,9 +191,9 @@ describe("builder", () => {
 describe("memory", () => {
   it("keeps the panel list and the open conversation's thinking mode", () => {
     const mem = { id: 1, kind: "fact" as const, text: "Usa pnpm", source: "owner" as const, status: "active" as const, createdAt: "t", updatedAt: "t", useCount: 0 };
-    let s = reduce(initialState, { kind: "core", message: { type: "memory.list.result", id: "x", enabled: true, memories: [mem], removed: 1 } });
+    let s = reduce(initialState, { kind: "core", message: { type: "memory.list.result", id: "x", enabled: true, memories: [mem], proposals: [], removed: 1 } });
     expect(s.memory?.memories).toHaveLength(1);
-    expect(s.memoryRemoved).toBe(1);
+    expect(s.memoryNotice).toBe("Borré 1 recuerdo.");
     s = reduce(s, { kind: "select", conversationId: "c1" });
     s = reduce(s, { kind: "core", message: { type: "conversations.history", id: "h", conversationId: "c1", title: "t", thinkingMode: "abogado", messages: [] } });
     expect(s.thinkingMode).toBe("abogado");
