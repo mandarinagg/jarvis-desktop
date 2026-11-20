@@ -207,3 +207,23 @@ describe("memory", () => {
     expect([start.getDay(), start.getDate(), start.getHours()]).toEqual([1, 16, 0]);
   });
 });
+
+describe("dashboard", () => {
+  it("keeps the Home snapshot without the envelope", () => {
+    const spend = { todayUsd: 0.5, dailyBudgetUsd: 3, monthUsd: 4, projectedMonthUsd: 6, days: [], month: { chatUsd: 4, builderUsd: 0, reflectionUsd: 0 }, topConversations: [] };
+    const message: CoreMessage = {
+      type: "dashboard.result",
+      id: "d",
+      generatedAt: "2026-11-20T18:00:00.000Z",
+      spend,
+      cloud: [],
+      activity: { actionsToday: 1, confirmedToday: 0, deniedToday: 0 },
+      builder: { running: 0, review: 1 },
+      memory: { enabled: true, active: 3, pendingProposals: 2, openIdeas: [] },
+    };
+    const s = reduce(initialState, { kind: "core", message });
+    expect(s.dashboard?.spend.monthUsd).toBe(4);
+    expect(s.dashboard?.memory.pendingProposals).toBe(2);
+    expect(s.dashboard && "type" in s.dashboard).toBe(false);
+  });
+});

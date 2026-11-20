@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.5"; // 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
+export const PROTOCOL_VERSION = "1.6"; // 1.6: dashboard.* (Phase 7); 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
 
 const Id = z.string().min(1).max(64);
 const SessionToken = z.string().regex(/^[0-9a-f]{64}$/, "token must be 256-bit lowercase hex");
@@ -205,7 +205,12 @@ export const ConversationsSetMode = z.strictObject({
 });
 export type ConversationsSetMode = z.infer<typeof ConversationsSetMode>;
 
+/** Phase 7 (ADR-025): the Home panel, one read-only snapshot of spend, activity and pending items. */
+export const DashboardGet = z.strictObject({ type: z.literal("dashboard.get"), id: Id });
+export type DashboardGet = z.infer<typeof DashboardGet>;
+
 export const ClientMessage = z.discriminatedUnion("type", [
+  DashboardGet,
   VoiceWake,
   PermissionRespond,
   AuditList,
@@ -525,7 +530,45 @@ export const MemoryListResult = z.strictObject({
 });
 export type MemoryListResult = z.infer<typeof MemoryListResult>;
 
+const Usd = z.number().nonnegative();
+export const SpendDay = z.strictObject({ day: z.string(), chatUsd: Usd, builderUsd: Usd, reflectionUsd: Usd });
+export type SpendDay = z.infer<typeof SpendDay>;
+
+/** Reply to dashboard.get. Texts (titles, ideas) are owner or model data: plain text, never markup. */
+export const DashboardResult = z.strictObject({
+  type: z.literal("dashboard.result"),
+  id: Id,
+  generatedAt: z.string(),
+  spend: z.strictObject({
+    todayUsd: Usd,
+    dailyBudgetUsd: z.number().positive(),
+    monthUsd: Usd,
+    /** Month so far extrapolated to the whole month. */
+    projectedMonthUsd: Usd,
+    /** Last 30 local days, oldest first, zeros included. */
+    days: z.array(SpendDay).max(31),
+    month: z.strictObject({ chatUsd: Usd, builderUsd: Usd, reflectionUsd: Usd }),
+    topConversations: z.array(z.strictObject({ id: Id, title: z.string(), costUsd: Usd })).max(5),
+    /** Share of chat input tokens read from the prompt cache this month. */
+    cacheHitRate: z.number().min(0).max(1).optional(),
+  }),
+  /** Who received data today (PRODUCT_SPEC 4.7). */
+  cloud: z
+    .array(z.strictObject({ provider: z.string().max(40), purpose: z.string().max(80), callsToday: z.number().int().nonnegative().optional() }))
+    .max(10),
+  activity: z.strictObject({ actionsToday: z.number().int().nonnegative(), confirmedToday: z.number().int().nonnegative(), deniedToday: z.number().int().nonnegative() }),
+  builder: z.strictObject({ running: z.number().int().nonnegative(), review: z.number().int().nonnegative() }),
+  memory: z.strictObject({
+    enabled: z.boolean(),
+    active: z.number().int().nonnegative(),
+    pendingProposals: z.number().int().nonnegative(),
+    openIdeas: z.array(z.strictObject({ id: z.number().int().positive(), text: z.string().max(1_000), status: IdeaStatusName })).max(5),
+  }),
+});
+export type DashboardResult = z.infer<typeof DashboardResult>;
+
 export const CoreMessage = z.discriminatedUnion("type", [
+  DashboardResult,
   MemoryListResult,
   BuilderListResult,
   BuilderTaskEvent,
