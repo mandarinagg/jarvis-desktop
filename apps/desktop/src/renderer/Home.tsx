@@ -1,7 +1,107 @@
-import type { DashboardResult, SpendDay } from "@jarvis/shared";
+import type { DashboardResult, ProactiveSettingsInfo, ProactiveState, SpendDay } from "@jarvis/shared";
 import { useState } from "react";
 
 type Dashboard = Omit<DashboardResult, "type" | "id">;
+type Proactivity = Omit<ProactiveState, "type" | "id">;
+export type ProactiveAction = { type: "cancel"; reminderId: number } | { type: "set"; settings: Partial<ProactiveSettingsInfo> };
+
+const reminderWhen = (iso: string) => {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const today = new Date();
+  const days = Math.round((new Date(d.toDateString()).getTime() - new Date(today.toDateString()).getTime()) / 86_400_000);
+  if (days === 0) return `Hoy ${time}`;
+  if (days === 1) return `Mañana ${time}`;
+  return `${d.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })} ${time}`;
+};
+
+/** Briefing, reminders and the owner's rules (Phase 7, ADR-026). Reminders are created by asking Jarvis. */
+function Proactive({ data, onAction }: { data: Proactivity | undefined; onAction: (a: ProactiveAction) => void }) {
+  if (!data) return null;
+  const { settings } = data;
+  const quiet = settings.quietHours;
+  return (
+    <div className="home-grid proactive">
+      <div>
+        <h3>Briefing de hoy</h3>
+        {data.briefing ? (
+          <p className="briefing">{data.briefing.text}</p>
+        ) : (
+          <p className="hint">
+            {settings.briefingTime
+              ? `Te lo armo a las ${settings.briefingTime} (fuera del horario silencioso). También podés preguntarme «¿qué tengo hoy?».`
+              : "Está apagado. Prendelo abajo, o preguntame «¿qué tengo hoy?» cuando quieras."}
+          </p>
+        )}
+        <h3>Recordatorios</h3>
+        {data.reminders.length === 0 && <p className="hint">No hay recordatorios. Pedímelos en el chat: «recordame mañana a las 9 llamar a Juan».</p>}
+        <ul className="plain-list">
+          {data.reminders.map((r) => (
+            <li key={r.id}>
+              <span>
+                <span className="project-meta">{reminderWhen(r.dueAt)}</span> {r.text}
+              </span>
+              <button className="link" onClick={() => onAction({ type: "cancel", reminderId: r.id })}>
+                Cancelar
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <h3>Reglas</h3>
+        <ul className="plain-list rules">
+          <li>
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.briefingTime !== null}
+                onChange={(e) => onAction({ type: "set", settings: { briefingTime: e.target.checked ? "08:00" : null } })}
+              />{" "}
+              Briefing diario
+            </label>
+            {settings.briefingTime !== null && (
+              <input
+                type="time"
+                value={settings.briefingTime}
+                aria-label="Hora del briefing"
+                onChange={(e) => e.target.value && onAction({ type: "set", settings: { briefingTime: e.target.value } })}
+              />
+            )}
+          </li>
+          <li>
+            <label>
+              <input
+                type="checkbox"
+                checked={quiet !== null}
+                onChange={(e) => onAction({ type: "set", settings: { quietHours: e.target.checked ? { start: "22:00", end: "08:00" } : null } })}
+              />{" "}
+              Horario silencioso
+            </label>
+            {quiet && (
+              <span className="time-range">
+                <input
+                  type="time"
+                  value={quiet.start}
+                  aria-label="Empieza"
+                  onChange={(e) => e.target.value && e.target.value !== quiet.end && onAction({ type: "set", settings: { quietHours: { ...quiet, start: e.target.value } } })}
+                />
+                a
+                <input
+                  type="time"
+                  value={quiet.end}
+                  aria-label="Termina"
+                  onChange={(e) => e.target.value && e.target.value !== quiet.start && onAction({ type: "set", settings: { quietHours: { ...quiet, end: e.target.value } } })}
+                />
+              </span>
+            )}
+          </li>
+        </ul>
+        <p className="hint">En el horario silencioso no aparece ninguna notificación: lo que caiga ahí sale cuando termina. Si la app está cerrada, sale cuando la abrís.</p>
+      </div>
+    </div>
+  );
+}
 
 const usd = (n: number) => `US$ ${n.toFixed(2)}`;
 const SERIES = [
@@ -118,12 +218,16 @@ function SpendChart({ days, budget }: { days: SpendDay[]; budget: number }) {
  */
 export function Home({
   data,
+  proactive,
+  onProactive,
   onRefresh,
   onOpenConversation,
   onShowMemory,
   onShowActivity,
 }: {
   data: Dashboard | undefined;
+  proactive: Proactivity | undefined;
+  onProactive: (a: ProactiveAction) => void;
   onRefresh: () => void;
   onOpenConversation: (id: string) => void;
   onShowMemory: () => void;
@@ -149,6 +253,8 @@ export function Home({
           </button>
         </div>
       </div>
+
+      <Proactive data={proactive} onAction={onProactive} />
 
       <div className="tiles">
         <div className={`tile ${ratio >= 1 ? "over" : ratio >= 0.8 ? "warn" : ""}`}>

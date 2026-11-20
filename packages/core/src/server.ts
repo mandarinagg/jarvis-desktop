@@ -9,6 +9,7 @@ import {
   type BuilderMessage,
   type ConversationsSetMode,
   type DashboardGet,
+  type ProactiveMessage,
   type MemoryMessage,
   type BudgetGet,
   type PermissionRespond,
@@ -62,6 +63,7 @@ export interface Handlers {
   memory?(session: Session, message: MemoryMessage): void | Promise<void>;
   conversationsSetMode?(session: Session, message: ConversationsSetMode): void;
   dashboardGet?(session: Session, message: DashboardGet): void;
+  proactive?(session: Session, message: ProactiveMessage): void;
   disconnected?(session: Session): void;
 }
 
@@ -304,6 +306,10 @@ export class CoreServer {
           return this.query(session, message, h.conversationsSetMode);
         case "dashboard.get":
           return this.query(session, message, h.dashboardGet);
+        case "proactive.get":
+        case "proactive.set":
+        case "reminders.cancel":
+          return this.query(session, message, h.proactive);
       }
     } catch (err) {
       this.logger.log("error", "ipc.handler_failed", {

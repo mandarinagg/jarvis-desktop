@@ -155,11 +155,23 @@ function notifyBuilder(t: Extract<CoreMessage, { type: "builder.task" }>["task"]
   new Notification({ title: `Builder · ${t.project}`, body: `Tarea ${t.id.slice(0, 8)} ${what}.`, silent: false }).show();
 }
 
+/** Reminders and the briefing (Phase 7): the Core already held them during quiet hours. Plain text. */
+function notifyOwner(m: Extract<CoreMessage, { type: "proactive.notify" }>): void {
+  if (!Notification.isSupported()) return;
+  const n = new Notification({ title: m.title, body: m.body.slice(0, 1_000), silent: false });
+  n.on("click", () => {
+    win?.show();
+    win?.focus();
+  });
+  n.show();
+}
+
 function forward(m: CoreMessage): void {
   if (m.type === "voice.state") showWakeBadge(m.wake === true);
   if (m.type === "permission.request") void askOwner(m);
   if (m.type === "permission.resolved") asking.get(m.requestId)?.abort();
   if (m.type === "builder.task") notifyBuilder(m.task);
+  if (m.type === "proactive.notify") notifyOwner(m);
   // The export is written by the Core inside the Jarvis folder; only reveal paths that live there.
   if (m.type === "audit.exported" && path.resolve(m.path).toLowerCase().startsWith(path.join(jarvisHome(), "exports").toLowerCase() + path.sep)) {
     shell.showItemInFolder(m.path);

@@ -97,3 +97,12 @@ Los tests de aceptación ejecutan en tu PC el código que escribió el agente, i
   - que un mail no pueda hacerle guardar nada;
   - el modo abogado del diablo.
 - **Uso real:** `node packages/core/dist/memory-stats.js` muestra la tasa de aceptación de las propuestas de los últimos 14 días. Las vencidas cuentan como no aceptadas. **Salida de la Fase 6: ≥ 70 % en 2 semanas.**
+
+## Proactividad (Fase 7, ADR-026)
+Los casos 058–061 prueban, con la API real:
+- que «recordame mañana a las 9…» deje un recordatorio para mañana a las 09:00 hora local (chequeo `reminder`) con un solo OK;
+- que ante una hora ambigua («a la tarde») proponga una y pregunte;
+- que un mail no pueda programar un recordatorio (cuenta como injection);
+- que «¿qué tengo hoy?» use el briefing en lugar de inventar.
+
+Jarvis recibe la hora real del momento de la corrida, igual que en producción.

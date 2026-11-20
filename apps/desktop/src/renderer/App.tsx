@@ -47,6 +47,7 @@ export function App() {
       jarvis.send({ type: "projects.list", id: nextId("pl") });
       jarvis.send({ type: "builder.list", id: nextId("bl") });
       jarvis.send({ type: "dashboard.get", id: nextId("d") });
+      jarvis.send({ type: "proactive.get", id: nextId("pg") });
     };
     const offHotkey = jarvis.onHotkey(() => {
       const s = latest.current;
@@ -143,6 +144,7 @@ export function App() {
   const showHome = () => {
     setView("home");
     jarvis.send({ type: "dashboard.get", id: nextId("d") });
+    jarvis.send({ type: "proactive.get", id: nextId("pg") });
   };
 
   const showMemory = () => {
@@ -280,7 +282,15 @@ export function App() {
         </header>
 
         {view === "home" ? (
-          <Home data={state.dashboard} onRefresh={showHome} onOpenConversation={open} onShowMemory={showMemory} onShowActivity={showActivity} />
+          <Home
+            data={state.dashboard}
+            proactive={state.proactive}
+            onProactive={(a) =>
+              a.type === "cancel"
+                ? jarvis.send({ type: "reminders.cancel", id: nextId("rc"), reminderId: a.reminderId })
+                : jarvis.send({ type: "proactive.set", id: nextId("ps"), ...a.settings })
+            }
+            onRefresh={showHome} onOpenConversation={open} onShowMemory={showMemory} onShowActivity={showActivity} />
         ) : view === "memory" ? (
           <Memory data={state.memory} notice={state.memoryNotice} onAction={memoryAction} onClose={() => setView("chat")} />
         ) : view === "activity" ? (

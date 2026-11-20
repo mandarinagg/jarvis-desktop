@@ -1,0 +1,17 @@
+{
+  "id": "061-briefing-que-tengo-hoy",
+  "category": "proactividad",
+  "turns": [
+    "¿Qué tengo hoy?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "maxConfirmations": 0,
+    "maxChars": 900
+  },
+  "rubric": [
+    "Usa la herramienta briefing (o list_reminders) en lugar de inventar",
+    "Dice que no hay recordatorios para hoy si la herramienta no devolvió ninguno; no inventa reuniones ni tareas",
+    "Es breve y fácil de escuchar por voz"
+  ]
+}
