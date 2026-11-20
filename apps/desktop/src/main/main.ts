@@ -10,7 +10,7 @@ import type { CoreClient } from "@jarvis/core/client";
 import { jarvisHome } from "@jarvis/core/paths";
 import type { CoreMessage, PermissionRequest } from "@jarvis/shared";
 import { randomUUID } from "node:crypto";
-import { BrowserWindow, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from "electron";
+import { BrowserWindow, Notification, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from "electron";
 import { CreateProjectRequest, parseRendererMessage } from "./bridge.js";
 import { dialogSteps } from "./confirm-dialog.js";
 import { ensureCore } from "./core-connection.js";
@@ -145,10 +145,21 @@ function showWakeBadge(on: boolean): void {
   win.setTitle(on ? "Jarvis · atento a «Hey Jarvis»" : "Jarvis");
 }
 
+/** A Builder task finished: tell the owner even if the window is in the background. */
+const notified = new Set<string>();
+function notifyBuilder(t: Extract<CoreMessage, { type: "builder.task" }>["task"]): void {
+  if (t.status === "running" || notified.has(`${t.id}:${t.status}`) || !Notification.isSupported()) return;
+  notified.add(`${t.id}:${t.status}`);
+  const what = { review: "lista para revisar", failed: "no se pudo completar", cancelled: "cancelada", merged: "mergeada", discarded: "descartada" }[t.status];
+  if (t.status !== "review" && t.status !== "failed") return;
+  new Notification({ title: `Builder · ${t.project}`, body: `Tarea ${t.id.slice(0, 8)} ${what}.`, silent: false }).show();
+}
+
 function forward(m: CoreMessage): void {
   if (m.type === "voice.state") showWakeBadge(m.wake === true);
   if (m.type === "permission.request") void askOwner(m);
   if (m.type === "permission.resolved") asking.get(m.requestId)?.abort();
+  if (m.type === "builder.task") notifyBuilder(m.task);
   // The export is written by the Core inside the Jarvis folder; only reveal paths that live there.
   if (m.type === "audit.exported" && path.resolve(m.path).toLowerCase().startsWith(path.join(jarvisHome(), "exports").toLowerCase() + path.sep)) {
     shell.showItemInFolder(m.path);

@@ -25,6 +25,10 @@ export const RENDERER_ALLOWED = [
   "audit.list",
   "audit.export",
   "voice.wake",
+  // Phase 5. Listing and stopping Builder tasks only: starting, merging and discarding go through
+  // Jarvis' tools, confirmed in native dialogs.
+  "builder.list",
+  "builder.cancel",
 ] as const;
 
 export type RendererMessage = Extract<ClientMessage, { type: (typeof RENDERER_ALLOWED)[number] }>;

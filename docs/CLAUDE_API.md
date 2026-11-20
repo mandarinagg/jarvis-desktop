@@ -91,8 +91,9 @@ El TTS representa US$ 0,08–0,46 por día del total. El Builder (Claude Agent S
 ## 5. Builder
 
 El Builder usa el **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`) — es un producto distinto del SDK de la API. Se configura con:
-- `cwd` restringido al workspace autorizado.
-- Hooks de permisos que consultan al Permission Engine del Core.
-- Allowlist de comandos; presupuesto por tarea; rama git dedicada.
+- `cwd` restringido al workspace autorizado: un git worktree por tarea, fuera de la carpeta del proyecto.
+- Un hook `PreToolUse` del Core que permite o rechaza cada herramienta (no hay aprobaciones a mitad de tarea: el owner aprueba el arranque y el diff final).
+- Allowlist de comandos; presupuesto por tarea (`maxBudgetUsd`, US$ 1 por defecto, dentro del tope diario); rama git dedicada.
+- `settingSources: []`, sin MCP, sin sesión persistida; `claude-opus-5-5` con `effort: high`. Detalle en ADR-023.
 
 Documentación: https://code.claude.com/docs/en/agent-sdk
