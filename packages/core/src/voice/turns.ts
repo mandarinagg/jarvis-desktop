@@ -7,6 +7,8 @@
  * it (barge-in): the Claude stream and the audio are cancelled and a new utterance starts.
  * With `vadBargeIn` the voice service also watches the mic while Jarvis speaks (ADR-016): talking
  * over him (vad.speech) interrupts him the same way, and the VAD ends that utterance on silence.
+ * With the wake word on (ADR-021), "Hey Jarvis" while idle arms the VAD the same way to record the
+ * command; if the owner says nothing within a few seconds, it goes back to waiting.
  */
 import { randomUUID } from "node:crypto";
 import type {
@@ -18,10 +20,11 @@ import type {
   VoicePtt,
   VoiceStateName,
   VoiceStatusGet,
+  VoiceWake,
 } from "@jarvis/shared";
 import { type Logger, silentLogger } from "../log.js";
 import type { Session } from "../server.js";
-import type { VoiceMetricsStore, VoiceOutcome } from "./metrics.js";
+import type { VoiceMetricsStore, VoiceOutcome, WakeOutcome } from "./metrics.js";
 import { PhraseSegmenter } from "./segmenter.js";
 import type { VoiceState } from "./supervisor.js";
 
@@ -58,12 +61,25 @@ export interface VoiceTurnsOptions {
   continueWithinMs?: number;
   /** Barge-in by voice: watch the mic (VAD) while Jarvis speaks. Off = only push-to-talk interrupts. */
   vadBargeIn?: boolean;
+  /** Wake word at startup (JARVIS_WAKE_WORD=1); the owner can toggle it from the app (voice.wake). */
+  wakeWord?: { enabled: boolean; threshold?: number | undefined };
+  /** After "Hey Jarvis": how long to wait for the owner to start talking. */
+  wakeCommandMs?: number;
+}
+
+/** What the STT may keep of the wake phrase at the start of the command ("…vis, ¿qué hora es?"). */
+const WAKE_PREFIX = /^\s*(?:(?:hey|ey|ei|jey)[\s,]+)?(?:jarvis|yarvis|jarvi|yarvi|vis)\b[\s,.:;!-]*/iu;
+
+export function stripWakePrefix(text: string): string {
+  return text.replace(WAKE_PREFIX, "").trim();
 }
 
 interface Utterance {
   id: string;
   conversationId?: string | undefined;
   releasedAt?: number;
+  /** Started by the wake word: its score, for the false-activation metric. */
+  wakeScore?: number;
 }
 
 interface Turn {
@@ -95,12 +111,18 @@ export class VoiceTurns {
   private lastConversation: { id: string; at: number } | undefined;
   /** VAD watch while a turn is spoken: `id` becomes the utterance if the owner talks over Jarvis. */
   private armed: { id: string; turnId: string } | undefined;
+  /** Wake word: wanted by the owner / confirmed listening by the voice service. */
+  private wantWake: boolean;
+  private wakeOn = false;
+  /** "Hey Jarvis" heard: the VAD waits for the command under this id. */
+  private awaiting: { id: string; score: number; timer: ReturnType<typeof setTimeout> } | undefined;
   private readonly logger: Logger;
   private readonly now: () => number;
 
   constructor(private readonly opts: VoiceTurnsOptions) {
     this.logger = opts.logger ?? silentLogger;
     this.now = opts.now ?? Date.now;
+    this.wantWake = opts.wakeWord?.enabled ?? false;
   }
 
   get state(): VoiceStateName {
@@ -112,8 +134,11 @@ export class VoiceTurns {
   supervisorState(state: VoiceState, detail?: string): void {
     if (state === "ready") {
       if (this.phase === "unavailable") this.setPhase("idle");
+      if (this.wantWake) this.voice({ type: "wake.enable", id: randomUUID(), ...this.threshold() });
       return;
     }
+    this.clearAwaiting();
+    this.wakeOn = false;
     this.utterance = undefined;
     this.current = undefined;
     this.armed = undefined;
@@ -123,6 +148,16 @@ export class VoiceTurns {
   }
 
   statusGet(session: Session, msg: VoiceStatusGet): void {
+    session.send(this.stateMessage(msg.id));
+  }
+
+  /** The owner turned the wake word on or off. Takes effect now if the voice service is up. */
+  voiceWake(session: Session, msg: VoiceWake): void {
+    this.wantWake = msg.enabled;
+    if (this.phase !== "unavailable") {
+      this.voice(msg.enabled ? { type: "wake.enable", id: randomUUID(), ...this.threshold() } : { type: "wake.disable", id: randomUUID() });
+    }
+    if (!msg.enabled) this.clearAwaiting();
     session.send(this.stateMessage(msg.id));
   }
 
@@ -151,6 +186,13 @@ export class VoiceTurns {
       }
       case "vad.speech":
         this.vadSpeech(msg.id);
+        return;
+      case "wake.listening":
+        this.wakeOn = msg.open;
+        this.broadcastState();
+        return;
+      case "wake.detected":
+        this.wakeDetected(msg.score);
         return;
       case "stt.final":
         this.sttFinal(msg.id, msg.text, msg.audioMs, msg.sttMs);
@@ -188,6 +230,11 @@ export class VoiceTurns {
   private pressed(conversationId: string | undefined): void {
     if (this.utterance && this.utterance.releasedAt === undefined) return; // key repeat
     this.disarm();
+    if (this.awaiting) {
+      this.voice({ type: "vad.disarm", id: this.awaiting.id });
+      this.recordWake(this.awaiting.score, "command"); // the owner went on with push-to-talk
+      this.clearAwaiting();
+    }
     if (this.current) this.bargeIn(this.current);
     this.utterance = { id: randomUUID(), conversationId };
     this.voice({ type: "stt.start", id: this.utterance.id });
@@ -214,8 +261,57 @@ export class VoiceTurns {
     this.armed = undefined;
   }
 
+  // ------------------------------------------------------------ wake word
+
+  private threshold(): { threshold?: number } {
+    const t = this.opts.wakeWord?.threshold;
+    return t !== undefined && t > 0 && t < 1 ? { threshold: t } : {};
+  }
+
+  /** "Hey Jarvis" while idle: arm the VAD to record the command (no spoken reply: the mic is open). */
+  private wakeDetected(score: number): void {
+    if (!this.wantWake) return;
+    if (this.phase !== "idle" || this.utterance || this.current || this.armed || this.awaiting) {
+      this.recordWake(score, "ignored");
+      return;
+    }
+    const id = randomUUID();
+    const timer = setTimeout(() => {
+      if (this.awaiting?.id !== id) return;
+      this.voice({ type: "vad.disarm", id });
+      this.recordWake(score, "timeout");
+      this.awaiting = undefined;
+      if (!this.utterance && !this.current) this.setPhase("idle");
+    }, this.opts.wakeCommandMs ?? 6_000);
+    timer.unref?.();
+    this.awaiting = { id, score, timer };
+    this.voice({ type: "vad.arm", id });
+    this.setPhase("listening");
+    this.logger.log("info", "voice.wake", { score });
+  }
+
+  private clearAwaiting(): void {
+    if (this.awaiting) clearTimeout(this.awaiting.timer);
+    this.awaiting = undefined;
+  }
+
+  private recordWake(score: number, outcome: WakeOutcome): void {
+    try {
+      this.opts.metrics?.recordWake(score, outcome);
+    } catch (err) {
+      this.logger.log("error", "voice.metrics_failed", { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
   /** The owner talked over Jarvis: interrupt him and let the VAD capture the new utterance. */
   private vadSpeech(id: string): void {
+    if (this.awaiting?.id === id && !this.utterance) {
+      const { score } = this.awaiting;
+      this.clearAwaiting();
+      this.utterance = { id, wakeScore: score };
+      this.setPhase("listening");
+      return;
+    }
     if (this.armed?.id !== id || this.utterance) {
       this.voice({ type: "stt.cancel", id }); // stale watch (the turn already ended): drop it
       return;
@@ -247,6 +343,10 @@ export class VoiceTurns {
     const turn = this.newTurn(u);
     turn.audioMs = audioMs;
     turn.sttMs = sttMs;
+    if (u.wakeScore !== undefined) {
+      text = stripWakePrefix(text);
+      this.recordWake(u.wakeScore, text ? "command" : "empty");
+    }
     if (!text.trim()) {
       turn.outcome = "empty";
       this.speakOnly(turn, PHRASES.notHeard);
@@ -398,6 +498,7 @@ export class VoiceTurns {
       ...(id ? { id } : {}),
       state: this.phase,
       micOpen: this.micOpen,
+      ...(this.wakeOn ? { wake: true } : {}),
       ...(this.current?.conversationId ? { conversationId: this.current.conversationId } : {}),
       ...(detail ? { detail: detail.slice(0, 500) } : {}),
     };

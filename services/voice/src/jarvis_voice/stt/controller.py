@@ -4,9 +4,14 @@ Barge-in by voice (ADR-016): vad.arm opens the mic while Jarvis speaks and only 
 activity detection. When the owner talks for >= 250 ms it reports vad.speech and records that
 utterance (with 0.5 s of pre-roll) until 700 ms of silence, then transcribes it like stt.stop.
 
-Privacy (VOICE_PIPELINE §5): the microphone is open only between stt.start and stt.stop, every
-open/close is reported (stt.listening) so the UI can show the mandatory indicator, and audio is
-kept in memory only until it is transcribed. Nothing is written to disk.
+Wake word (ADR-021): wake.enable keeps the mic open between captures and feeds it only to the
+wake word detector, which keeps ~1.3 s of features (never raw audio) and reports wake.detected.
+The Core then arms the VAD (vad.arm) to record the command, exactly like a barge-in.
+
+Privacy (VOICE_PIPELINE §5): without the wake word the microphone is open only between stt.start
+and stt.stop (or vad.arm and the end of that capture); every open/close is reported
+(stt.listening, wake.listening) so the UI can show the mandatory indicator, and audio is kept in
+memory only until it is transcribed. Nothing is written to disk.
 """
 
 from __future__ import annotations
@@ -41,6 +46,13 @@ class Transcriber(Protocol):
 class Vad(Protocol):
     def reset(self) -> None: ...
     def prob(self, frame: np.ndarray) -> float: ...
+
+
+class WakeDetector(Protocol):
+    threshold: float
+
+    def reset(self) -> None: ...
+    def push(self, audio: np.ndarray) -> float | None: ...
 
 
 class Microphone(Protocol):
@@ -89,6 +101,7 @@ class SttController:
         max_seconds: float = MAX_SECONDS,
         load_vad: Callable[[], Vad] | None = None,
         gate: Callable[[], SpeechGate] = SpeechGate,
+        load_wake: Callable[[], WakeDetector] | None = None,
     ) -> None:
         self._mic, self._send, self._log, self._clock = microphone, send, log, clock
         self._corrector = corrector or Corrector()
@@ -112,6 +125,15 @@ class SttController:
         self._preroll: deque[np.ndarray] = deque()
         self._vad_jobs: queue.Queue[tuple[str, np.ndarray] | None] = queue.Queue()
         threading.Thread(target=self._vad_run, name="stt-vad", daemon=True).start()
+        # Wake word: the mic stays open between captures while _wake_on, feeding only the detector.
+        self._mic_open = False
+        self._load_wake = load_wake
+        self._wake: WakeDetector | None = None
+        self._wake_error: str | None = None
+        self._wake_on = False
+        self._wake_id: str | None = None
+        self._wake_jobs: queue.Queue[np.ndarray | str | None] = queue.Queue()
+        threading.Thread(target=self._wake_run, name="stt-wake", daemon=True).start()
         threading.Thread(target=self._load, args=(load_engine,), name="stt-load", daemon=True).start()
         self._worker = threading.Thread(target=self._run, name="stt-worker", daemon=True)
         self._worker.start()
@@ -125,7 +147,7 @@ class SttController:
             self._active, self._chunks, self._samples = utterance_id, [], 0
             self._vad_on = self._watching = False
         try:
-            self._mic.open(self._on_audio)
+            self._open_mic()
         except Exception as exc:  # no device, exclusive mode, permissions...
             with self._lock:
                 self._active = None
@@ -149,7 +171,7 @@ class SttController:
             self._preroll.clear()
             self._gate = self._new_gate()
         try:
-            self._mic.open(self._on_audio)
+            self._open_mic()
         except Exception as exc:
             with self._lock:
                 self._active, self._vad_on, self._watching = None, False, False
@@ -165,6 +187,40 @@ class SttController:
         if watching:
             self.cancel(utterance_id)
 
+    def wake_enable(self, request_id: str, threshold: float | None = None) -> None:
+        """Keep listening for the wake word between captures."""
+        detector = self._get_wake()
+        if detector is None:
+            self._send({"type": "voice.error", "id": request_id, "code": "not_configured", "message": "la palabra de activación no está disponible"})
+            return
+        if threshold is not None:
+            detector.threshold = threshold
+        with self._lock:
+            self._wake_on, self._wake_id = True, request_id
+            idle = self._active is None
+        self._wake_jobs.put("reset")
+        if idle:
+            try:
+                self._open_mic()
+            except Exception as exc:
+                with self._lock:
+                    self._wake_on = False
+                self._log("error", "stt.mic_failed", error=repr(exc))
+                self._send({"type": "voice.error", "id": request_id, "code": "stt_failed", "message": "no se pudo abrir el micrófono"})
+                return
+        self._log("info", "stt.wake_on", threshold=detector.threshold)
+        self._send({"type": "wake.listening", "id": request_id, "open": True})
+
+    def wake_disable(self, request_id: str) -> None:
+        with self._lock:
+            was_on, self._wake_on = self._wake_on, False
+            idle = self._active is None
+        if idle:
+            self._close_mic()
+        if was_on:
+            self._log("info", "stt.wake_off")
+        self._send({"type": "wake.listening", "id": request_id, "open": False})
+
     def stop(self, utterance_id: str) -> None:
         audio = self._close(utterance_id)
         if audio is not None:
@@ -176,6 +232,10 @@ class SttController:
     def close(self) -> None:
         if self._active is not None:
             self.cancel(self._active)
+        with self._lock:
+            self._wake_on = False
+        self._close_mic()
+        self._wake_jobs.put(None)
         self._vad_jobs.put(None)
         self._jobs.put(None)
         self._worker.join(timeout=5)
@@ -184,15 +244,27 @@ class SttController:
 
     def wait_idle(self, timeout: float = 5.0) -> None:
         deadline = time.monotonic() + timeout
-        while (self._jobs.unfinished_tasks or self._vad_jobs.unfinished_tasks) and time.monotonic() < deadline:
+        while (self._jobs.unfinished_tasks or self._vad_jobs.unfinished_tasks or self._wake_jobs.unfinished_tasks) and time.monotonic() < deadline:
             time.sleep(0.005)
 
     # ------------------------------------------------------------ internals
+
+    def _open_mic(self) -> None:
+        if not self._mic_open:
+            self._mic.open(self._on_audio)
+            self._mic_open = True
+
+    def _close_mic(self) -> None:
+        if self._mic_open:
+            self._mic_open = False
+            self._mic.close()
 
     def _on_audio(self, chunk: np.ndarray) -> None:
         overflow = None
         with self._lock:
             if self._active is None:
+                if self._wake_on:
+                    self._wake_jobs.put(chunk)
                 return
             if self._vad_on:  # the VAD thread decides what to keep
                 self._vad_jobs.put((self._active, chunk))
@@ -213,8 +285,12 @@ class SttController:
             self._vad_on = self._watching = False
             self._preroll.clear()
             chunks, self._chunks = self._chunks, []
+            keep_open = self._wake_on
         try:
-            self._mic.close()
+            if keep_open:
+                self._wake_jobs.put("reset")  # the capture's audio never reaches the detector
+            else:
+                self._close_mic()
         finally:
             self._send({"type": "stt.listening", "id": utterance_id, "open": False})
         return np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
@@ -229,6 +305,47 @@ class SttController:
                     self._vad_error = f"{type(exc).__name__}: {exc}"
                     self._log("error", "stt.vad_failed", error=self._vad_error)
             return self._vad
+
+    def _get_wake(self) -> WakeDetector | None:
+        with self._vad_lock:
+            if self._wake is None and self._wake_error is None and self._load_wake is not None:
+                try:
+                    self._wake = self._load_wake()
+                    self._log("info", "stt.wake_ready")
+                except Exception as exc:
+                    self._wake_error = f"{type(exc).__name__}: {exc}"
+                    self._log("error", "stt.wake_failed", error=self._wake_error)
+            return self._wake
+
+    def _wake_run(self) -> None:
+        """Scores mic audio for the wake word, off the audio thread."""
+        while True:
+            job = self._wake_jobs.get()
+            try:
+                if job is None:
+                    return
+                detector = self._wake
+                if detector is None:
+                    continue
+                if isinstance(job, str):
+                    detector.reset()
+                    continue
+                with self._lock:
+                    listening = self._wake_on and self._active is None
+                    wake_id = self._wake_id
+                if not listening:
+                    continue
+                score = detector.push(job)
+                if score is not None and wake_id is not None:
+                    with self._lock:
+                        still = self._wake_on and self._active is None
+                    if still:
+                        self._log("info", "stt.wake_detected", score=round(score, 3))
+                        self._send({"type": "wake.detected", "id": wake_id, "score": round(score, 4)})
+            except Exception as exc:
+                self._log("error", "stt.wake_worker_failed", error=repr(exc))
+            finally:
+                self._wake_jobs.task_done()
 
     def _vad_run(self) -> None:
         """Feeds 32 ms frames to the VAD. Runs off the audio thread so inference never drops audio."""

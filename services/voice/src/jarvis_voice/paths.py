@@ -32,6 +32,11 @@ def vad_model() -> Path:
     return jarvis_home() / "models" / "vad" / "silero_vad.onnx"
 
 
+def wake_models() -> Path:
+    """openWakeWord v0.5.1 models (ADR-021): melspectrogram, embedding_model and hey_jarvis_v0.1."""
+    return jarvis_home() / "models" / "wakeword"
+
+
 def stt_vocabulary() -> Path:
     return jarvis_home() / "stt" / "vocabulary.txt"
 

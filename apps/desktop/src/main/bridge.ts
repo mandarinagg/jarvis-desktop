@@ -24,6 +24,7 @@ export const RENDERER_ALLOWED = [
   // (confirm-dialog.ts), so model output rendered here can never approve an action.
   "audit.list",
   "audit.export",
+  "voice.wake",
 ] as const;
 
 export type RendererMessage = Extract<ClientMessage, { type: (typeof RENDERER_ALLOWED)[number] }>;

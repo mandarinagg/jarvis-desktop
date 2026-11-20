@@ -171,13 +171,23 @@ export function App() {
       <main className="stage">
         <header className="meter-bar">
           <div
-            className={`voice-chip ${state.voice.state} ${state.voice.micOpen ? "mic-open" : ""}`}
+            className={`voice-chip ${state.voice.state} ${state.voice.micOpen ? "mic-open" : ""} ${state.voice.wake ? "wake" : ""}`}
             title={state.voice.detail ?? (shortcut ? `Atajo global: ${shortcut}` : "Atajo global no disponible")}
           >
             <span className="voice-dot" aria-hidden="true" />
             <span>{voiceLabel(state.voice)}</span>
             {shortcut && voiceReady && <kbd>{shortcut}</kbd>}
           </div>
+          {voiceReady && (
+            <button
+              className="link wake-toggle"
+              onClick={() => jarvis.send({ type: "voice.wake", id: nextId("w"), enabled: !state.voice.wake })}
+              aria-pressed={state.voice.wake === true}
+              title="La detección es local: nada de lo que digas antes de «Hey Jarvis» se guarda ni sale de tu PC"
+            >
+              {state.voice.wake ? "Apagar «Hey Jarvis»" : "Activar «Hey Jarvis»"}
+            </button>
+          )}
           {state.projects.length > 0 && (
             <label className="project-picker" title="Jarvis busca primero en este proyecto">
               <span>Proyecto</span>

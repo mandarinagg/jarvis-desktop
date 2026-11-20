@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-VOICE_PROTOCOL_VERSION = "1.1"
+VOICE_PROTOCOL_VERSION = "1.2"
 MAX_LINE_BYTES = 1024 * 1024
 
 Check = Callable[[Any], bool]
@@ -42,6 +42,10 @@ def _nonneg_number(v: Any) -> bool:
 
 _ID = _str(1, 64)
 _SEQ = _int(0, 10_000)
+
+
+def _unit(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 1
 
 
 @dataclass(frozen=True)
@@ -83,6 +87,8 @@ TO_VOICE: dict[str, Schema] = {
     "stt.cancel": Schema({"id": _ID}, {}),
     "vad.arm": Schema({"id": _ID}, {}),
     "vad.disarm": Schema({"id": _ID}, {}),
+    "wake.enable": Schema({"id": _ID}, {"threshold": _unit}),
+    "wake.disable": Schema({"id": _ID}, {}),
 }
 
 ERROR_CODES = ("invalid_json", "invalid_message", "incompatible_version", "not_configured", "tts_failed", "stt_failed", "internal")
@@ -97,6 +103,8 @@ FROM_VOICE: dict[str, Schema] = {
     "tts.finished": Schema({"turnId": _ID, "interrupted": _bool}, {}),
     "stt.listening": Schema({"id": _ID, "open": _bool}, {}),
     "vad.speech": Schema({"id": _ID}, {}),
+    "wake.listening": Schema({"id": _ID, "open": _bool}, {}),
+    "wake.detected": Schema({"id": _ID, "score": _unit}, {}),
     "stt.final": Schema({"id": _ID, "text": _str(0, 8000), "audioMs": _nonneg_number, "sttMs": _nonneg_number}, {}),
 }
 

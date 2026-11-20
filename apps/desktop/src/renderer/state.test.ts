@@ -95,6 +95,8 @@ describe("voice", () => {
     expect(voiceLabel({ state: "speaking", micOpen: false })).toBe("Hablando");
     expect(voiceLabel({ state: "speaking", micOpen: true })).toBe("Hablando · te escucho");
     expect(voiceLabel({ state: "listening", micOpen: true })).toBe("Micrófono abierto");
+    expect(voiceLabel({ state: "idle", micOpen: false, wake: true })).toBe("Atento a «Hey Jarvis»");
+    expect(voiceLabel({ state: "thinking", micOpen: false, wake: true })).toBe("Pensando");
   });
 
   it("shows a spoken turn as a user message and streams the reply", () => {

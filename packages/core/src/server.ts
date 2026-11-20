@@ -16,6 +16,7 @@ import {
   type ProjectsMessage,
   type VoicePtt,
   type VoiceStatusGet,
+  type VoiceWake,
   type CoreMessage,
   FrameTooLargeError,
   LineDecoder,
@@ -49,6 +50,7 @@ export interface Handlers {
   budgetGet?(session: Session, message: BudgetGet): void;
   voicePtt?(session: Session, message: VoicePtt): void;
   voiceStatusGet?(session: Session, message: VoiceStatusGet): void;
+  voiceWake?(session: Session, message: VoiceWake): void;
   projects?(session: Session, message: ProjectsMessage): void | Promise<void>;
   permissionRespond?(session: Session, message: PermissionRespond): void;
   audit?(session: Session, message: AuditMessage): void | Promise<void>;
@@ -245,6 +247,8 @@ export class CoreServer {
           return this.query(session, message, h.voicePtt);
         case "voice.status.get":
           return this.query(session, message, h.voiceStatusGet);
+        case "voice.wake":
+          return this.query(session, message, h.voiceWake);
         case "projects.list":
         case "projects.create":
         case "projects.update":

@@ -86,6 +86,25 @@ ASSETS = [
         "2623a2953f6ff3d2c1e61740c6cdb7168133479b267dfef114a4a3cc5bdd788f",
         "models/vad/silero_vad.onnx",
     ),
+    # openWakeWord v0.5.1 (code Apache-2.0; pre-trained models CC BY-NC-SA 4.0: personal use only, ADR-021)
+    Asset(
+        "openWakeWord melspectrogram",
+        "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx",
+        "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
+        "models/wakeword/melspectrogram.onnx",
+    ),
+    Asset(
+        "openWakeWord speech embedding",
+        "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx",
+        "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
+        "models/wakeword/embedding_model.onnx",
+    ),
+    Asset(
+        "openWakeWord hey jarvis",
+        "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx",
+        "94a13cfe60075b132f6a472e7e462e8123ee70861bc3fb58434a73712ee0d2cb",
+        "models/wakeword/hey_jarvis_v0.1.onnx",
+    ),
 ]
 
 

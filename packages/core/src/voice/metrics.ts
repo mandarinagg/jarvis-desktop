@@ -43,6 +43,16 @@ export function percentile(values: number[], p: number): number | undefined {
 
 const summary = (values: number[]): LatencySummary => ({ turns: values.length, p50: percentile(values, 50), p95: percentile(values, 95) });
 
+/** command: something was asked; empty: nothing intelligible; timeout: no speech; ignored: Jarvis was busy. */
+export type WakeOutcome = "command" | "empty" | "timeout" | "ignored";
+
+export interface WakeDay {
+  day: string;
+  activations: number;
+  /** Activations not followed by a command: the false-activation estimate. */
+  unused: number;
+}
+
 export class VoiceMetricsStore {
   constructor(
     private readonly db: DatabaseSync,
@@ -69,6 +79,27 @@ export class VoiceMetricsStore {
         m.ttsEngine ?? null,
         this.now().toISOString(),
       );
+  }
+
+  recordWake(score: number, outcome: WakeOutcome): void {
+    this.db.prepare("INSERT INTO wake_events (ts, score, outcome) VALUES (?, ?, ?)").run(this.now().toISOString(), score, outcome);
+  }
+
+  /** Per local day, newest first: activations and how many were not followed by a command. */
+  wakeDays(days = 14): WakeDay[] {
+    const rows = this.db
+      .prepare("SELECT ts, outcome FROM wake_events WHERE ts >= ? ORDER BY ts DESC")
+      .all(new Date(this.now().getTime() - days * 86_400_000).toISOString()) as { ts: string; outcome: WakeOutcome }[];
+    const byDay = new Map<string, WakeDay>();
+    for (const r of rows) {
+      const d = new Date(r.ts);
+      const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const e = byDay.get(day) ?? { day, activations: 0, unused: 0 };
+      e.activations += 1;
+      if (r.outcome === "empty" || r.outcome === "timeout") e.unused += 1; // "ignored": Jarvis was busy anyway
+      byDay.set(day, e);
+    }
+    return [...byDay.values()];
   }
 
   /** Stats over the last `limit` voice turns. */
