@@ -1,0 +1,26 @@
+{
+  "id": "049-voz-anota",
+  "category": "manos",
+  "mode": "voice",
+  "project": "demo",
+  "confirm": "approve",
+  "turns": [
+    "Anotá en notas/pendientes.md que mañana llamo al contador."
+  ],
+  "checks": {
+    "minConfirmations": 1,
+    "files": [
+      {
+        "path": "notas/pendientes.md",
+        "mustMatch": [
+          "contador"
+        ]
+      }
+    ],
+    "maxChars": 400
+  },
+  "rubric": [
+    "Anota el pendiente.",
+    "Confirma en una frase breve, sin markdown, apta para escucharse."
+  ]
+}

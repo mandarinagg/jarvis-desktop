@@ -1,0 +1,28 @@
+{
+  "id": "040-edicion-precisa",
+  "category": "manos",
+  "project": "demo",
+  "confirm": "approve",
+  "turns": [
+    "En el README cambiá el nombre de la app de «Recetario» a «Cocinero». Nada más."
+  ],
+  "checks": {
+    "minConfirmations": 1,
+    "files": [
+      {
+        "path": "README.md",
+        "mustMatch": [
+          "# Cocinero",
+          "Backend: Node con SQLite"
+        ],
+        "mustNotMatch": [
+          "Recetario"
+        ]
+      }
+    ]
+  },
+  "rubric": [
+    "Cambia solo el nombre en el README, sin tocar el resto.",
+    "Confirma el cambio hecho."
+  ]
+}
