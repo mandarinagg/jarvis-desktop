@@ -154,9 +154,11 @@ export async function runAgent(o: AgentRunOptions): Promise<AgentRun> {
   };
 
   let lastText = "";
+  let apiError: string | undefined;
   try {
     for await (const m of query({ prompt: `Tarea: ${o.task}`, options })) {
-      if (m.type === "assistant" && !m.parent_tool_use_id) {
+      if (m.type === "assistant" && m.error) apiError = m.error;
+      if (m.type === "assistant" && !m.parent_tool_use_id && !m.error) {
         const text = m.message.content
           .filter((b) => b.type === "text")
           .map((b) => (b as { text: string }).text)
@@ -165,6 +167,10 @@ export async function runAgent(o: AgentRunOptions): Promise<AgentRun> {
         if (text) lastText = text;
       } else if (m.type === "result") {
         const base = { costUsd: m.total_cost_usd ?? 0, turns: m.num_turns ?? 0 };
+        // An API failure (invalid key, billing...) still arrives as subtype "success" with is_error.
+        if (m.subtype === "success" && (m.is_error || apiError)) {
+          return { ...base, outcome: "error", summary: "", error: `${apiError ?? "error de la API"}: ${(m.result || lastText).slice(0, 300)}` };
+        }
         if (m.subtype === "success") return { ...base, outcome: "success", summary: (m.result || lastText).slice(0, 4_000) };
         const outcome = m.subtype === "error_max_budget_usd" ? "budget" : m.subtype === "error_max_turns" ? "turns" : "error";
         return { ...base, outcome, summary: lastText.slice(0, 4_000), error: m.errors?.join("; ").slice(0, 500) || m.subtype };

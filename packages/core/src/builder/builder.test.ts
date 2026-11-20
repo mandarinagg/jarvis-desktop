@@ -298,6 +298,13 @@ describe("Builder through the hub", () => {
     expect(broke.builder.list()[0]).toMatchObject({ status: "review", error: "se agotó el presupuesto de US$ 1.00", filesChanged: 1 });
   });
 
+  it("an API failure (invalid key) is an error, not a task that changed nothing", async () => {
+    const { hub, builder } = await setup(fakeAgent([], { is_error: true, result: "Invalid API key · Fix external API key", total_cost_usd: 0 } as Partial<SDKMessage>));
+    await hub.call("builder__start_task", { project: "Utils", task: "Agregá una función slugify" }, {});
+    await builder.settled();
+    expect(builder.list()[0]).toMatchObject({ status: "failed", error: expect.stringMatching(/Invalid API key/) });
+  });
+
   it("one task at a time, within the daily cap, only in git projects", async () => {
     const { builder, conversations } = await setup(fakeAgent([slugify]));
     const plan = builder.planStart("Utils", "Agregá una función slugify");
