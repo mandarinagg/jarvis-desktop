@@ -89,5 +89,5 @@ El protocolo de clientes pasa a 1.4:
   - El SDK suma unos 330 MB (`claude.exe`) a `node_modules`.
   - El proyecto tiene que ser un repo git con al menos un commit y estar en una rama.
 - **Pendiente:**
-  - las 5 tareas reales de la salida, con la API real (`evals/builder`);
+  - las 5 tareas reales de la salida, con la API real (`pnpm --filter @jarvis/evals builder-eval`);
   - evaluar el sandbox del SDK en Windows.

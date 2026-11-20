@@ -5,6 +5,12 @@
 ## Dónde estamos
 - **Fase 0 (Diagnóstico):** completa, salvo la cuenta de la API de Anthropic, que la tiene que crear el owner.
 - **Fase 1 (L0: Core + chat):** implementada y en `main`. Falta validarla con la API real.
+- **Fase 5 (L4a: Builder):** **implementada** en los PRs #43–#44 (apilados sobre #42, ADR-023):
+  - Jarvis le pasa tareas de software a un agente del Claude Agent SDK;
+  - el agente trabaja en un git worktree por tarea, fuera de la carpeta del proyecto, con hook de permisos, allowlist de comandos y presupuesto;
+  - el owner aprueba el arranque y el diff completo antes del merge;
+  - hay 5 tareas reales de salida con tests de aceptación ocultos.
+  Falta validarla con la API real: `builder-eval` tiene que dar 5/5 sin cambios fuera del workspace.
 - **Fase 4 (L3: Manos):** **implementada** en los PRs #38–#42 (apilados sobre #37, ADR-018 a ADR-022):
   - confirmaciones del owner en un diálogo nativo, con reglas y audit log consultable;
   - escritura y git con vista previa exacta y huella;
@@ -18,9 +24,9 @@
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.3 (`voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
+| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.4 (`voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
 | Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
-| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events` |
+| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks` |
 | Secretos | Credential Manager | `anthropic-api-key` (falta) y `google-tts-api-key` (migrada el 2026-11-19) |
 | Claude | `packages/core/src/claude/` | Streaming, `effort: low`, caché, tope diario de US$3 |
 | Voice Service | `services/voice` (`python -m jarvis_voice.service`) | Proceso hijo del Core por stdio. Supervisor con backoff y estado `degradado` |
@@ -34,6 +40,7 @@
 | Herramientas | `packages/core/src/tools/` | Servidores propios `projects` (lectura, escritura con huella, git diff/commit) y `jarvis` (`recent_activity`), servidores de terceros de `mcp-servers.json`, ToolHub, Permission Engine v1 (reglas en `permissions.json`) y audit log. Loop de hasta 8 rondas |
 | Confirmaciones | `tools/confirm.ts` + `apps/desktop/src/main/confirm-dialog.ts` | Diálogo nativo del proceso principal (nunca el renderer), doble para destructivas, 2 min de espera; CLI en terminal; por voz avisa que está en pantalla |
 | Wake word | `services/voice/.../stt/wake.py` | «Hey Jarvis» (openWakeWord sobre onnxruntime), apagada por defecto, indicador en la barra de tareas, `wake_events` |
+| Builder | `packages/core/src/builder/` + `tools/builder-server.ts` | Claude Agent SDK 0.3.319 en un git worktree por tarea (`%APPDATA%/Jarvis/workspaces`), sin settings del repo ni del owner, hook `PreToolUse` (rutas dentro del worktree, Bash con allowlist), presupuesto por tarea dentro del tope diario. Comandos que corren código: el owner los habilita en `builder.json`. Sección Builder en Actividad y notificación de Windows |
 | Evals | `evals/` | 50 conversaciones: 6 de voz, 10 de proyectos sobre `docs/` y 21 de la Fase 4 sobre un proyecto `demo` descartable (10 injections en total). Juez Opus 5.5 con el registro de acciones; umbral del 80% y 0 acciones sin confirmación |
 
 ## Pendiente del owner (bloquea el cierre de las Fases 1 a 4)
@@ -48,14 +55,22 @@
    3. Activarla con el botón «Activar «Hey Jarvis»».
    4. Después de unos días, `voice-stats` tiene que mostrar menos de 1 activación sin uso por día.
 7. Probar una escritura real: pedile a Jarvis que cree o edite un archivo en un proyecto tuyo, revisá el diff en el diálogo y mirá el panel **Actividad**.
+8. **Builder (Fase 5):**
+   1. `pnpm --filter @jarvis/evals builder-eval`: unos US$ 3–5. Tiene que dar 5/5 y 0 cambios fuera del workspace.
+   2. Probarlo en un proyecto tuyo (un repo git):
+      - si querés que pueda correr tests, habilitalos en `%APPDATA%\Jarvis\builder.json`, por ejemplo `{ "projects": { "MiProyecto": { "commands": ["npm test"] } } }`;
+      - pedile a Jarvis una tarea chica;
+      - aprobá el arranque;
+      - cuando llegue la notificación, pedile que la mergee y revisá el diff.
 
 ## Próximos pasos (para quien retome)
-1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → #39 → #40 → #41 → #42. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
+1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → … → #42 → #43 → #44. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
 2. Con la key guardada:
    - correr las evals completas y ajustar `packages/core/prompts/system.md` y `voice.md`;
    - en la Fase 4, revisar sobre todo que una injection nunca genere un pedido de permiso, que anuncie el cambio antes de pedir el OK y que no reintente un rechazo.
 3. Medir la voz real con `voice-stats` (p50 menor a 2.0 s) y calibrar la wake word.
-4. **Fase 5 (Builder):** Claude Agent SDK en workspaces autorizados, siempre en una rama, con diff antes del merge. Arrancar solo con pedido explícito del owner.
+4. Con la key, correr `builder-eval` y mirar los rechazos del hook en el reporte. Si el agente choca seguido con la allowlist, ajustar el prompt del Builder (`builder/runner.ts`), no la política.
+5. **Fase 6 (Memoria que aprende):** memoria episódica, semántica y procedural, reflexión diaria con propuestas aprobables y UI de memoria. Arrancar solo con pedido explícito del owner.
 
 ## Decisiones abiertas
 - **Costo:** el uso típico estimado (~US$2,2/día) supera el objetivo de US$1. Se decide con datos reales.
@@ -65,6 +80,7 @@
 - **Pendientes de ADR-007:** cifrado AES-GCM de campos (Fase 3) y backups `VACUUM INTO`.
 - **Confirmación por voz** (ADR-018): postergada hasta tener verificación de hablante o AEC.
 - **Sandbox del sistema operativo** para servidores MCP de terceros (ADR-020): no hay. Registrar un servidor equivale a instalar un programa.
+- **Builder sin sandbox del SO** (ADR-023): un comando habilitado como `npm test` corre código del proyecto con los permisos del owner. El sandbox del SDK en Windows queda por evaluar.
 - **Wake word en español:** el modelo es «Hey Jarvis» en inglés. Si con la voz del owner no anda, hay que entrenar uno propio (ADR-021). Los modelos son CC BY-NC-SA, solo para uso personal.
 
 ## Trampas conocidas
@@ -81,10 +97,13 @@
 - **`tsc` emite aunque haya errores:** revisá la salida del build antes de probar.
 - **SDK 1.x** autentica con `Authorization: Bearer`.
 - **pnpm 10:** los argumentos se pasan sin `--`.
+- **Agent SDK:** una key inválida llega como resultado `success` con `is_error`. El runner lo trata como error.
+- **Agent SDK:** pesa unos 330 MB (`claude.exe` firmado; Smart App Control lo deja correr).
+- **Worktrees del Builder:** si el Core muere a mitad de una tarea, la tarea queda «falló» y su worktree sigue ahí hasta que se descarte.
 
 ## Cómo verificar el estado
 ```powershell
 pnpm install --frozen-lockfile
-pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 285 tests
+pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 307 tests
 cd services/voice; uv run python -m pytest -q         # 207 tests (en local incluye Parakeet, Silero y openWakeWord reales)
 ```

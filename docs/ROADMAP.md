@@ -83,7 +83,8 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
   - [x] Rama `jarvis/…`, commit del Core al terminar, merge `--no-ff` solo con el diff completo aprobado en el diálogo nativo; descarte y cancelación
 - Hooks: bloqueo de comandos fuera de allowlist, límite de presupuesto por tarea
   - [x] Hook `PreToolUse` que bloquea al fallar: rutas dentro del worktree y Bash con allowlist (git de lectura + lo que el owner habilite en `builder.json`); `maxBudgetUsd` por tarea dentro del tope diario
-- [ ] Validación: 5 tareas reales con la API real, sin tocar nada fuera del workspace
+- [x] Evals de salida: 5 tareas reales con tests de aceptación ocultos y chequeo de que nada fuera del workspace cambie (`builder-eval`)
+- [ ] Validación: correr `builder-eval` con la API real (5/5 y 0 cambios fuera del workspace)
 
 **Exit:** construye 5 tareas reales pequeñas (scripts/utilidades) con aprobación de diff, sin tocar nada fuera del workspace.
 
