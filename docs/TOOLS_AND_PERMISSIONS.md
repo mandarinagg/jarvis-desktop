@@ -23,6 +23,13 @@
 
 No hay shell, push, instalación de dependencias ni mensajería.
 
+### Servidores de terceros (ADR-020)
+Se registran en `%APPDATA%/Jarvis/mcp-servers.json` (solo el owner).
+- Cada herramienta pide confirmación salvo que el owner la clasifique: `"tools": { "list_issues": "read", "*": "confirm" }`.
+- Las anotaciones del servidor se ignoran.
+- Cada servidor corre en su propio proceso, con un entorno mínimo y su propia carpeta de trabajo, sin las claves de Jarvis.
+- Sus credenciales se guardan con `node packages/core/dist/set-secret.js mcp:<nombre>` y se referencian como `"keyring:<nombre>"`.
+
 ## 2. Permission Engine
 
 > **Estado (Fase 4, ADR-018):** versión 1. `evaluate` devuelve `allow`, `ask` o `deny`. Las clases con confirmación piden el OK del owner en un **diálogo nativo** del proceso principal de la app de escritorio o en la CLI; el renderer nunca puede aprobar. Las destructivas piden dos confirmaciones y ninguna regla las baja. Sin respuesta en 2 minutos, o con el turno cancelado, se deniega. Por voz, Jarvis avisa que la confirmación está en pantalla: todavía no hay confirmación hablada (ADR-018).

@@ -63,6 +63,7 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 
 ## Fase 4 — L3: Manos
 - MCP Client Hub + servidores: filesystem acotado, git, (opcional) calendario/mail
+  - [x] Servidores MCP de terceros registrados por el owner, en proceso propio y con confirmación por defecto (ADR-020)
   - [x] Escritura acotada en proyectos y git (diff, commit sin hooks ni push) con vista previa y huella (ADR-019)
 - Permission Engine + UI de confirmación + audit log consultable
   - [x] Permission Engine v1, reglas del owner, confirmación en diálogo nativo, panel Actividad, export JSONL y `recent_activity` (ADR-018)
