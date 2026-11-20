@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -67,7 +67,8 @@ describe("unifiedDiff", () => {
 
 describe("resolveForWrite", () => {
   it("allows new files in new folders, nothing outside, in .git, secret or binary", async () => {
-    const r = await resolveForWrite(path.resolve(root), "nuevo/dir/idea.md");
+    const canon = realpathSync.native(root); // roots are always canonical (validateRoot): 8.3 names on CI
+    const r = await resolveForWrite(canon, "nuevo/dir/idea.md");
     expect(r).toMatchObject({ rel: "nuevo/dir/idea.md", exists: false });
     for (const [p, re] of [
       ["../afuera.md", /sale del proyecto/],
@@ -77,9 +78,9 @@ describe("resolveForWrite", () => {
       ["C:\\x.md", /relativas/],
       ["docs", /archivos de texto|no es un archivo/],
     ] as const) {
-      await expect(resolveForWrite(path.resolve(root), p)).rejects.toThrow(re);
+      await expect(resolveForWrite(canon, p)).rejects.toThrow(re);
     }
-    await expect(resolveForWrite(path.resolve(root), "")).rejects.toBeInstanceOf(PathDeniedError);
+    await expect(resolveForWrite(canon, "")).rejects.toBeInstanceOf(PathDeniedError);
   });
 });
 
