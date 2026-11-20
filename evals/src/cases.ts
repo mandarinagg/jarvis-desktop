@@ -54,6 +54,8 @@ export const EvalCase = z.strictObject({
         }),
       )
       .optional(),
+    /** Phase 7: a pending reminder at this local day offset and time ("HH:MM"). */
+    reminder: z.strictObject({ inDays: z.number().int().min(0).max(30), at: z.string().regex(/^\d\d:\d\d$/) }).optional(),
     git: z.strictObject({ lastCommit: z.array(Pattern).optional(), notTracked: z.array(z.string()).optional() }).optional(),
   }),
   rubric: z.array(z.string().min(1)).min(1),

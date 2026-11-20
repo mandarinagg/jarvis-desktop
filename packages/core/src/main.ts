@@ -12,6 +12,10 @@ import { Builder } from "./builder/service.js";
 import { BuilderTaskStore } from "./builder/store.js";
 import { ChatService } from "./chat.js";
 import { dashboard } from "./dashboard.js";
+import { nowLine } from "./proactive/schedule.js";
+import { Proactive } from "./proactive/service.js";
+import { ProactiveStore } from "./proactive/store.js";
+import { REMINDERS_SERVER, REMINDERS_TOOLS, createRemindersServer, remindersPreviews } from "./tools/reminders-server.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
 import { openDatabase } from "./db.js";
 import { localDay } from "./db.js";
@@ -147,6 +151,20 @@ async function main(): Promise<number> {
   builder.recoverInterrupted();
   await tools.addInProcess(BUILDER_SERVER, createBuilderServer(builder), BUILDER_SERVER_TOOLS, builderPreviews(builder));
   const tts = ttsResolver(env);
+  // Phase 7 (ADR-026): reminders (owner confirms each one) and the daily briefing, as notifications.
+  const proactiveStore = new ProactiveStore(db);
+  const proactive = new Proactive({
+    db,
+    store: proactiveStore,
+    broadcast: (m) => broadcast(m),
+    canNotify: () => sessions().some((s) => s.client === "desktop"),
+    dailyBudgetUsd,
+    logger,
+  });
+  const remindersDeps = { store: proactiveStore, briefing: () => proactive.briefingNow(), conversationOfTurn: (t: string) => memories.conversationOfTurn(t) };
+  await tools.addInProcess(REMINDERS_SERVER, createRemindersServer(remindersDeps), REMINDERS_TOOLS, remindersPreviews(remindersDeps));
+  const proactiveTimer = setInterval(() => proactive.tick(), 30_000);
+  proactiveTimer.unref();
   const auditService = new AuditService(audit, path.join(home, "exports"));
   const chat = new ChatService({
     store,
@@ -165,6 +183,7 @@ async function main(): Promise<number> {
       if (r.memories.length) memories.recordUses(turnId, conversationId, r.memories.map((m) => m.id));
       return r.block;
     },
+    clock: nowLine,
     modePrompt: (conversationId) => {
       const mode = store.thinkingMode(conversationId);
       return mode ? modePrompts[mode] : undefined;
@@ -211,6 +230,7 @@ async function main(): Promise<number> {
     confirmations.cancelAll();
     await builder.close();
     if (reflectionTimer) clearInterval(reflectionTimer);
+    clearInterval(proactiveTimer);
     unwatchFile(rulesFile);
     index.close();
     await tools.close();
@@ -237,6 +257,7 @@ async function main(): Promise<number> {
       audit: (s, m) => auditService.handle(s, m),
       memory: (s, m) => memoryService.handle(s, m),
       conversationsSetMode: (s, m) => chat.conversationsSetMode(s, m),
+      proactive: (s, m) => proactive.handle(s, m),
       dashboardGet: (s, m) =>
         s.send({ type: "dashboard.result", id: m.id, ...dashboard(db, { dailyBudgetUsd, googleTts: tts().engine === "google" }) }),
       builder: (s, m) => {

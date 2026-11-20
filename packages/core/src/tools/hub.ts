@@ -162,6 +162,14 @@ export class ToolHub implements ToolRuntime {
         return "Mergeando la tarea del Builder";
       case "discard_task":
         return "Descartando la tarea del Builder";
+      case "list_reminders":
+        return "Mirando tus recordatorios";
+      case "briefing":
+        return "Armando el resumen del día";
+      case "create_reminder":
+        return "Programando un recordatorio";
+      case "cancel_reminder":
+        return "Cancelando un recordatorio";
       default:
         return tool;
     }

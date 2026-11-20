@@ -41,6 +41,10 @@ export const RENDERER_ALLOWED = [
   "conversations.setMode",
   // Phase 7. The Home panel: a read-only snapshot.
   "dashboard.get",
+  // Proactivity: rules and cancelling reminders. Creating one needs Jarvis' tool and a native OK.
+  "proactive.get",
+  "proactive.set",
+  "reminders.cancel",
 ] as const;
 
 export type RendererMessage = Extract<ClientMessage, { type: (typeof RENDERER_ALLOWED)[number] }>;

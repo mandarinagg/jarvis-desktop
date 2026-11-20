@@ -1007,3 +1007,26 @@ html.is-overlay body {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Proactivity (Phase 7, ADR-026) */
+.briefing {
+  white-space: pre-line;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--panel);
+  border-left: 3px solid var(--signal);
+  border-radius: 4px;
+}
+.rules input[type="time"] {
+  font: inherit;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.time-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

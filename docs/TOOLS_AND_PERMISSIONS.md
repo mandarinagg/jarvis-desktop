@@ -32,6 +32,14 @@ Jarvis no tiene shell, push, instalación de dependencias ni mensajería.
 
 Antes de pedir el OK se rechaza todo lo que parezca un secreto. La confirmación es la defensa contra el envenenamiento de memoria: una injection no puede guardar nada sin que el owner lo vea.
 
+### Recordatorios (servidor `reminders`, ADR-026)
+| Herramienta | Clase |
+|---|---|
+| `list_reminders`, `briefing` | lectura |
+| `create_reminder` (texto y hora exactos en el diálogo), `cancel_reminder` | con confirmación |
+
+Un recordatorio termina siendo una notificación con la cara de Jarvis, así que ningún mail ni archivo puede programar uno sin que el owner lo vea.
+
 ### Builder (servidor `builder`, ADR-023)
 | Herramienta | Clase |
 |---|---|

@@ -30,3 +30,7 @@ export * from "./memory/retrieve.js";
 export * from "./memory/service.js";
 export * from "./memory/store.js";
 export * from "./tools/memory-server.js";
+export * from "./proactive/schedule.js";
+export * from "./proactive/service.js";
+export * from "./proactive/store.js";
+export * from "./tools/reminders-server.js";
