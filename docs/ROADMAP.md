@@ -90,9 +90,12 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 
 ## Fase 6 — L4b: Memoria que aprende
 - Memoria episódica/semántica/procedural
+  - [x] Datos, preferencias, procedimientos (texto) y episodios con vencimiento; FTS5; recuperación por turno como datos; `explain` (ADR-024)
 - Job de reflexión diaria con propuestas aprobables
 - UI de memoria (ver/editar/borrar/desactivar)
+  - [x] Panel Memoria: buscar, filtrar, editar, desactivar, borrar, olvidar la semana, apagar la memoria
 - Idea Vault + modos de pensamiento
+  - [x] Ideas con estado (guardar con confirmación) y modos sparring, brainstorm y abogado del diablo
 
 **Exit:** en 2 semanas de uso, ≥ 70% de recuerdos propuestos son aceptados; recuperación correcta en evals de memoria.
 

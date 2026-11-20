@@ -60,6 +60,16 @@ export class ConversationStore {
       .all(limit) as unknown as Conversation[];
   }
 
+  /** Thinking mode of a conversation (Phase 6); null = normal. */
+  thinkingMode(conversationId: string): "sparring" | "brainstorm" | "abogado" | undefined {
+    const row = this.db.prepare("SELECT thinking_mode AS m FROM conversations WHERE id = ?").get(conversationId) as { m: string | null } | undefined;
+    return (row?.m ?? undefined) as "sparring" | "brainstorm" | "abogado" | undefined;
+  }
+
+  setThinkingMode(conversationId: string, mode: "sparring" | "brainstorm" | "abogado" | null): void {
+    this.db.prepare("UPDATE conversations SET thinking_mode = ? WHERE id = ?").run(mode, conversationId);
+  }
+
   /** The owner cut the spoken reply short (barge-in after the text had already been stored). */
   markInterrupted(turnId: string): void {
     this.db.prepare("UPDATE messages SET interrupted = 1 WHERE turn_id = ? AND role = 'assistant'").run(turnId);

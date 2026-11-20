@@ -34,6 +34,8 @@ export interface Preview {
 
 /** `_meta` key the hub uses to hand the approved fingerprint to its own servers (never the model). */
 export const FINGERPRINT_META = "jarvis/fingerprint";
+/** `_meta` key with the turn id, for the Core's own servers only (never third-party ones). */
+export const TURN_META = "jarvis/turn";
 
 /** Builds the preview of a call; throwing PreviewError rejects the call with that message. */
 export type Previewer = (args: unknown) => Promise<Preview>;
@@ -57,6 +59,7 @@ interface Connected {
   client: Client;
   tools: Anthropic.Beta.BetaTool[];
   previews: Record<string, Previewer>;
+  own: boolean;
 }
 
 export class ToolHub implements ToolRuntime {
@@ -79,7 +82,7 @@ export class ToolHub implements ToolRuntime {
     await server.connect(serverSide);
     const client = new Client({ name: "jarvis-core", version: "0.1.0" });
     await client.connect(clientSide);
-    await this.addClient(name, client, (tool) => risks[tool], { previews });
+    await this.addClient(name, client, (tool) => risks[tool], { previews, own: true });
   }
 
   /**
@@ -91,7 +94,7 @@ export class ToolHub implements ToolRuntime {
     name: string,
     client: Client,
     classify: (tool: string) => Risk | undefined,
-    opts: { previews?: Record<string, Previewer>; thirdParty?: boolean } = {},
+    opts: { previews?: Record<string, Previewer>; thirdParty?: boolean; own?: boolean } = {},
   ): Promise<number> {
     if (!SERVER_NAME.test(name) || this.servers.has(name)) throw new Error(`invalid or duplicate server name: ${name}`);
     const { tools } = await client.listTools();
@@ -112,7 +115,7 @@ export class ToolHub implements ToolRuntime {
         input_schema: { ...t.inputSchema, type: "object" } as Anthropic.Beta.BetaTool.InputSchema,
       });
     }
-    this.servers.set(name, { name, client, tools: defs, previews: opts.previews ?? {} });
+    this.servers.set(name, { name, client, tools: defs, previews: opts.previews ?? {}, own: opts.own === true });
     // Deterministic order keeps the tools prefix byte-identical across requests (prompt cache).
     this.defs = [...this.servers.values()].flatMap((s) => s.tools).sort((a, b) => a.name.localeCompare(b.name));
     return defs.length;
@@ -212,7 +215,14 @@ export class ToolHub implements ToolRuntime {
         {
           name: tool,
           arguments: (input ?? {}) as Record<string, unknown>,
-          ...(preview?.fingerprint ? { _meta: { [FINGERPRINT_META]: preview.fingerprint } } : {}),
+          ...(preview?.fingerprint || (connected.own && ctx.turnId)
+            ? {
+                _meta: {
+                  ...(preview?.fingerprint ? { [FINGERPRINT_META]: preview.fingerprint } : {}),
+                  ...(connected.own && ctx.turnId ? { [TURN_META]: ctx.turnId } : {}),
+                },
+              }
+            : {}),
         },
         undefined,
         { ...(ctx.signal ? { signal: ctx.signal } : {}), timeout: 30_000 },

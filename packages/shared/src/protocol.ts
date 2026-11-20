@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.4"; // 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5)
+export const PROTOCOL_VERSION = "1.5"; // 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
 
 const Id = z.string().min(1).max(64);
 const SessionToken = z.string().regex(/^[0-9a-f]{64}$/, "token must be 256-bit lowercase hex");
@@ -144,6 +144,53 @@ export type BuilderCancel = z.infer<typeof BuilderCancel>;
 
 export type BuilderMessage = BuilderList | BuilderCancel;
 
+/** Memory (Phase 6, ADR-024): the owner sees, edits, disables and deletes what Jarvis remembers.
+ * New memories only come from Jarvis' tools (native confirmation) or accepted proposals. */
+export const MemoryKindName = z.enum(["fact", "preference", "procedure", "idea", "episode"]);
+export const IdeaStatusName = z.enum(["nueva", "en_curso", "hecha", "descartada"]);
+
+export const MemoryList = z.strictObject({
+  type: z.literal("memory.list"),
+  id: Id,
+  query: z.string().max(200).optional(),
+  kind: MemoryKindName.optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+});
+export type MemoryList = z.infer<typeof MemoryList>;
+
+export const MemoryUpdate = z.strictObject({
+  type: z.literal("memory.update"),
+  id: Id,
+  memoryId: z.number().int().positive(),
+  text: z.string().min(1).max(1_000).optional(),
+  status: z.enum(["active", "disabled"]).optional(),
+  ideaStatus: IdeaStatusName.optional(),
+});
+export type MemoryUpdate = z.infer<typeof MemoryUpdate>;
+
+export const MemoryDelete = z.strictObject({ type: z.literal("memory.delete"), id: Id, memoryIds: z.array(z.number().int().positive()).min(1).max(500) });
+export type MemoryDelete = z.infer<typeof MemoryDelete>;
+
+/** "Olvidá todo lo de esta semana": deletes memories (and pending proposals) created in [since, until). */
+export const MemoryForget = z.strictObject({ type: z.literal("memory.forget"), id: Id, since: z.iso.datetime(), until: z.iso.datetime() });
+export type MemoryForget = z.infer<typeof MemoryForget>;
+
+/** Turns memory on or off (retrieval, saving and reflection). Omit `enabled` to just read it. */
+export const MemorySettings = z.strictObject({ type: z.literal("memory.settings"), id: Id, enabled: z.boolean().optional() });
+export type MemorySettings = z.infer<typeof MemorySettings>;
+
+export type MemoryMessage = MemoryList | MemoryUpdate | MemoryDelete | MemoryForget | MemorySettings;
+
+export const ThinkingModeName = z.enum(["sparring", "brainstorm", "abogado"]);
+/** Thinking mode of a conversation (Phase 6); null = normal. */
+export const ConversationsSetMode = z.strictObject({
+  type: z.literal("conversations.setMode"),
+  id: Id,
+  conversationId: Id,
+  mode: ThinkingModeName.nullable(),
+});
+export type ConversationsSetMode = z.infer<typeof ConversationsSetMode>;
+
 export const ClientMessage = z.discriminatedUnion("type", [
   VoiceWake,
   PermissionRespond,
@@ -151,6 +198,12 @@ export const ClientMessage = z.discriminatedUnion("type", [
   AuditExport,
   BuilderList,
   BuilderCancel,
+  MemoryList,
+  MemoryUpdate,
+  MemoryDelete,
+  MemoryForget,
+  MemorySettings,
+  ConversationsSetMode,
   VoicePtt,
   VoiceStatusGet,
   AuthHello,
@@ -261,6 +314,7 @@ export const ConversationHistory = z.strictObject({
   conversationId: Id,
   title: z.string(),
   projectId: Id.optional(),
+  thinkingMode: ThinkingModeName.optional(),
   messages: z.array(HistoryMessage),
 });
 export type ConversationHistory = z.infer<typeof ConversationHistory>;
@@ -410,7 +464,36 @@ export type BuilderListResult = z.infer<typeof BuilderListResult>;
 export const BuilderTaskEvent = z.strictObject({ type: z.literal("builder.task"), task: BuilderTaskInfo });
 export type BuilderTaskEvent = z.infer<typeof BuilderTaskEvent>;
 
+export const MemoryInfo = z.strictObject({
+  id: z.number().int().positive(),
+  kind: MemoryKindName,
+  /** Written by the owner or by Jarvis: plain text, never rendered as markup. */
+  text: z.string().max(1_000),
+  project: z.string().optional(),
+  source: z.enum(["owner", "reflection"]),
+  status: z.enum(["active", "disabled"]),
+  ideaStatus: IdeaStatusName.optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  expiresAt: z.string().optional(),
+  lastUsedAt: z.string().optional(),
+  useCount: z.number().int().nonnegative(),
+});
+export type MemoryInfo = z.infer<typeof MemoryInfo>;
+
+/** Reply to every memory.* request (with its id): the current list and whether memory is on. */
+export const MemoryListResult = z.strictObject({
+  type: z.literal("memory.list.result"),
+  id: Id,
+  enabled: z.boolean(),
+  memories: z.array(MemoryInfo).max(500),
+  /** memory.delete / memory.forget: how many were removed. */
+  removed: z.number().int().nonnegative().optional(),
+});
+export type MemoryListResult = z.infer<typeof MemoryListResult>;
+
 export const CoreMessage = z.discriminatedUnion("type", [
+  MemoryListResult,
   BuilderListResult,
   BuilderTaskEvent,
   PermissionRequest,

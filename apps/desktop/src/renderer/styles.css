@@ -748,3 +748,62 @@ html.is-overlay body {
   word-break: break-word;
   opacity: 0.9;
 }
+
+/* ------------------------------------------------------------ Memory (Phase 6) */
+.memory-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.memory-search input {
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  background: transparent;
+  color: inherit;
+}
+.memory-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.memory-filters .active {
+  font-weight: 600;
+  text-decoration: underline;
+}
+.memory-text {
+  margin: 4px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.memory-item.disabled {
+  opacity: 0.55;
+}
+.memory-item.preference {
+  border-left-color: #2563eb;
+}
+.memory-item.idea {
+  border-left-color: #9333ea;
+}
+.memory-item.episode {
+  border-left-color: #64748b;
+}
+.memory-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.memory-edit textarea {
+  font: inherit;
+  min-height: 70px;
+  padding: 6px;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+}
+.link.danger {
+  color: #c2410c;
+}
