@@ -66,6 +66,8 @@ async function main(): Promise<number> {
     else if (m.type === "permission.resolved") {
       asking.get(m.requestId)?.abort();
       out(m.approved ? "  · permitido\n" : `  · no se hizo${m.reason ? ` (${m.reason})` : ""}\n`);
+    } else if (m.type === "builder.task" && (m.task.status === "review" || m.task.status === "failed")) {
+      out(`\n  · Builder: la tarea ${m.task.id.slice(0, 8)} en ${m.task.project} ${m.task.status === "review" ? "está lista para revisar" : `no se pudo completar (${m.task.error ?? "sin detalle"})`}\n`);
     }
   });
 

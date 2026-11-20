@@ -124,7 +124,12 @@ export class ConversationStore {
   }
 
   spentOn(day: string): number {
-    const row = this.db.prepare("SELECT COALESCE(SUM(cost_usd), 0) AS total FROM usage WHERE day = ?").get(day);
+    // Chat turns plus Builder tasks (Phase 5): one daily cap for everything Jarvis spends.
+    const row = this.db
+      .prepare(
+        "SELECT (SELECT COALESCE(SUM(cost_usd), 0) FROM usage WHERE day = ?) + (SELECT COALESCE(SUM(cost_usd), 0) FROM builder_tasks WHERE day = ?) AS total",
+      )
+      .get(day, day);
     return Number(row?.total ?? 0);
   }
 

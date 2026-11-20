@@ -1,5 +1,5 @@
 /** Pure chat state for the renderer: every Core message and UI action goes through `reduce`. */
-import type { AuditEntryInfo, ConversationSummary, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
+import type { AuditEntryInfo, BuilderTaskInfo, ConversationSummary, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
 
 export interface UiMessage {
   role: "user" | "assistant";
@@ -29,6 +29,8 @@ export interface State {
   /** Audit log page (Phase 4), newest first; undefined until loaded. */
   audit?: AuditEntryInfo[];
   auditExport?: { path: string; count: number };
+  /** Builder tasks (Phase 5), newest first. */
+  builder?: BuilderTaskInfo[];
   error?: string;
 }
 
@@ -224,6 +226,10 @@ function reduceCore(state: State, m: CoreMessage): State {
     }
     case "audit.list.result":
       return { ...state, audit: m.entries };
+    case "builder.list.result":
+      return { ...state, builder: m.tasks };
+    case "builder.task":
+      return { ...state, builder: [m.task, ...(state.builder ?? []).filter((t) => t.id !== m.task.id)] };
     case "audit.exported":
       return { ...state, auditExport: { path: m.path, count: m.count } };
     case "budget.status":

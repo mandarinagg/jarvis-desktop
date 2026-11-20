@@ -43,6 +43,7 @@ export function App() {
       jarvis.send({ type: "budget.get", id: nextId("b") });
       jarvis.send({ type: "voice.status.get", id: nextId("v") });
       jarvis.send({ type: "projects.list", id: nextId("pl") });
+      jarvis.send({ type: "builder.list", id: nextId("bl") });
     };
     const offHotkey = jarvis.onHotkey(() => {
       const s = latest.current;
@@ -129,6 +130,7 @@ export function App() {
   const showActivity = () => {
     setView("activity");
     jarvis.send({ type: "audit.list", id: nextId("al"), limit: 100 });
+    jarvis.send({ type: "builder.list", id: nextId("bl") });
   };
 
   const startNew = () => {
@@ -225,6 +227,8 @@ export function App() {
           <Activity
             entries={state.audit}
             exported={state.auditExport}
+            tasks={state.builder}
+            onCancelTask={(taskId) => jarvis.send({ type: "builder.cancel", id: nextId("bc"), taskId })}
             onRefresh={showActivity}
             onExport={() => jarvis.send({ type: "audit.export", id: nextId("ae") })}
             onClose={() => setView("chat")}

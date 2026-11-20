@@ -22,11 +22,11 @@ describe("openDatabase", () => {
   it("applies migrations once and uses WAL", () => {
     const file = tempDb();
     const db = openDatabase(file);
-    expect(schemaVersion(db)).toBe(6);
+    expect(schemaVersion(db)).toBe(7);
     expect(db.prepare("PRAGMA journal_mode").get()).toMatchObject({ journal_mode: "wal" });
     db.close();
     const again = openDatabase(file);
-    expect(schemaVersion(again)).toBe(6);
+    expect(schemaVersion(again)).toBe(7);
     again.close();
   });
 

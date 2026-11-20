@@ -107,6 +107,8 @@ describe("schemas", () => {
       "audit.list",
       "auth.hello",
       "budget.get",
+      "builder.cancel",
+      "builder.list",
       "chat.cancel",
       "chat.send",
       "conversations.get",

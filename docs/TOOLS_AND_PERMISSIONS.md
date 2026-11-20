@@ -21,7 +21,21 @@
 | `delete_file` (mueve a la papelera de Jarvis) | destructiva |
 | `jarvis__recent_activity` | lectura |
 
-No hay shell, push, instalación de dependencias ni mensajería.
+Jarvis no tiene shell, push, instalación de dependencias ni mensajería.
+
+### Builder (servidor `builder`, ADR-023)
+| Herramienta | Clase |
+|---|---|
+| `task_status` | lectura |
+| `cancel_task` | preparación (solo detiene) |
+| `start_task` (tarea, presupuesto y comandos exactos), `merge_task` (diff completo), `discard_task` | con confirmación |
+
+- El agente trabaja en un git worktree propio, fuera del proyecto, con un hook que permite o rechaza cada herramienta: archivos solo dentro del worktree (nunca `.git` ni secretos) y Bash solo para comandos simples de la allowlist.
+- Por defecto la allowlist trae solo git de lectura. Los comandos que corren código (tests) los habilita el owner por proyecto en `%APPDATA%/Jarvis/builder.json`:
+  ```json
+  { "budgetUsd": 1, "projects": { "Recetario": { "commands": ["node --test", "npm test"] } } }
+  ```
+- Cada llamada del agente queda en el audit log (server `builder`) con rutas y comandos, nunca contenidos.
 
 ### Servidores de terceros (ADR-020)
 Se registran en `%APPDATA%/Jarvis/mcp-servers.json` (solo el owner).

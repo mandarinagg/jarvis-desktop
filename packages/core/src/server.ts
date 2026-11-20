@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import net from "node:net";
 import {
   type AuditMessage,
+  type BuilderMessage,
   type BudgetGet,
   type PermissionRespond,
   type ChatCancel,
@@ -54,6 +55,7 @@ export interface Handlers {
   projects?(session: Session, message: ProjectsMessage): void | Promise<void>;
   permissionRespond?(session: Session, message: PermissionRespond): void;
   audit?(session: Session, message: AuditMessage): void | Promise<void>;
+  builder?(session: Session, message: BuilderMessage): void | Promise<void>;
   disconnected?(session: Session): void;
 }
 
@@ -270,6 +272,14 @@ export class CoreServer {
             return;
           }
           await h.audit(session, message);
+          return;
+        case "builder.list":
+        case "builder.cancel":
+          if (!h.builder) {
+            session.send({ type: "error", id: message.id, code: "upstream_error", message: `${message.type} is not available` });
+            return;
+          }
+          await h.builder(session, message);
           return;
       }
     } catch (err) {
