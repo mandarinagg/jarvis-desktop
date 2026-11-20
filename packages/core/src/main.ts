@@ -27,7 +27,7 @@ import { ConfirmationBroker } from "./tools/confirm.js";
 import { ToolHub } from "./tools/hub.js";
 import { JARVIS_SERVER, JARVIS_TOOLS, createJarvisServer } from "./tools/jarvis-server.js";
 import { AuditLog, PermissionEngine, loadRules } from "./tools/permissions.js";
-import { PROJECTS_SERVER, PROJECTS_TOOLS, createProjectsServer } from "./tools/projects-server.js";
+import { PROJECTS_SERVER, PROJECTS_TOOLS, createProjectsServer, projectsPreviews } from "./tools/projects-server.js";
 import { VoiceMetricsStore } from "./voice/metrics.js";
 import { createVoiceSpawner } from "./voice/spawn.js";
 import { VoiceSupervisor } from "./voice/supervisor.js";
@@ -83,7 +83,8 @@ async function main(): Promise<number> {
   let sessions: () => Session[] = () => [];
   const confirmations = new ConfirmationBroker({ sessions: () => sessions(), logger });
   const tools = new ToolHub(permissions, audit, logger, confirmations);
-  await tools.addInProcess(PROJECTS_SERVER, createProjectsServer({ projects, index }), PROJECTS_TOOLS);
+  const projectsDeps = { projects, index, trashDir: path.join(home, "trash") };
+  await tools.addInProcess(PROJECTS_SERVER, createProjectsServer(projectsDeps), PROJECTS_TOOLS, projectsPreviews(projectsDeps));
   await tools.addInProcess(JARVIS_SERVER, createJarvisServer({ audit }), JARVIS_TOOLS);
   const auditService = new AuditService(audit, path.join(home, "exports"));
   const chat = new ChatService({

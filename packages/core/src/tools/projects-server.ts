@@ -1,7 +1,9 @@
 /**
- * The `projects` MCP server (ADR-003, ADR-017): read-only tools over the folders the owner
- * authorized. It runs in the Core's process (own, read-only code) and is reached through the MCP
- * client like any other server, so every call passes the Permission Engine and the Audit Log.
+ * The `projects` MCP server (ADR-003, ADR-017, ADR-019): tools over the folders the owner
+ * authorized. Reads run freely; writes (write_file, edit_file, git_commit) need the owner's OK and
+ * delete_file needs it twice. It runs in the Core's process (own code) and is reached through the
+ * MCP client like any other server, so every call passes the Permission Engine and the Audit Log.
+ * Write tools only act on the fingerprint the hub passes in `_meta` (what the owner approved).
  * Everything returned is file content or metadata: data for the model, never instructions.
  */
 import { readFile, readdir, stat } from "node:fs/promises";
@@ -13,7 +15,20 @@ import { EXCLUDED_DIRS } from "../projects/guard.js";
 import type { ProjectIndex } from "../projects/indexer.js";
 import type { Project, ProjectStore } from "../projects/store.js";
 import { type GitRunner, gitStatus, runGit } from "./git.js";
+import { FINGERPRINT_META, PreviewError, type Previewer } from "./hub.js";
 import type { Risk } from "./permissions.js";
+import {
+  WriteError,
+  applyCommit,
+  applyFilePlan,
+  commitPreview,
+  filePreview,
+  gitDiff,
+  planCommit,
+  planDelete,
+  planEdit,
+  planWrite,
+} from "./write-ops.js";
 
 export const PROJECTS_SERVER = "projects";
 export const MAX_READ_LINES = 400;
@@ -28,13 +43,40 @@ export const PROJECTS_TOOLS: Record<string, Risk> = {
   read_file: "read",
   list_dir: "read",
   git_status: "read",
+  git_diff: "read",
+  write_file: "confirm",
+  edit_file: "confirm",
+  git_commit: "confirm",
+  delete_file: "destructive",
 };
 
 export interface ProjectsServerDeps {
   projects: ProjectStore;
   index: ProjectIndex;
   git?: GitRunner;
+  /** Where delete_file moves files (inside the Jarvis folder, unreachable by tools). */
+  trashDir?: string;
 }
+
+const ProjectName = z.string().min(1).max(100);
+const RelPath = z.string().min(1).max(500).describe("Ruta relativa a la raíz del proyecto");
+export const WriteArgs = z.object({
+  project: ProjectName,
+  path: RelPath,
+  content: z.string().max(200_000).describe("Contenido completo del archivo"),
+});
+export const EditArgs = z.object({
+  project: ProjectName,
+  path: RelPath,
+  old_text: z.string().min(1).max(50_000).describe("Fragmento exacto a reemplazar; tiene que aparecer una sola vez"),
+  new_text: z.string().max(100_000).describe("Texto que lo reemplaza"),
+});
+export const DeleteArgs = z.object({ project: ProjectName, path: RelPath });
+export const CommitArgs = z.object({
+  project: ProjectName,
+  message: z.string().min(1).max(2_000).describe("Mensaje del commit"),
+  paths: z.array(z.string().min(1).max(500)).min(1).max(50).describe('Archivos o carpetas a incluir; "." = todos los cambios'),
+});
 
 class ToolError extends Error {}
 
@@ -67,6 +109,22 @@ export function createProjectsServer(deps: ProjectsServerDeps): McpServer {
     };
 
   const ro = { readOnlyHint: true, openWorldHint: false };
+  const trashDir = deps.trashDir ?? path.join(process.cwd(), ".jarvis-trash");
+  const approvedOf = (extra: { _meta?: unknown }) => {
+    const v = (extra._meta as Record<string, unknown> | undefined)?.[FINGERPRINT_META];
+    return typeof v === "string" ? v : undefined;
+  };
+  const writing =
+    <A>(fn: (args: A, approved: string | undefined) => Promise<string>) =>
+    async (args: A, extra: { _meta?: unknown }) => {
+      try {
+        return text(await fn(args, approvedOf(extra)));
+      } catch (err) {
+        if (err instanceof ToolError || err instanceof WriteError) return fail(`No lo hice: ${err.message}.`);
+        if (err instanceof PathDeniedError) return fail(`Ruta no permitida: ${err.message}.`);
+        return fail("No se pudo completar la escritura.");
+      }
+    };
 
   server.registerTool(
     "list_projects",
@@ -204,5 +262,104 @@ export function createProjectsServer(deps: ProjectsServerDeps): McpServer {
     }),
   );
 
+  server.registerTool(
+    "git_diff",
+    {
+      description: "Muestra los cambios sin commitear de un proyecto (diff contra el último commit), opcionalmente de un solo archivo.",
+      inputSchema: { project: ProjectName, path: z.string().max(500).optional().describe("Archivo; sin él, todo el proyecto") },
+      annotations: ro,
+    },
+    guarded(async (a: { project: string; path?: string | undefined }) => {
+      const p = project(a.project);
+      try {
+        return await gitDiff(p, a.path, git);
+      } catch (err) {
+        if (err instanceof WriteError) throw new ToolError(err.message);
+        throw err;
+      }
+    }),
+  );
+
+  server.registerTool(
+    "write_file",
+    {
+      description:
+        "Crea un archivo de texto o reemplaza todo su contenido. El owner ve el diff y tiene que aprobarlo antes de que se escriba. " +
+        "Para cambios chicos en un archivo existente preferí edit_file.",
+      inputSchema: WriteArgs.shape,
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    writing(async (a: z.infer<typeof WriteArgs>, approved) => applyFilePlan(await planWrite(project(a.project), a.path, a.content), approved, trashDir)),
+  );
+
+  server.registerTool(
+    "edit_file",
+    {
+      description:
+        "Reemplaza un fragmento exacto (old_text, que tiene que aparecer una sola vez) por new_text en un archivo existente. " +
+        "Leé el archivo antes para copiar el fragmento tal cual. El owner aprueba el diff antes de que se escriba.",
+      inputSchema: EditArgs.shape,
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    writing(async (a: z.infer<typeof EditArgs>, approved) =>
+      applyFilePlan(await planEdit(project(a.project), a.path, a.old_text, a.new_text), approved, trashDir),
+    ),
+  );
+
+  server.registerTool(
+    "delete_file",
+    {
+      description: "Borra un archivo (lo mueve a la papelera de Jarvis). Es destructivo: el owner lo confirma dos veces.",
+      inputSchema: DeleteArgs.shape,
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+    },
+    writing(async (a: z.infer<typeof DeleteArgs>, approved) => applyFilePlan(await planDelete(project(a.project), a.path), approved, trashDir)),
+  );
+
+  server.registerTool(
+    "git_commit",
+    {
+      description:
+        "Commitea los cambios de las rutas indicadas con un mensaje. No hace push y no corre hooks. Excluye archivos con posibles secretos. " +
+        "Mirá antes git_status o git_diff. El owner aprueba la lista de archivos y el mensaje.",
+      inputSchema: CommitArgs.shape,
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    writing(async (a: z.infer<typeof CommitArgs>, approved) => applyCommit(await planCommit(project(a.project), a.message, a.paths, git), approved, git)),
+  );
+
   return server;
+}
+
+/**
+ * Previews the hub shows the owner before a write runs. They validate the raw model input with the
+ * same schemas as the tools, and plan the change exactly like the tool will.
+ */
+export function projectsPreviews(deps: ProjectsServerDeps): Record<string, Previewer> {
+  const git = deps.git ?? runGit;
+  const find = (name: string) => {
+    const p = deps.projects.find(name);
+    if (!p) throw new PreviewError(`No hay un proyecto «${name}».`);
+    return p;
+  };
+  const wrap =
+    <S extends z.ZodType>(schema: S, fn: (a: z.infer<S>) => Promise<import("./hub.js").Preview>): Previewer =>
+    async (raw) => {
+      const parsed = schema.safeParse(raw);
+      if (!parsed.success) throw new PreviewError(`Argumentos inválidos: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+      try {
+        return await fn(parsed.data);
+      } catch (err) {
+        if (err instanceof PreviewError) throw err;
+        if (err instanceof WriteError) throw new PreviewError(`No lo hice: ${err.message}.`);
+        if (err instanceof PathDeniedError) throw new PreviewError(`Ruta no permitida: ${err.message}.`);
+        throw new PreviewError("No pude preparar el cambio.");
+      }
+    };
+  return {
+    write_file: wrap(WriteArgs, async (a) => filePreview(await planWrite(find(a.project), a.path, a.content))),
+    edit_file: wrap(EditArgs, async (a) => filePreview(await planEdit(find(a.project), a.path, a.old_text, a.new_text))),
+    delete_file: wrap(DeleteArgs, async (a) => filePreview(await planDelete(find(a.project), a.path))),
+    git_commit: wrap(CommitArgs, async (a) => commitPreview(await planCommit(find(a.project), a.message, a.paths, git))),
+  };
 }

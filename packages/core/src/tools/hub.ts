@@ -26,7 +26,12 @@ export interface ToolCallContext {
 export interface Preview {
   title: string;
   detail: string;
+  /** What was on disk when the preview was built; the server refuses to act if it changed. */
+  fingerprint?: string;
 }
+
+/** `_meta` key the hub uses to hand the approved fingerprint to its own servers (never the model). */
+export const FINGERPRINT_META = "jarvis/fingerprint";
 
 /** Builds the preview of a call; throwing PreviewError rejects the call with that message. */
 export type Previewer = (args: unknown) => Promise<Preview>;
@@ -111,6 +116,18 @@ export class ToolHub implements ToolRuntime {
         return `Listando ${s("project") ?? ""}/${s("path") ?? ""}`;
       case "git_status":
         return `Viendo el estado de git de ${s("project") ?? ""}`;
+      case "git_diff":
+        return `Mirando los cambios de ${s("project") ?? ""}`;
+      case "write_file":
+        return `Escribiendo ${s("project") ?? ""}/${s("path") ?? ""}`;
+      case "edit_file":
+        return `Editando ${s("project") ?? ""}/${s("path") ?? ""}`;
+      case "delete_file":
+        return `Borrando ${s("project") ?? ""}/${s("path") ?? ""}`;
+      case "git_commit":
+        return `Commit en ${s("project") ?? ""}`;
+      case "recent_activity":
+        return "Revisando lo que hice";
       default:
         return tool;
     }
@@ -128,18 +145,23 @@ export class ToolHub implements ToolRuntime {
     if (verdict.decision === "deny" || !connected) return deny(verdict.reason ?? "servidor no conectado");
 
     let approvedBy: string = verdict.allowedBy ?? "policy";
-    if (verdict.decision === "ask") {
-      if (!this.confirmer) return deny("requiere confirmación y no hay cómo pedirla");
-      let preview: Preview;
+    // Tools with a preview plan their change first, also when a rule lets them run without asking:
+    // the fingerprint makes the server act on exactly what was planned (and approved).
+    const previewer = connected.previews[tool];
+    let preview: Preview | undefined;
+    if (previewer || verdict.decision === "ask") {
       try {
-        preview = await (connected.previews[tool] ?? genericPreview(server, tool))(input);
+        preview = await (previewer ?? genericPreview(server, tool))(input);
       } catch (err) {
         if (err instanceof PreviewError) return { content: err.message, isError: true }; // invalid call: nothing to confirm
         throw err;
       }
+    }
+    if (verdict.decision === "ask" && preview) {
+      if (!this.confirmer) return deny("requiere confirmación y no hay cómo pedirla");
       ctx.onWaiting?.();
       const outcome = await this.confirmer.confirm(
-        { turnId: ctx.turnId, server, tool, risk: verdict.risk, confirmations: verdict.confirmations ?? 1, ...preview },
+        { turnId: ctx.turnId, server, tool, risk: verdict.risk, confirmations: verdict.confirmations ?? 1, title: preview.title, detail: preview.detail },
         ctx.signal,
       );
       if (ctx.signal?.aborted) {
@@ -156,7 +178,11 @@ export class ToolHub implements ToolRuntime {
     const t0 = performance.now();
     try {
       const res = await connected.client.callTool(
-        { name: tool, arguments: (input ?? {}) as Record<string, unknown> },
+        {
+          name: tool,
+          arguments: (input ?? {}) as Record<string, unknown>,
+          ...(preview?.fingerprint ? { _meta: { [FINGERPRINT_META]: preview.fingerprint } } : {}),
+        },
         undefined,
         { ...(ctx.signal ? { signal: ctx.signal } : {}), timeout: 30_000 },
       );
