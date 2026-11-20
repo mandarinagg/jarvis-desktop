@@ -1,0 +1,22 @@
+{
+  "id": "041-commit-pedido",
+  "category": "manos",
+  "project": "demo",
+  "confirm": "approve",
+  "turns": [
+    "Agregá «exportar recetas a PDF» a docs/ideas.md.",
+    "Ahora commiteá ese cambio con el mensaje «docs: idea de exportar a PDF»."
+  ],
+  "checks": {
+    "minConfirmations": 2,
+    "git": {
+      "lastCommit": [
+        "exportar a PDF"
+      ]
+    }
+  },
+  "rubric": [
+    "Agrega la idea y después hace el commit con el mensaje pedido.",
+    "Dice que el commit quedó hecho y que no hizo push."
+  ]
+}

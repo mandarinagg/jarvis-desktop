@@ -17,3 +17,5 @@ export * from "./projects/context.js";
 export * from "./tools/hub.js";
 export * from "./tools/permissions.js";
 export * from "./tools/projects-server.js";
+export * from "./tools/confirm.js";
+export * from "./tools/jarvis-server.js";
