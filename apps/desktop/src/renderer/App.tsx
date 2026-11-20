@@ -1,5 +1,6 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useReducer, useRef, useState } from "react";
 import { Activity } from "./Activity.js";
+import { Memory, type MemoryAction } from "./Memory.js";
 import { Projects } from "./Projects.js";
 import { type ToolStatus, budgetLevel, initialState, pttPressed, reduce, voiceLabel } from "./state.js";
 
@@ -30,7 +31,7 @@ export function App() {
   const [draft, setDraft] = useState("");
   const [hotkey, setHotkey] = useState<string | null>(null);
   const [holding, setHolding] = useState(false);
-  const [view, setView] = useState<"chat" | "activity">("chat");
+  const [view, setView] = useState<"chat" | "activity" | "memory">("chat");
   const latest = useRef(state);
   latest.current = state;
   const transcriptEnd = useRef<HTMLDivElement>(null);
@@ -133,6 +134,19 @@ export function App() {
     jarvis.send({ type: "builder.list", id: nextId("bl") });
   };
 
+  const showMemory = () => {
+    setView("memory");
+    jarvis.send({ type: "memory.list", id: nextId("ml") });
+  };
+  const memoryAction = (a: MemoryAction) => {
+    const id = nextId("m");
+    if (a.type === "list") jarvis.send({ type: "memory.list", id, ...(a.query ? { query: a.query } : {}), ...(a.kind ? { kind: a.kind } : {}) });
+    else if (a.type === "update") jarvis.send({ ...a, type: "memory.update", id });
+    else if (a.type === "delete") jarvis.send({ type: "memory.delete", id, memoryIds: a.memoryIds });
+    else if (a.type === "forget") jarvis.send({ type: "memory.forget", id, since: a.since, until: a.until });
+    else jarvis.send({ type: "memory.settings", id, enabled: a.enabled });
+  };
+
   const startNew = () => {
     if (busy) return;
     dispatch({ kind: "new" });
@@ -167,6 +181,9 @@ export function App() {
         <Projects projects={state.projects} connected={state.connected} onError={(m) => dispatch({ kind: "core", message: { type: "error", code: "internal", message: m } })} />
         <button className="link activity-link" onClick={showActivity} disabled={!state.connected} aria-pressed={view === "activity"}>
           Actividad
+        </button>
+        <button className="link activity-link" onClick={showMemory} disabled={!state.connected} aria-pressed={view === "memory"}>
+          Memoria
         </button>
       </aside>
 
@@ -203,6 +220,28 @@ export function App() {
               </select>
             </label>
           )}
+          {state.activeId && (
+            <label className="project-picker" title="Cómo te responde Jarvis en esta conversación">
+              <span>Modo</span>
+              <select
+                value={state.thinkingMode ?? ""}
+                onChange={(e) =>
+                  jarvis.send({
+                    type: "conversations.setMode",
+                    id: nextId("md"),
+                    conversationId: state.activeId as string,
+                    mode: (e.target.value || null) as "sparring" | "brainstorm" | "abogado" | null,
+                  })
+                }
+                disabled={busy}
+              >
+                <option value="">Normal</option>
+                <option value="sparring">Sparring</option>
+                <option value="brainstorm">Brainstorm</option>
+                <option value="abogado">Abogado del diablo</option>
+              </select>
+            </label>
+          )}
           {state.budget ? (
             <div className={`meter ${level}`} title="Gasto de hoy en la API de Claude">
               <div className="meter-track">
@@ -223,7 +262,9 @@ export function App() {
           )}
         </header>
 
-        {view === "activity" ? (
+        {view === "memory" ? (
+          <Memory data={state.memory} removed={state.memoryRemoved} onAction={memoryAction} onClose={() => setView("chat")} />
+        ) : view === "activity" ? (
           <Activity
             entries={state.audit}
             exported={state.auditExport}

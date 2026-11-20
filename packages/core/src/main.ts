@@ -14,13 +14,16 @@ import { ChatService } from "./chat.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
 import { openDatabase } from "./db.js";
 import { localDay } from "./db.js";
+import { retrieve } from "./memory/retrieve.js";
+import { MemoryService } from "./memory/service.js";
+import { MemoryStore } from "./memory/store.js";
 import { createLogger } from "./log.js";
 import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
 import { projectCard } from "./projects/context.js";
 import { ProjectIndex } from "./projects/indexer.js";
 import { ProjectsService } from "./projects/service.js";
 import { ProjectStore } from "./projects/store.js";
-import { loadSystemPrompt, loadVoicePrompt } from "./prompt.js";
+import { loadModePrompts, loadSystemPrompt, loadVoicePrompt } from "./prompt.js";
 import { KeyringSecretStore, mcpSecret } from "./secrets.js";
 import { AlreadyRunningError, CoreServer } from "./server.js";
 import { ConversationStore } from "./store.js";
@@ -31,6 +34,7 @@ import { ConfirmationBroker } from "./tools/confirm.js";
 import { connectExternalServers, loadExternalServers } from "./tools/external.js";
 import { ToolHub } from "./tools/hub.js";
 import { JARVIS_SERVER, JARVIS_TOOLS, createJarvisServer } from "./tools/jarvis-server.js";
+import { MEMORY_SERVER, MEMORY_TOOLS, createMemoryServer, memoryPreviews } from "./tools/memory-server.js";
 import { AuditLog, PermissionEngine, loadRules } from "./tools/permissions.js";
 import { PROJECTS_SERVER, PROJECTS_TOOLS, createProjectsServer, projectsPreviews } from "./tools/projects-server.js";
 import { VoiceMetricsStore } from "./voice/metrics.js";
@@ -96,6 +100,12 @@ async function main(): Promise<number> {
   const projectsDeps = { projects, index, trashDir: path.join(home, "trash") };
   await tools.addInProcess(PROJECTS_SERVER, createProjectsServer(projectsDeps), PROJECTS_TOOLS, projectsPreviews(projectsDeps));
   await tools.addInProcess(JARVIS_SERVER, createJarvisServer({ audit }), JARVIS_TOOLS);
+  // Phase 6 (ADR-024): memory that learns. Saving needs the owner's OK; retrieval is per turn, as data.
+  const memories = new MemoryStore(db);
+  const memoryDeps = { memories, projects, conversations: store };
+  await tools.addInProcess(MEMORY_SERVER, createMemoryServer(memoryDeps), MEMORY_TOOLS, memoryPreviews(memoryDeps));
+  const memoryService = new MemoryService(memories, projects);
+  const modePrompts = loadModePrompts();
   // The server is created below; events only flow once it is listening.
   let broadcast: (m: CoreMessage) => void = () => {};
   const dailyBudgetUsd = Number.isFinite(budget) && budget > 0 ? budget : 3;
@@ -127,6 +137,15 @@ async function main(): Promise<number> {
       return p ? projectCard(p) : undefined;
     },
     dailyBudgetUsd,
+    memoryContext: ({ conversationId, turnId, text }) => {
+      const r = retrieve(memories, { text, projectId: projects.conversationProject(conversationId)?.id, now: new Date() });
+      if (r.memories.length) memories.recordUses(turnId, conversationId, r.memories.map((m) => m.id));
+      return r.block;
+    },
+    modePrompt: (conversationId) => {
+      const mode = store.thinkingMode(conversationId);
+      return mode ? modePrompts[mode] : undefined;
+    },
     logger,
   });
 
@@ -192,6 +211,8 @@ async function main(): Promise<number> {
       },
       permissionRespond: (s, m) => confirmations.respond(s, m),
       audit: (s, m) => auditService.handle(s, m),
+      memory: (s, m) => memoryService.handle(s, m),
+      conversationsSetMode: (s, m) => chat.conversationsSetMode(s, m),
       builder: (s, m) => {
         if (m.type === "builder.list") s.send({ type: "builder.list.result", id: m.id, tasks: builder.list() });
         else {

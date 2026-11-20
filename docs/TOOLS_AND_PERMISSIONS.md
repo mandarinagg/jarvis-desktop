@@ -23,6 +23,15 @@
 
 Jarvis no tiene shell, push, instalación de dependencias ni mensajería.
 
+### Memoria (servidor `memory`, ADR-024)
+| Herramienta | Clase |
+|---|---|
+| `search`, `explain` | lectura |
+| `set_thinking_mode` | preparación |
+| `remember`, `save_idea`, `update_idea`, `forget` (texto exacto en el diálogo) | con confirmación |
+
+Antes de pedir el OK se rechaza todo lo que parezca un secreto. La confirmación es la defensa contra el envenenamiento de memoria: una injection no puede guardar nada sin que el owner lo vea.
+
 ### Builder (servidor `builder`, ADR-023)
 | Herramienta | Clase |
 |---|---|

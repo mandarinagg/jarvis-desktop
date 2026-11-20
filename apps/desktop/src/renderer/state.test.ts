@@ -187,3 +187,23 @@ describe("builder", () => {
     ]);
   });
 });
+
+describe("memory", () => {
+  it("keeps the panel list and the open conversation's thinking mode", () => {
+    const mem = { id: 1, kind: "fact" as const, text: "Usa pnpm", source: "owner" as const, status: "active" as const, createdAt: "t", updatedAt: "t", useCount: 0 };
+    let s = reduce(initialState, { kind: "core", message: { type: "memory.list.result", id: "x", enabled: true, memories: [mem], removed: 1 } });
+    expect(s.memory?.memories).toHaveLength(1);
+    expect(s.memoryRemoved).toBe(1);
+    s = reduce(s, { kind: "select", conversationId: "c1" });
+    s = reduce(s, { kind: "core", message: { type: "conversations.history", id: "h", conversationId: "c1", title: "t", thinkingMode: "abogado", messages: [] } });
+    expect(s.thinkingMode).toBe("abogado");
+    s = reduce(s, { kind: "new" });
+    expect(s.thinkingMode).toBeUndefined();
+  });
+
+  it("forgets from Monday of this week", async () => {
+    const { weekStart } = await import("./Memory.js");
+    const start = new Date(weekStart(new Date(2026, 10, 20, 15, 0))); // Friday 20/11/2026
+    expect([start.getDay(), start.getDate(), start.getHours()]).toEqual([1, 16, 0]);
+  });
+});
