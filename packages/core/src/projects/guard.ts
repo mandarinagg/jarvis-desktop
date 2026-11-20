@@ -133,6 +133,36 @@ export async function resolveInside(root: string, requested: string): Promise<{ 
 }
 
 /**
+ * Resolves a model-supplied path for writing (Phase 4, ADR-019). Like resolveInside, but the file
+ * may not exist yet: then its deepest existing ancestor is canonicalized and must be inside the
+ * root. Only text files outside excluded folders (.git included) and the secrets denylist.
+ */
+export async function resolveForWrite(root: string, requested: string): Promise<{ abs: string; rel: string; exists: boolean }> {
+  const cleaned = requested.trim().replace(/^[\\/]+/, "");
+  if (!cleaned) throw new PathDeniedError("falta el nombre del archivo");
+  if (/^[a-zA-Z]:/.test(cleaned) || cleaned.startsWith("\\\\")) throw new PathDeniedError("solo rutas relativas al proyecto");
+  const lexical = path.resolve(root, cleaned);
+  if (!isInside(root, lexical) || lexical === root) throw new PathDeniedError("la ruta sale del proyecto");
+  const lexicalReason = deniedReason(toRel(root, lexical));
+  if (lexicalReason) throw new PathDeniedError(lexicalReason);
+  if (!isTextFile(path.basename(lexical))) throw new PathDeniedError("solo se pueden escribir archivos de texto");
+  let abs: string;
+  let exists = true;
+  try {
+    abs = await realpath(lexical);
+  } catch {
+    exists = false;
+    abs = canonical(lexical);
+  }
+  if (!isInside(root, abs)) throw new PathDeniedError("la ruta sale del proyecto (enlace simbólico)");
+  const rel = toRel(root, abs);
+  const reason = deniedReason(rel);
+  if (reason) throw new PathDeniedError(reason);
+  if (exists && !statSync(abs).isFile()) throw new PathDeniedError("no es un archivo");
+  return { abs, rel, exists };
+}
+
+/**
  * Canonical form of a path that may not exist yet: realpath of its deepest existing ancestor plus
  * the rest. Needed to compare against realpath'd roots (8.3 short names like RUNNER~1, junctions).
  */

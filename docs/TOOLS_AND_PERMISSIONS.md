@@ -12,6 +12,17 @@
 | **Destructiva** | eliminar archivos, force push, borrar datos | Confirmación **doble** con vista exacta de lo que pasará |
 | **Prohibida** | shell genérico irrestricto, acceso fuera de carpetas autorizadas, leer el almacén de credenciales | Bloqueado siempre |
 
+### Herramientas actuales (servidor `projects`, ADR-017 y ADR-019)
+
+| Herramienta | Clase |
+|---|---|
+| `list_projects`, `search`, `read_file`, `list_dir`, `git_status`, `git_diff` | lectura |
+| `write_file`, `edit_file`, `git_commit` | con confirmación |
+| `delete_file` (mueve a la papelera de Jarvis) | destructiva |
+| `jarvis__recent_activity` | lectura |
+
+No hay shell, push, instalación de dependencias ni mensajería.
+
 ## 2. Permission Engine
 
 > **Estado (Fase 4, ADR-018):** versión 1. `evaluate` devuelve `allow`, `ask` o `deny`. Las clases con confirmación piden el OK del owner en un **diálogo nativo** del proceso principal de la app de escritorio o en la CLI; el renderer nunca puede aprobar. Las destructivas piden dos confirmaciones y ninguna regla las baja. Sin respuesta en 2 minutos, o con el turno cancelado, se deniega. Por voz, Jarvis avisa que la confirmación está en pantalla: todavía no hay confirmación hablada (ADR-018).
