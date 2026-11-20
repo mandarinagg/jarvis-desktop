@@ -658,3 +658,60 @@ html.is-overlay body {
   color: #c2410c;
 }
 
+
+/* ------------------------------------------------------------ activity (Phase 4) */
+.activity-link {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.activity {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.activity-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.activity-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.audit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.audit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  border-left: 3px solid var(--line, rgba(127, 127, 127, 0.3));
+  padding-left: 10px;
+}
+.audit.confirm {
+  border-left-color: #ca8a04;
+}
+.audit.destructive,
+.audit.deny {
+  border-left-color: #c2410c;
+}
+.audit-args {
+  font-size: 12px;
+  opacity: 0.8;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.tool-trail .tool.waiting {
+  color: #ca8a04;
+  opacity: 1;
+}

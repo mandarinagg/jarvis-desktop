@@ -1,13 +1,15 @@
 /**
  * MCP Client Hub (ADR-003): connects the Core to its MCP servers and exposes their tools to
  * Claude. Every call goes model -> Permission Engine -> MCP server -> Audit Log. The model only
- * asks; a denied call never reaches the server.
+ * asks; a denied call never reaches the server. Calls the engine answers with `ask` wait for the
+ * owner's confirmation (ADR-018), shown with a preview the Core builds from validated arguments.
  */
 import type Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type Logger, silentLogger } from "../log.js";
+import type { Confirmer } from "./confirm.js";
 import type { AuditLog, PermissionEngine, Risk } from "./permissions.js";
 
 export const MAX_RESULT_CHARS = 20_000;
@@ -16,7 +18,20 @@ const SEP = "__"; // Claude sees "<server>__<tool>"
 export interface ToolCallContext {
   turnId?: string | undefined;
   signal?: AbortSignal | undefined;
+  /** The call is waiting for the owner's confirmation. */
+  onWaiting?: (() => void) | undefined;
 }
+
+/** What the owner sees before approving: written by the Core, never free text from the model. */
+export interface Preview {
+  title: string;
+  detail: string;
+}
+
+/** Builds the preview of a call; throwing PreviewError rejects the call with that message. */
+export type Previewer = (args: unknown) => Promise<Preview>;
+
+export class PreviewError extends Error {}
 
 export interface ToolCallResult {
   content: string;
@@ -34,6 +49,7 @@ interface Connected {
   name: string;
   client: Client;
   tools: Anthropic.Beta.BetaTool[];
+  previews: Record<string, Previewer>;
 }
 
 export class ToolHub implements ToolRuntime {
@@ -45,12 +61,13 @@ export class ToolHub implements ToolRuntime {
     private readonly permissions: PermissionEngine,
     private readonly audit: AuditLog,
     logger?: Logger,
+    private readonly confirmer?: Confirmer,
   ) {
     this.logger = logger ?? silentLogger;
   }
 
   /** Connects one of the Core's own servers in-process and registers each tool's risk class. */
-  async addInProcess(name: string, server: McpServer, risks: Record<string, Risk>): Promise<void> {
+  async addInProcess(name: string, server: McpServer, risks: Record<string, Risk>, previews: Record<string, Previewer> = {}): Promise<void> {
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     await server.connect(serverSide);
     const client = new Client({ name: "jarvis-core", version: "0.1.0" });
@@ -70,7 +87,7 @@ export class ToolHub implements ToolRuntime {
         input_schema: { ...t.inputSchema, type: "object" } as Anthropic.Beta.BetaTool.InputSchema,
       });
     }
-    this.servers.set(name, { name, client, tools: defs });
+    this.servers.set(name, { name, client, tools: defs, previews });
     // Deterministic order keeps the tools prefix byte-identical across requests (prompt cache).
     this.defs = [...this.servers.values()].flatMap((s) => s.tools).sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -101,16 +118,44 @@ export class ToolHub implements ToolRuntime {
 
   async call(name: string, input: unknown, ctx: ToolCallContext): Promise<ToolCallResult> {
     const [server = "", tool = ""] = name.split(SEP);
-    const verdict = this.permissions.evaluate(server, tool);
+    const verdict = this.permissions.evaluate(server, tool, input);
     const base = { turnId: ctx.turnId, server, tool, args: input, risk: verdict.risk };
-    if (verdict.decision === "deny" || !this.servers.has(server)) {
-      const reason = verdict.reason ?? "servidor no conectado";
+    const connected = this.servers.get(server);
+    const deny = (reason: string) => {
       this.audit.record({ ...base, decision: "deny", reason });
       return { content: `Permiso denegado: ${reason}.`, isError: true };
+    };
+    if (verdict.decision === "deny" || !connected) return deny(verdict.reason ?? "servidor no conectado");
+
+    let approvedBy: string = verdict.allowedBy ?? "policy";
+    if (verdict.decision === "ask") {
+      if (!this.confirmer) return deny("requiere confirmación y no hay cómo pedirla");
+      let preview: Preview;
+      try {
+        preview = await (connected.previews[tool] ?? genericPreview(server, tool))(input);
+      } catch (err) {
+        if (err instanceof PreviewError) return { content: err.message, isError: true }; // invalid call: nothing to confirm
+        throw err;
+      }
+      ctx.onWaiting?.();
+      const outcome = await this.confirmer.confirm(
+        { turnId: ctx.turnId, server, tool, risk: verdict.risk, confirmations: verdict.confirmations ?? 1, ...preview },
+        ctx.signal,
+      );
+      if (ctx.signal?.aborted) {
+        this.audit.record({ ...base, decision: "deny", reason: "turno cancelado" });
+        throw new Error("turn cancelled");
+      }
+      if (!outcome.approved) {
+        const r = deny(outcome.reason ?? "el owner no lo aprobó");
+        return { ...r, content: `${r.content} No lo reintentes salvo que el owner te lo pida de nuevo.` };
+      }
+      approvedBy = outcome.by ?? "owner";
     }
+
     const t0 = performance.now();
     try {
-      const res = await (this.servers.get(server) as Connected).client.callTool(
+      const res = await connected.client.callTool(
         { name: tool, arguments: (input ?? {}) as Record<string, unknown> },
         undefined,
         { ...(ctx.signal ? { signal: ctx.signal } : {}), timeout: 30_000 },
@@ -122,6 +167,7 @@ export class ToolHub implements ToolRuntime {
       this.audit.record({
         ...base,
         decision: "allow",
+        approvedBy,
         ok: !isError,
         error: isError ? content.slice(0, 200) : undefined,
         durationMs: Math.round(performance.now() - t0),
@@ -130,7 +176,7 @@ export class ToolHub implements ToolRuntime {
       return { content, isError };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.audit.record({ ...base, decision: "allow", ok: false, error: message, durationMs: Math.round(performance.now() - t0) });
+      this.audit.record({ ...base, decision: "allow", approvedBy, ok: false, error: message, durationMs: Math.round(performance.now() - t0) });
       if (ctx.signal?.aborted) throw err;
       return { content: "La herramienta falló.", isError: true };
     }
@@ -140,4 +186,12 @@ export class ToolHub implements ToolRuntime {
     for (const s of this.servers.values()) await s.client.close().catch(() => {});
     this.servers.clear();
   }
+}
+
+/** Fallback preview: the exact arguments, pretty-printed (third-party tools have no custom one). */
+export function genericPreview(server: string, tool: string): Previewer {
+  return async (args) => ({
+    title: `Jarvis quiere usar ${server} → ${tool}`,
+    detail: JSON.stringify(args ?? {}, null, 2),
+  });
 }

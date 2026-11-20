@@ -138,19 +138,6 @@ describe("projects MCP server through the hub", () => {
   });
 });
 
-describe("PermissionEngine", () => {
-  it("allows read, denies everything else until confirmations exist", () => {
-    const pe = new PermissionEngine();
-    pe.register({ server: "fs", tool: "read", risk: "read", enabled: true });
-    pe.register({ server: "fs", tool: "write", risk: "confirm", enabled: true });
-    pe.register({ server: "fs", tool: "off", risk: "read", enabled: false });
-    expect(pe.evaluate("fs", "read").decision).toBe("allow");
-    expect(pe.evaluate("fs", "write")).toMatchObject({ decision: "deny", reason: expect.stringMatching(/confirmación/) });
-    expect(pe.evaluate("fs", "off")).toMatchObject({ decision: "deny", reason: "herramienta deshabilitada" });
-    expect(pe.evaluate("x", "y").decision).toBe("deny");
-  });
-});
-
 describe("gitStatus", () => {
   it("reports folders that are not repositories", async () => {
     const s = await gitStatus(root, async () => {

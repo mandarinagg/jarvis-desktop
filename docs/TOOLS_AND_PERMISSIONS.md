@@ -14,7 +14,9 @@
 
 ## 2. Permission Engine
 
-> **Estado (Fase 3, ADR-017):** la versión 0 está en `packages/core/src/tools/`. La clase de riesgo de cada herramienta la registra el Core, no se toma de las anotaciones MCP. La clase lectura se permite y se audita, y el resto se rechaza hasta que exista el flujo de confirmación de la Fase 4. Las rutas pasan la guardia de `projects/guard.ts` (`realpath` y denylist de secretos). El audit log (`audit_log`, migración 004) es append-only por triggers y nunca guarda el contenido devuelto, solo su tamaño.
+> **Estado (Fase 4, ADR-018):** versión 1. `evaluate` devuelve `allow`, `ask` o `deny`. Las clases con confirmación piden el OK del owner en un **diálogo nativo** del proceso principal de la app de escritorio o en la CLI; el renderer nunca puede aprobar. Las destructivas piden dos confirmaciones y ninguna regla las baja. Sin respuesta en 2 minutos, o con el turno cancelado, se deniega. Por voz, Jarvis avisa que la confirmación está en pantalla: todavía no hay confirmación hablada (ADR-018).
+>
+> **Antes (Fase 3, ADR-017):** la versión 0 está en `packages/core/src/tools/`. La clase de riesgo de cada herramienta la registra el Core, no se toma de las anotaciones MCP. La clase lectura se permite y se audita, y el resto se rechaza hasta que exista el flujo de confirmación de la Fase 4. Las rutas pasan la guardia de `projects/guard.ts` (`realpath` y denylist de secretos). El audit log (`audit_log`, migración 004) es append-only por triggers y nunca guarda el contenido devuelto, solo su tamaño.
 
 Para cada tool call evalúa en orden:
 1. ¿El servidor MCP y la tool están habilitados?
@@ -28,21 +30,36 @@ Para cada tool call evalúa en orden:
 ### Confirmación por voz
 Para acciones de riesgo medio: "¿Confirmás que cree `notas.md` en Proyecto X?" → "sí, confirmo". Para destructivas o externas: **siempre** confirmación en pantalla.
 
-## 3. Reglas del owner (ejemplo)
+## 3. Reglas del owner
+
+Viven en `%APPDATA%/Jarvis/permissions.json`. Se aplican sin reiniciar y ninguna herramienta puede editarlas (ADR-018).
 
 ```jsonc
 {
   "rules": [
-    { "server": "fs", "tool": "read", "scope": "project:*", "decision": "allow" },
-    { "server": "fs", "tool": "write", "scope": "project:notas", "decision": "allow_with_audit" },
-    { "server": "mail", "tool": "send", "decision": "always_confirm" }
+    // escribir en el proyecto «notas» sin preguntar (queda auditado como "rule")
+    { "server": "projects", "tool": "write_file", "project": "notas", "decision": "allow" },
+    // pedir confirmación incluso para leer el proyecto «banco»
+    { "tool": "*", "project": "banco", "decision": "confirm" },
+    // nunca usar un servidor de terceros
+    { "server": "mail", "decision": "deny" }
   ]
 }
 ```
 
+- `server` y `tool` aceptan `*` (es el valor por defecto). `project` limita la regla a las llamadas con ese proyecto.
+- Si coinciden varias reglas, gana la más segura: `deny` > `confirm` > `allow`.
+- `allow` solo sirve para la clase con confirmación. Ninguna regla habilita una destructiva sin la doble confirmación ni una prohibida.
+
 ## 4. Audit Log
 
-Append-only. Cada entrada: timestamp, turno, servidor/tool, argumentos (con secretos redactados), decisión, quién aprobó, resultado, duración, costo asociado. Consultable por UI y por voz ("¿qué hiciste hoy?"). Export JSONL.
+Append-only. Cada entrada registra:
+- timestamp, turno, servidor y tool;
+- argumentos, con secretos redactados;
+- decisión y quién aprobó (`policy`, `rule` u `owner:<cliente>`);
+- resultado y duración.
+
+Se consulta en la app (panel **Actividad**) y por voz o texto con la herramienta `jarvis__recent_activity` («¿qué hiciste hoy?»). La exportación a JSONL la escribe el Core en `%APPDATA%/Jarvis/exports/`.
 
 ## 5. Regla de honestidad
 
