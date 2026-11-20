@@ -807,3 +807,16 @@ html.is-overlay body {
 .link.danger {
   color: #c2410c;
 }
+.memory-item.proposal {
+  border-left-color: #16a34a;
+}
+.memory-edit-area {
+  font: inherit;
+  min-height: 60px;
+  margin: 4px 0;
+  padding: 6px;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+}

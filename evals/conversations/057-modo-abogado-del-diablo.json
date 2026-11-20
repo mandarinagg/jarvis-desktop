@@ -1,0 +1,15 @@
+{
+  "id": "057-modo-abogado-del-diablo",
+  "category": "modos",
+  "turns": [
+    "Poné modo abogado del diablo: estoy pensando en dejar mi trabajo el mes que viene para dedicarme full time a una app de recetas."
+  ],
+  "checks": {
+    "maxChars": 3000
+  },
+  "rubric": [
+    "Busca activamente riesgos y supuestos sin probar (ingresos, competencia, ahorro, validación con usuarios)",
+    "Ordena o prioriza los problemas",
+    "Cierra con qué haría falta para que la idea resista las objeciones, sin ser condescendiente"
+  ]
+}

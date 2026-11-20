@@ -5,6 +5,15 @@
 ## Dónde estamos
 - **Fase 0 (Diagnóstico):** completa, salvo la cuenta de la API de Anthropic, que la tiene que crear el owner.
 - **Fase 1 (L0: Core + chat):** implementada y en `main`. Falta validarla con la API real.
+- **Fase 6 (L4b: Memoria que aprende):** **implementada** en los PRs #45–#46 (apilados sobre #44, ADR-024):
+  - memoria de datos, preferencias, procedimientos, ideas y episodios que se recupera en cada turno como datos;
+  - guardar siempre pide confirmación nativa, con filtro de secretos;
+  - `explain` muestra qué recuerdos usó;
+  - reflexión diaria con propuestas aprobables;
+  - panel Memoria;
+  - modos sparring, brainstorm y abogado del diablo;
+  - evals de recuperación (15/15 offline) y 7 casos conversacionales.
+  Falta validarla: 2 semanas de uso con ≥ 70 % de propuestas aceptadas (`memory-stats`) y los casos 051–057 con la API real.
 - **Fase 5 (L4a: Builder):** **implementada** en los PRs #43–#44 (apilados sobre #42, ADR-023):
   - Jarvis le pasa tareas de software a un agente del Claude Agent SDK;
   - el agente trabaja en un git worktree por tarea, fuera de la carpeta del proyecto, con hook de permisos, allowlist de comandos y presupuesto;
@@ -24,9 +33,9 @@
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.4 (`voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
+| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.5 (`voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
 | Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
-| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks` |
+| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks`, 008 memoria (`memories` + FTS5, `memory_uses`, `memory_proposals`, `reflections`, `settings`) |
 | Secretos | Credential Manager | `anthropic-api-key` (falta) y `google-tts-api-key` (migrada el 2026-11-19) |
 | Claude | `packages/core/src/claude/` | Streaming, `effort: low`, caché, tope diario de US$3 |
 | Voice Service | `services/voice` (`python -m jarvis_voice.service`) | Proceso hijo del Core por stdio. Supervisor con backoff y estado `degradado` |
@@ -41,6 +50,7 @@
 | Confirmaciones | `tools/confirm.ts` + `apps/desktop/src/main/confirm-dialog.ts` | Diálogo nativo del proceso principal (nunca el renderer), doble para destructivas, 2 min de espera; CLI en terminal; por voz avisa que está en pantalla |
 | Wake word | `services/voice/.../stt/wake.py` | «Hey Jarvis» (openWakeWord sobre onnxruntime), apagada por defecto, indicador en la barra de tareas, `wake_events` |
 | Builder | `packages/core/src/builder/` + `tools/builder-server.ts` | Claude Agent SDK 0.3.319 en un git worktree por tarea (`%APPDATA%/Jarvis/workspaces`), sin settings del repo ni del owner, hook `PreToolUse` (rutas dentro del worktree, Bash con allowlist), presupuesto por tarea dentro del tope diario. Comandos que corren código: el owner los habilita en `builder.json`. Sección Builder en Actividad y notificación de Windows |
+| Memoria | `packages/core/src/memory/` + `tools/memory-server.ts` | Recuperación FTS5 por turno en `<recuerdos>` (sufijo del system), herramientas con confirmación, reflexión diaria (`JARVIS_REFLECTION=0` la apaga), panel Memoria, modos en `prompts/modes/`. Reporte: `node packages/core/dist/memory-stats.js` |
 | Evals | `evals/` | 50 conversaciones: 6 de voz, 10 de proyectos sobre `docs/` y 21 de la Fase 4 sobre un proyecto `demo` descartable (10 injections en total). Juez Opus 5.5 con el registro de acciones; umbral del 80% y 0 acciones sin confirmación |
 
 ## Pendiente del owner (bloquea el cierre de las Fases 1 a 4)
@@ -55,7 +65,11 @@
    3. Activarla con el botón «Activar «Hey Jarvis»».
    4. Después de unos días, `voice-stats` tiene que mostrar menos de 1 activación sin uso por día.
 7. Probar una escritura real: pedile a Jarvis que cree o edite un archivo en un proyecto tuyo, revisá el diff en el diálogo y mirá el panel **Actividad**.
-8. **Builder (Fase 5):**
+8. **Memoria (Fase 6):**
+   1. Usá Jarvis normalmente. Cuando digas algo que vale la pena, pedile «acordate de…» y aprobá el texto.
+   2. Cada mañana, en el panel **Memoria**, aceptá, editá o rechazá las propuestas de la reflexión. Si no querés esperar, tocá «Reflexionar ahora».
+   3. A las 2 semanas: `node packages/core/dist/memory-stats.js` tiene que dar ≥ 70 %.
+9. **Builder (Fase 5):**
    1. `pnpm --filter @jarvis/evals builder-eval`: unos US$ 3–5. Tiene que dar 5/5 y 0 cambios fuera del workspace.
    2. Probarlo en un proyecto tuyo (un repo git):
       - si querés que pueda correr tests, habilitalos en `%APPDATA%\Jarvis\builder.json`, por ejemplo `{ "projects": { "MiProyecto": { "commands": ["npm test"] } } }`;
@@ -64,13 +78,14 @@
       - cuando llegue la notificación, pedile que la mergee y revisá el diff.
 
 ## Próximos pasos (para quien retome)
-1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → … → #42 → #43 → #44. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
+1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → … → #42 → #43 → #44 → #45 → #46. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
 2. Con la key guardada:
    - correr las evals completas y ajustar `packages/core/prompts/system.md` y `voice.md`;
    - en la Fase 4, revisar sobre todo que una injection nunca genere un pedido de permiso, que anuncie el cambio antes de pedir el OK y que no reintente un rechazo.
 3. Medir la voz real con `voice-stats` (p50 menor a 2.0 s) y calibrar la wake word.
 4. Con la key, correr `builder-eval` y mirar los rechazos del hook en el reporte. Si el agente choca seguido con la allowlist, ajustar el prompt del Builder (`builder/runner.ts`), no la política.
-5. **Fase 6 (Memoria que aprende):** memoria episódica, semántica y procedural, reflexión diaria con propuestas aprobables y UI de memoria. Arrancar solo con pedido explícito del owner.
+5. Si la aceptación de propuestas queda por debajo del 70 %, mirá qué se rechaza y ajustá `REFLECTION_SYSTEM` (`memory/reflection.ts`). Si `memory-eval` empieza a fallar con recuerdos reales, evaluá embeddings locales (ADR-024).
+6. **Fase 7 (Socio):** proactividad con reglas, skills propuestas por Jarvis con evals, clientes móviles. Arrancar solo con pedido explícito del owner.
 
 ## Decisiones abiertas
 - **Costo:** el uso típico estimado (~US$2,2/día) supera el objetivo de US$1. Se decide con datos reales.
@@ -81,6 +96,7 @@
 - **Confirmación por voz** (ADR-018): postergada hasta tener verificación de hablante o AEC.
 - **Sandbox del sistema operativo** para servidores MCP de terceros (ADR-020): no hay. Registrar un servidor equivale a instalar un programa.
 - **Builder sin sandbox del SO** (ADR-023): un comando habilitado como `npm test` corre código del proyecto con los permisos del owner. El sandbox del SDK en Windows queda por evaluar.
+- **Memoria sin cifrar** (ADR-024, ADR-007): vive en la DB local. El filtro evita guardar secretos, pero el cifrado de campos sigue pendiente.
 - **Wake word en español:** el modelo es «Hey Jarvis» en inglés. Si con la voz del owner no anda, hay que entrenar uno propio (ADR-021). Los modelos son CC BY-NC-SA, solo para uso personal.
 
 ## Trampas conocidas
@@ -104,6 +120,7 @@
 ## Cómo verificar el estado
 ```powershell
 pnpm install --frozen-lockfile
-pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 307 tests
+pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 322 tests
+pnpm --filter @jarvis/evals memory-eval               # recuperación de memoria, offline: 15/15
 cd services/voice; uv run python -m pytest -q         # 207 tests (en local incluye Parakeet, Silero y openWakeWord reales)
 ```

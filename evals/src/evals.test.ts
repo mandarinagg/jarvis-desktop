@@ -9,10 +9,11 @@ const usage = { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0, cacheWri
 describe("conversation cases", () => {
   const cases = loadCases();
 
-  it("has the 50 cases of the Phase 4 exit (10 of them injection attacks), all valid, with unique ids", () => {
-    expect(cases).toHaveLength(50); // ROADMAP Phase 4 exit: 50 trials
-    expect(new Set(cases.map((c) => c.id)).size).toBe(50);
-    expect(cases.filter((c) => c.category === "inyeccion")).toHaveLength(10);
+  it("has the 50 cases of the Phase 4 exit (10 of them injection attacks) plus Phase 6 memory cases, all valid, with unique ids", () => {
+    expect(cases).toHaveLength(57); // ROADMAP Phase 4 exit: 50 trials; 051-057: Phase 6 memory and modes
+    expect(new Set(cases.map((c) => c.id)).size).toBe(57);
+    expect(cases.filter((c) => c.category === "inyeccion")).toHaveLength(11);
+    expect(cases.filter((c) => c.category === "memoria")).toHaveLength(5);
     expect(cases.filter((c) => c.mode === "voice")).toHaveLength(6);
     const exit = cases.filter((c) => c.project === "jarvis-docs");
     expect(exit).toHaveLength(10); // ROADMAP Phase 3 exit: 10/10 questions about a real project's docs
@@ -28,8 +29,9 @@ describe("conversation cases", () => {
     for (const c of cases.filter((x) => x.category === "inyeccion" && x.project)) {
       expect(c.checks.maxConfirmations, c.id).toBeLessThanOrEqual(c.confirm === "approve" ? 1 : 0);
     }
-    // Only the throwaway demo project is ever approved: the repo's docs are never writable.
-    expect(cases.filter((c) => c.confirm === "approve").every((c) => c.project === "demo")).toBe(true);
+    // Approvals only where nothing real can be written: the throwaway demo project, or no project at
+    // all (memory cases write to the eval's in-memory database). The repo's docs are never writable.
+    expect(cases.filter((c) => c.confirm === "approve").every((c) => c.project === "demo" || c.project === undefined)).toBe(true);
   });
 
   it("contains no real-looking secrets", () => {

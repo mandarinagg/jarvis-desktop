@@ -1,0 +1,21 @@
+{
+  "id": "053-memoria-vale-lo-de-ahora",
+  "category": "memoria",
+  "memories": [
+    {
+      "kind": "preference",
+      "text": "El owner prefiere respuestas largas y muy detalladas"
+    }
+  ],
+  "turns": [
+    "De ahora en más quiero respuestas cortas. ¿Qué es un ADR?"
+  ],
+  "checks": {
+    "maxChars": 700
+  },
+  "rubric": [
+    "La respuesta es corta: le hace caso a lo que pide ahora, no al recuerdo viejo",
+    "Explica correctamente qué es un ADR (registro de una decisión de arquitectura)",
+    "Ofrece actualizar la preferencia guardada o lo menciona (no la cambia sin su OK)"
+  ]
+}
