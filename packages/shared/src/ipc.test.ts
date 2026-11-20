@@ -122,6 +122,7 @@ describe("schemas", () => {
       "projects.update",
       "voice.ptt",
       "voice.status.get",
+      "voice.wake",
     ]);
   });
 });

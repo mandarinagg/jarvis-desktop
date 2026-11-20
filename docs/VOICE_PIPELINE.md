@@ -15,7 +15,7 @@ Altavoz ◀─ Reproductor ◀─ TTS por frase ◀─ Segmentador de frases ◀
 | Etapa | Motor propuesto | Local | Notas |
 |-------|-----------------|-------|-------|
 | AEC | WebRTC APM | ✅ | Necesario para barge-in con parlantes. Setup del owner: auriculares → AEC opcional (se implementa después, no bloquea la Fase 2) |
-| Wake word | openWakeWord | ✅ | Umbral ajustable; nunca envía audio previo a la activación |
+| Wake word | openWakeWord «hey jarvis» sobre onnxruntime (Fase 4, ADR-021) | ✅ | Umbral ajustable; nunca envía ni guarda audio previo a la activación |
 | VAD | Silero VAD | ✅ | Detecta fin de frase (~500–700 ms de silencio, configurable) |
 | STT | Parakeet TDT 0.6B v3 sobre whisper.cpp/ggml (Vulkan) | ✅ | Elegido por benchmark (ADR-010); alternativo: whisper turbo con contexto completo |
 | TTS | Google Cloud Neural2 `es-US-Neural2-B`; fallback offline Piper `es_AR-daniela-high` | nube (fallback local) | Elegido por comparativa a ciegas (ADR-011). Solo viaja el texto de Jarvis |
@@ -94,6 +94,16 @@ Implementado en la Fase 2 (ADR-016), sin AEC porque el owner usa auriculares:
 - Si termina el turno sin que el owner hable, `vad.disarm` cierra el micrófono.
 - El atajo siempre gana: desarma el VAD o termina antes la frase que se está grabando.
 - `JARVIS_BARGE_IN=0` deja solo el barge-in por atajo, que es lo que conviene con parlantes hasta que haya AEC.
+
+## 4.1 Wake word (Fase 4, ADR-021)
+
+«Hey Jarvis», 100 % local: el pipeline de openWakeWord corre sobre onnxruntime y usa unos 45 ms de CPU por segundo de audio.
+- **Viene apagada.** Se prende con el botón «Activar «Hey Jarvis»» o con `JARVIS_WAKE_WORD=1`.
+- **Con la wake word prendida, el micrófono queda abierto entre turnos**, pero el audio solo va al detector. El detector guarda unos 1,3 s de features, nunca audio crudo.
+- **Indicador:** un punto en el botón de la barra de tareas y el chip «Atento a «Hey Jarvis»».
+- **Al detectarla:** el Core arma el VAD para grabar el pedido, que termina con 700 ms de silencio. Si en 6 s no hablás, vuelve a esperar.
+- **Umbral:** `JARVIS_WAKE_THRESHOLD` (0,5 por defecto). Se calibra con `uv run python -m jarvis_voice.diagnostics.wake_check`.
+- **Falsas activaciones:** `voice-stats` las muestra por día.
 
 ## 5. Privacidad
 

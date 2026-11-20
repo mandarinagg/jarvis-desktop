@@ -27,6 +27,7 @@ describe("voice from the renderer", () => {
   it("allows push-to-talk and status queries", () => {
     expect(parseRendererMessage({ type: "voice.ptt", id: "1", pressed: true, conversationId: "c" })).toBeDefined();
     expect(parseRendererMessage({ type: "voice.status.get", id: "1" })).toBeDefined();
+    expect(parseRendererMessage({ type: "voice.wake", id: "1", enabled: true })).toBeDefined();
     expect(parseRendererMessage({ type: "voice.ptt", id: "1", pressed: "yes" })).toBeUndefined();
   });
 });

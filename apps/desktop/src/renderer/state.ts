@@ -23,7 +23,7 @@ export interface State {
   messages: UiMessage[];
   /** Request in flight: set on send (or on voice.transcript for voice turns), gets its turnId on chat.started. */
   streaming?: { requestId: string; turnId?: string; voice?: boolean };
-  voice: { state: VoiceStateName; micOpen: boolean; detail?: string };
+  voice: { state: VoiceStateName; micOpen: boolean; wake?: boolean; detail?: string };
   budget?: { spentTodayUsd: number; dailyBudgetUsd: number };
   lastTurnCostUsd?: number;
   /** Audit log page (Phase 4), newest first; undefined until loaded. */
@@ -58,8 +58,8 @@ export function pttPressed(voice: State["voice"]): boolean {
 }
 
 /** Chip and overlay text. The mic indicator always wins; while Jarvis speaks it may be listening for barge-in. */
-export function voiceLabel(voice: Pick<State["voice"], "state" | "micOpen">): string {
-  if (!voice.micOpen) return VOICE_LABELS[voice.state];
+export function voiceLabel(voice: Pick<State["voice"], "state" | "micOpen" | "wake">): string {
+  if (!voice.micOpen) return voice.wake && voice.state === "idle" ? "Atento a «Hey Jarvis»" : VOICE_LABELS[voice.state];
   return voice.state === "speaking" ? "Hablando · te escucho" : "Micrófono abierto";
 }
 
@@ -136,6 +136,7 @@ function reduceCore(state: State, m: CoreMessage): State {
   switch (m.type) {
     case "voice.state": {
       const voice: State["voice"] = { state: m.state, micOpen: m.micOpen };
+      if (m.wake) voice.wake = true;
       if (m.detail) voice.detail = m.detail;
       return { ...state, voice };
     }

@@ -122,6 +122,8 @@ async function main(): Promise<number> {
     logger,
     // Barge-in by voice (ADR-016) assumes headphones: with speakers Jarvis would interrupt himself.
     vadBargeIn: env.JARVIS_BARGE_IN !== "0",
+    // Wake word (ADR-021): off unless JARVIS_WAKE_WORD=1; the app can toggle it at runtime.
+    wakeWord: { enabled: env.JARVIS_WAKE_WORD === "1", threshold: env.JARVIS_WAKE_THRESHOLD ? Number(env.JARVIS_WAKE_THRESHOLD) : undefined },
   });
   // Voice is on by default (Phase 2); JARVIS_VOICE=0 keeps the Core text-only.
   const voice: VoiceSupervisor | undefined =
@@ -169,6 +171,7 @@ async function main(): Promise<number> {
       budgetGet: (s, m) => chat.budgetGet(s, m),
       voicePtt: (s, m) => turns.ptt(s, m),
       voiceStatusGet: (s, m) => turns.statusGet(s, m),
+      voiceWake: (s, m) => turns.voiceWake(s, m),
       projects: (s, m) => projectsService.handle(s, m),
       shutdown: () => stop("core.shutdown"),
     },

@@ -10,11 +10,11 @@ import type { CoreClient } from "@jarvis/core/client";
 import { jarvisHome } from "@jarvis/core/paths";
 import type { CoreMessage, PermissionRequest } from "@jarvis/shared";
 import { randomUUID } from "node:crypto";
-import { BrowserWindow, app, dialog, globalShortcut, ipcMain, screen, shell } from "electron";
+import { BrowserWindow, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from "electron";
 import { CreateProjectRequest, parseRendererMessage } from "./bridge.js";
 import { dialogSteps } from "./confirm-dialog.js";
 import { ensureCore } from "./core-connection.js";
-import { overlayVisible } from "./overlay.js";
+import { overlayVisible, wakeBadgeBitmap } from "./overlay.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const smokeShot = process.argv.find((a) => a.startsWith("--smoke-screenshot="))?.split("=")[1];
@@ -135,7 +135,18 @@ async function askOwner(req: PermissionRequest): Promise<void> {
   core?.send({ type: "permission.respond", id: randomUUID(), requestId: req.requestId, approved, confirmations });
 }
 
+let wakeBadge = false;
+
+/** Mandatory indicator while the mic waits for the wake word: a dot on the taskbar button. */
+function showWakeBadge(on: boolean): void {
+  if (!win || on === wakeBadge) return;
+  wakeBadge = on;
+  win.setOverlayIcon(on ? nativeImage.createFromBitmap(wakeBadgeBitmap(), { width: 16, height: 16 }) : null, on ? "Micrófono atento a «Hey Jarvis»" : "");
+  win.setTitle(on ? "Jarvis · atento a «Hey Jarvis»" : "Jarvis");
+}
+
 function forward(m: CoreMessage): void {
+  if (m.type === "voice.state") showWakeBadge(m.wake === true);
   if (m.type === "permission.request") void askOwner(m);
   if (m.type === "permission.resolved") asking.get(m.requestId)?.abort();
   // The export is written by the Core inside the Jarvis folder; only reveal paths that live there.
@@ -173,6 +184,7 @@ async function connectCore(): Promise<void> {
   core.on("close", () => {
     core = undefined;
     overlay?.hide();
+    showWakeBadge(false);
     win?.webContents.send("jarvis:status", { connected: false, hotkey });
   });
   win?.webContents.send("jarvis:status", { connected: true, hotkey });

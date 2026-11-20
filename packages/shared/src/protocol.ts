@@ -102,6 +102,10 @@ export const VoicePtt = z.strictObject({
 export type VoicePtt = z.infer<typeof VoicePtt>;
 
 export const VoiceStatusGet = z.strictObject({ type: z.literal("voice.status.get"), id: Id });
+
+/** Phase 4 (ADR-021): turn the "Hey Jarvis" wake word on or off. */
+export const VoiceWake = z.strictObject({ type: z.literal("voice.wake"), id: Id, enabled: z.boolean() });
+export type VoiceWake = z.infer<typeof VoiceWake>;
 export type VoiceStatusGet = z.infer<typeof VoiceStatusGet>;
 
 // Phase 4 (ADR-018): the owner answers a permission.request. Only the desktop main process (native
@@ -131,6 +135,7 @@ export type AuditExport = z.infer<typeof AuditExport>;
 export type AuditMessage = AuditList | AuditExport;
 
 export const ClientMessage = z.discriminatedUnion("type", [
+  VoiceWake,
   PermissionRespond,
   AuditList,
   AuditExport,
@@ -285,6 +290,8 @@ export const VoiceStateMessage = z.strictObject({
   id: Id.optional(),
   state: VoiceStateName,
   micOpen: z.boolean(),
+  /** Phase 4: the mic is open for the wake word only (mandatory indicator, ADR-021). */
+  wake: z.boolean().optional(),
   conversationId: Id.optional(),
   detail: z.string().max(500).optional(),
 });

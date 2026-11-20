@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { type ParseResult, parseWith } from "./protocol.js";
 
-export const VOICE_PROTOCOL_VERSION = "1.1";
+export const VOICE_PROTOCOL_VERSION = "1.2"; // 1.1: vad.* (barge-in); 1.2: wake.* (wake word)
 
 const Id = z.string().min(1).max(64);
 
@@ -76,6 +76,16 @@ export type VadArm = z.infer<typeof VadArm>;
 export const VadDisarm = z.strictObject({ type: z.literal("vad.disarm"), id: Id });
 export type VadDisarm = z.infer<typeof VadDisarm>;
 
+/**
+ * Wake word (Phase 4, ADR-021): keep the mic open between captures and feed it only to the local
+ * detector. `threshold` (0-1) overrides the detector's default. Answered with wake.listening.
+ */
+export const WakeEnable = z.strictObject({ type: z.literal("wake.enable"), id: Id, threshold: z.number().min(0).max(1).optional() });
+export type WakeEnable = z.infer<typeof WakeEnable>;
+
+export const WakeDisable = z.strictObject({ type: z.literal("wake.disable"), id: Id });
+export type WakeDisable = z.infer<typeof WakeDisable>;
+
 /** No more phrases for this turn: tts.finished fires once everything queued has played. */
 export const TtsEnd = z.strictObject({ type: z.literal("tts.end"), id: Id, turnId: Id });
 export type TtsEnd = z.infer<typeof TtsEnd>;
@@ -92,6 +102,8 @@ export const ToVoiceMessage = z.discriminatedUnion("type", [
   SttCancel,
   VadArm,
   VadDisarm,
+  WakeEnable,
+  WakeDisable,
 ]);
 export type ToVoiceMessage = z.infer<typeof ToVoiceMessage>;
 
@@ -152,6 +164,14 @@ export type SttListening = z.infer<typeof SttListening>;
 export const VadSpeech = z.strictObject({ type: z.literal("vad.speech"), id: Id });
 export type VadSpeech = z.infer<typeof VadSpeech>;
 
+/** The wake word detector is listening (open) or stopped. The UI shows its own indicator. */
+export const WakeListening = z.strictObject({ type: z.literal("wake.listening"), id: Id, open: z.boolean() });
+export type WakeListening = z.infer<typeof WakeListening>;
+
+/** "Hey Jarvis" heard (score >= threshold). Nothing said before it is kept or sent. */
+export const WakeDetected = z.strictObject({ type: z.literal("wake.detected"), id: Id, score: z.number().min(0).max(1) });
+export type WakeDetected = z.infer<typeof WakeDetected>;
+
 /** Final transcription of an utterance. Empty text means nothing intelligible was said. */
 export const SttFinal = z.strictObject({
   type: z.literal("stt.final"),
@@ -171,6 +191,8 @@ export const FromVoiceMessage = z.discriminatedUnion("type", [
   SttListening,
   SttFinal,
   VadSpeech,
+  WakeListening,
+  WakeDetected,
 ]);
 export type FromVoiceMessage = z.infer<typeof FromVoiceMessage>;
 
