@@ -5,7 +5,7 @@
  * Commands: /nueva (new conversation), /salir. Ctrl+C while Jarvis answers cancels the answer.
  */
 import readline from "node:readline/promises";
-import type { CoreMessage } from "@jarvis/shared";
+import type { CoreMessage, PermissionRequest } from "@jarvis/shared";
 import { CoreClient } from "./client.js";
 import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
 import { readSessionToken } from "./token.js";
@@ -35,6 +35,37 @@ async function main(): Promise<number> {
     else {
       rl.close();
       process.exit(0);
+    }
+  });
+
+  // Phase 4 (ADR-018): the CLI is a trustworthy prompt, so it can answer permission requests.
+  const asking = new Map<string, AbortController>();
+  const askPermission = async (m: PermissionRequest) => {
+    const ac = new AbortController();
+    asking.set(m.requestId, ac);
+    let approved: boolean;
+    let confirmations = 0;
+    try {
+      out(`\n\n  ⚠ ${m.title}\n${m.detail.split("\n").map((l) => `    ${l}`).join("\n")}\n`);
+      approved = /^s(i|í)?$/i.test((await rl.question("  ¿Lo permitís? (s/N) ", { signal: ac.signal })).trim());
+      if (approved) confirmations = 1;
+      if (approved && m.confirmations === 2) {
+        const again = await rl.question("  No se puede deshacer. Escribí BORRAR para confirmar: ", { signal: ac.signal });
+        approved = again.trim() === "BORRAR";
+        if (approved) confirmations = 2;
+      }
+    } catch {
+      return; // answered elsewhere, expired or cancelled
+    } finally {
+      asking.delete(m.requestId);
+    }
+    client.send({ type: "permission.respond", id: `p-${Date.now()}`, requestId: m.requestId, approved, confirmations });
+  };
+  client.on("message", (m: CoreMessage) => {
+    if (m.type === "permission.request") void askPermission(m);
+    else if (m.type === "permission.resolved") {
+      asking.get(m.requestId)?.abort();
+      out(m.approved ? "  · permitido\n" : `  · no se hizo${m.reason ? ` (${m.reason})` : ""}\n`);
     }
   });
 

@@ -41,6 +41,14 @@ describe("projects from the renderer", () => {
   });
 });
 
+describe("confirmations and audit from the renderer", () => {
+  it("can browse and export the audit log, but never answer a permission request", () => {
+    expect(parseRendererMessage({ type: "audit.list", id: "1", limit: 50 })).toBeDefined();
+    expect(parseRendererMessage({ type: "audit.export", id: "1" })).toBeDefined();
+    expect(parseRendererMessage({ type: "permission.respond", id: "1", requestId: "r", approved: true, confirmations: 2 })).toBeUndefined();
+  });
+});
+
 describe("overlayVisible", () => {
   it("is shown during a voice turn and always while the mic is open", async () => {
     const { overlayVisible } = await import("./overlay.js");

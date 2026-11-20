@@ -34,6 +34,7 @@ export const PHRASES = {
   budget: "Llegué al tope de gasto de hoy. Seguimos mañana o subí el tope.",
   upstream: "No pude hablar con Claude. Te dejé el detalle en pantalla.",
   generic: "Algo falló. Te dejé el detalle en pantalla.",
+  confirm: "Necesito que me lo confirmes en pantalla.",
 } as const;
 
 export interface VoiceLink {
@@ -313,6 +314,8 @@ export class VoiceTurns {
       case "chat.tool":
         // Tools take a while: an instant cached acknowledgement beats silence (VOICE_PIPELINE §2).
         if (live && m.status === "started" && turn.seq === 0) this.speak(turn, PHRASES.lookup);
+        // Confirmations are always on screen (ADR-018): say so instead of waiting in silence.
+        if (live && m.status === "waiting") this.speak(turn, PHRASES.confirm);
         return;
       case "chat.delta":
         turn.firstTokenAt ??= this.now();

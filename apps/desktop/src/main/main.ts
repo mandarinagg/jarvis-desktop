@@ -7,10 +7,12 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CoreClient } from "@jarvis/core/client";
-import type { CoreMessage } from "@jarvis/shared";
+import { jarvisHome } from "@jarvis/core/paths";
+import type { CoreMessage, PermissionRequest } from "@jarvis/shared";
 import { randomUUID } from "node:crypto";
 import { BrowserWindow, app, dialog, globalShortcut, ipcMain, screen, shell } from "electron";
 import { CreateProjectRequest, parseRendererMessage } from "./bridge.js";
+import { dialogSteps } from "./confirm-dialog.js";
 import { ensureCore } from "./core-connection.js";
 import { overlayVisible } from "./overlay.js";
 
@@ -93,7 +95,53 @@ function createOverlay(): BrowserWindow {
   return o;
 }
 
+/** Open native confirmation dialogs, closed when the request is answered elsewhere or expires. */
+const asking = new Map<string, AbortController>();
+
+/**
+ * Phase 4 (ADR-018): the owner approves in a native dialog shown here. The renderer never sees a
+ * way to answer: it only shows that Jarvis is waiting (chat.tool status "waiting").
+ */
+async function askOwner(req: PermissionRequest): Promise<void> {
+  if (!win || asking.has(req.requestId)) return;
+  const ac = new AbortController();
+  asking.set(req.requestId, ac);
+  let confirmations = 0;
+  try {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.flashFrame(true);
+    for (const step of dialogSteps(req)) {
+      const { response } = await dialog.showMessageBox(win, {
+        type: "warning",
+        title: step.title,
+        message: step.message,
+        detail: step.detail,
+        buttons: step.buttons,
+        defaultId: 1, // Enter never approves by accident
+        cancelId: 1,
+        noLink: true,
+        signal: ac.signal,
+      });
+      if (ac.signal.aborted || response !== 0) break;
+      confirmations++;
+    }
+  } finally {
+    asking.delete(req.requestId);
+    win?.flashFrame(false);
+  }
+  if (ac.signal.aborted) return;
+  const approved = confirmations === req.confirmations;
+  core?.send({ type: "permission.respond", id: randomUUID(), requestId: req.requestId, approved, confirmations });
+}
+
 function forward(m: CoreMessage): void {
+  if (m.type === "permission.request") void askOwner(m);
+  if (m.type === "permission.resolved") asking.get(m.requestId)?.abort();
+  // The export is written by the Core inside the Jarvis folder; only reveal paths that live there.
+  if (m.type === "audit.exported" && path.resolve(m.path).toLowerCase().startsWith(path.join(jarvisHome(), "exports").toLowerCase() + path.sep)) {
+    shell.showItemInFolder(m.path);
+  }
   win?.webContents.send("jarvis:message", m);
   if (m.type !== "voice.state" || !overlay) return;
   overlay.webContents.send("jarvis:message", m);

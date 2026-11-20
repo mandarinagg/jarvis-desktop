@@ -103,6 +103,8 @@ describe("schemas", () => {
   it("client messages are a closed set", () => {
     const types = ClientMessage.options.map((o) => o.shape.type.value).sort();
     expect(types).toEqual([
+      "audit.export",
+      "audit.list",
       "auth.hello",
       "budget.get",
       "chat.cancel",
@@ -112,6 +114,7 @@ describe("schemas", () => {
       "conversations.setProject",
       "core.ping",
       "core.shutdown",
+      "permission.respond",
       "projects.create",
       "projects.delete",
       "projects.list",

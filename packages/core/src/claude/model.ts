@@ -25,7 +25,7 @@ export interface ChatTurnRequest {
 export interface ToolEvent {
   name: string;
   summary: string;
-  status: "started" | "done" | "error" | "denied";
+  status: "started" | "waiting" | "done" | "error" | "denied";
 }
 
 /** Tool rounds per turn; the last round is forced to answer with what it has (tool_choice none). */
@@ -150,7 +150,11 @@ export class AnthropicChatModel implements ChatModel {
         for (const use of uses) {
           const summary = req.tools.describe(use.name, use.input);
           req.onTool?.({ name: use.name, summary, status: "started" });
-          const r = await req.tools.call(use.name, use.input, { turnId: req.turnId, signal: req.signal });
+          const r = await req.tools.call(use.name, use.input, {
+            turnId: req.turnId,
+            signal: req.signal,
+            onWaiting: () => req.onTool?.({ name: use.name, summary, status: "waiting" }),
+          });
           const status = !r.isError ? "done" : r.content.startsWith("Permiso denegado") ? "denied" : "error";
           req.onTool?.({ name: use.name, summary, status });
           results.push({ type: "tool_result", tool_use_id: use.id, content: r.content, ...(r.isError ? { is_error: true } : {}) });

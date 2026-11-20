@@ -29,6 +29,7 @@ ACKNOWLEDGEMENTS = (
     "Llegué al tope de gasto de hoy. Seguimos mañana o subí el tope.",
     "No pude hablar con Claude. Te dejé el detalle en pantalla.",
     "Algo falló. Te dejé el detalle en pantalla.",
+    "Necesito que me lo confirmes en pantalla.",
 )
 
 _SPACES = re.compile(r"\s+")

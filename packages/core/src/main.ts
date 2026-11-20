@@ -3,8 +3,10 @@
  * Jarvis Core daemon entry point (ADR-001 / ADR-008).
  * Owns the per-user named pipe (single instance), the SQLite database and the Claude adapter.
  */
+import { unwatchFile, watchFile } from "node:fs";
 import { rm } from "node:fs/promises";
 import type { CoreMessage, TtsConfig } from "@jarvis/shared";
+import type { Session } from "./server.js";
 import path from "node:path";
 import { ChatService } from "./chat.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
@@ -20,8 +22,11 @@ import { KeyringSecretStore } from "./secrets.js";
 import { AlreadyRunningError, CoreServer } from "./server.js";
 import { ConversationStore } from "./store.js";
 import { newSessionToken, writeSessionToken } from "./token.js";
+import { AuditService } from "./tools/audit-service.js";
+import { ConfirmationBroker } from "./tools/confirm.js";
 import { ToolHub } from "./tools/hub.js";
-import { AuditLog, PermissionEngine } from "./tools/permissions.js";
+import { JARVIS_SERVER, JARVIS_TOOLS, createJarvisServer } from "./tools/jarvis-server.js";
+import { AuditLog, PermissionEngine, loadRules } from "./tools/permissions.js";
 import { PROJECTS_SERVER, PROJECTS_TOOLS, createProjectsServer } from "./tools/projects-server.js";
 import { VoiceMetricsStore } from "./voice/metrics.js";
 import { createVoiceSpawner } from "./voice/spawn.js";
@@ -69,9 +74,18 @@ async function main(): Promise<number> {
   const store = new ConversationStore(db);
   const projects = new ProjectStore(db);
   const index = new ProjectIndex(db, projects, logger);
-  // Tools (ADR-003, ADR-017): model -> Permission Engine -> MCP server -> Audit Log.
-  const tools = new ToolHub(new PermissionEngine(), new AuditLog(db), logger);
+  // Tools (ADR-003, ADR-017, ADR-018): model -> Permission Engine -> (owner confirmation) -> MCP server -> Audit Log.
+  // Owner rules live in the Jarvis folder, which no project and no tool can reach; edits apply live.
+  const rulesFile = path.join(home, "permissions.json");
+  const permissions = new PermissionEngine(loadRules(rulesFile, logger));
+  watchFile(rulesFile, { interval: 2_000 }, () => permissions.setRules(loadRules(rulesFile, logger)));
+  const audit = new AuditLog(db);
+  let sessions: () => Session[] = () => [];
+  const confirmations = new ConfirmationBroker({ sessions: () => sessions(), logger });
+  const tools = new ToolHub(permissions, audit, logger, confirmations);
   await tools.addInProcess(PROJECTS_SERVER, createProjectsServer({ projects, index }), PROJECTS_TOOLS);
+  await tools.addInProcess(JARVIS_SERVER, createJarvisServer({ audit }), JARVIS_TOOLS);
+  const auditService = new AuditService(audit, path.join(home, "exports"));
   const chat = new ChatService({
     store,
     model: modelResolver(env),
@@ -123,6 +137,8 @@ async function main(): Promise<number> {
   const stop = async (reason: string) => {
     logger.log("info", "core.stopping", { reason });
     chat.cancelAll();
+    confirmations.cancelAll();
+    unwatchFile(rulesFile);
     index.close();
     await tools.close();
     await voice?.stop();
@@ -140,7 +156,12 @@ async function main(): Promise<number> {
     handlers: {
       chatSend: (s, m) => chat.chatSend(s, m),
       chatCancel: (s, m) => chat.chatCancel(s, m),
-      disconnected: (s) => chat.disconnected(s),
+      disconnected: (s) => {
+        chat.disconnected(s);
+        confirmations.disconnected(s);
+      },
+      permissionRespond: (s, m) => confirmations.respond(s, m),
+      audit: (s, m) => auditService.handle(s, m),
       conversationsList: (s, m) => chat.conversationsList(s, m),
       conversationsGet: (s, m) => chat.conversationsGet(s, m),
       budgetGet: (s, m) => chat.budgetGet(s, m),
@@ -163,6 +184,7 @@ async function main(): Promise<number> {
   // The token is written only after we own the pipe, so a second instance never overwrites it.
   await writeSessionToken(tokenPath(home), token);
   broadcast = (m) => server.broadcast(m);
+  sessions = () => server.sessionList();
   logger.log("info", "core.ready", { pipe, version: CORE_VERSION, dailyBudgetUsd: budget });
   voice?.start();
   // Phase 3: bring every registered project's index up to date, then follow changes (ADR-017).

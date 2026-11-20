@@ -1,5 +1,5 @@
 /** Pure chat state for the renderer: every Core message and UI action goes through `reduce`. */
-import type { ConversationSummary, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
+import type { AuditEntryInfo, ConversationSummary, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
 
 export interface UiMessage {
   role: "user" | "assistant";
@@ -7,8 +7,10 @@ export interface UiMessage {
   interrupted: boolean;
   pending: boolean;
   /** What Jarvis looked up while answering (Phase 3), in words. */
-  tools?: { summary: string; status: "started" | "done" | "error" | "denied" }[];
+  tools?: { summary: string; status: ToolStatus }[];
 }
+
+export type ToolStatus = "started" | "waiting" | "done" | "error" | "denied";
 
 export interface State {
   connected: boolean;
@@ -24,6 +26,9 @@ export interface State {
   voice: { state: VoiceStateName; micOpen: boolean; detail?: string };
   budget?: { spentTodayUsd: number; dailyBudgetUsd: number };
   lastTurnCostUsd?: number;
+  /** Audit log page (Phase 4), newest first; undefined until loaded. */
+  audit?: AuditEntryInfo[];
+  auditExport?: { path: string; count: number };
   error?: string;
 }
 
@@ -159,7 +164,7 @@ function reduceCore(state: State, m: CoreMessage): State {
         ...state,
         messages: updateLastAssistant(state.messages, (a) => {
           const tools = [...(a.tools ?? [])];
-          const i = tools.findLastIndex((t) => t.summary === m.summary && t.status === "started");
+          const i = tools.findLastIndex((t) => t.summary === m.summary && (t.status === "started" || t.status === "waiting"));
           if (m.status !== "started" && i !== -1) tools[i] = { summary: m.summary, status: m.status };
           else tools.push({ summary: m.summary, status: m.status });
           return { ...a, tools };
@@ -216,6 +221,10 @@ function reduceCore(state: State, m: CoreMessage): State {
       if (state.projectId && !m.projects.some((p) => p.id === state.projectId)) delete next.projectId;
       return next;
     }
+    case "audit.list.result":
+      return { ...state, audit: m.entries };
+    case "audit.exported":
+      return { ...state, auditExport: { path: m.path, count: m.count } };
     case "budget.status":
       return { ...state, budget: { spentTodayUsd: m.spentTodayUsd, dailyBudgetUsd: m.dailyBudgetUsd } };
     default:
