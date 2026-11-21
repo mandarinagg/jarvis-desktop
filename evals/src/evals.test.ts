@@ -10,11 +10,12 @@ describe("conversation cases", () => {
   const cases = loadCases();
 
   it("has the 50 cases of the Phase 4 exit (10 of them injection attacks) plus Phase 6 memory cases, all valid, with unique ids", () => {
-    expect(cases).toHaveLength(61); // ROADMAP Phase 4 exit: 50 trials; 051-057: Phase 6 memory and modes; 058-061: Phase 7 reminders and briefing
-    expect(new Set(cases.map((c) => c.id)).size).toBe(61);
-    expect(cases.filter((c) => c.category === "inyeccion")).toHaveLength(12);
+    expect(cases).toHaveLength(63); // ROADMAP Phase 4 exit: 50 trials; 051-057: Phase 6 memory and modes; 058-063: Phase 7 reminders, briefing and skills
+    expect(new Set(cases.map((c) => c.id)).size).toBe(63);
+    expect(cases.filter((c) => c.category === "inyeccion")).toHaveLength(13);
     expect(cases.filter((c) => c.category === "memoria")).toHaveLength(5);
     expect(cases.filter((c) => c.category === "proactividad")).toHaveLength(3);
+    expect(cases.filter((c) => c.category === "evolucion")).toHaveLength(1);
     expect(cases.filter((c) => c.mode === "voice")).toHaveLength(6);
     const exit = cases.filter((c) => c.project === "jarvis-docs");
     expect(exit).toHaveLength(10); // ROADMAP Phase 3 exit: 10/10 questions about a real project's docs
@@ -212,6 +213,36 @@ describe("reminders workspace (Phase 7)", () => {
       expect(r.content).toMatch(/^Listo/);
       expect(ws.checkState(c)).toEqual([]);
       expect(ws.unconfirmedSensitive()).toBe(0);
+    } finally {
+      await ws.close();
+    }
+  });
+});
+
+describe("skills workspace (Phase 7)", () => {
+  it("counts the skill proposals a case leaves behind", async () => {
+    const { createWorkspace } = await import("./workspace.js");
+    const c = loadCases().find((x) => x.id === "062-skill-proponer");
+    if (!c) throw new Error("no skills case");
+    const ws = await createWorkspace(c);
+    try {
+      expect(ws.checkState(c)).toEqual([expect.stringMatching(/quedaron 0 propuestas de skill/)]);
+      const r = await ws.tools.call(
+        "skills__propose_skill",
+        {
+          name: "resumen-lunes",
+          description: "Cuando el owner pide el resumen semanal de sus proyectos",
+          steps: "1. git_status y git_diff de cada proyecto. 2. Resumir lo hecho, lo pendiente y los riesgos en pocas líneas.",
+          reason: "lo pide todos los lunes",
+          cases: [
+            { prompt: "Haceme el resumen del lunes", rubric: ["Revisa git de cada proyecto"] },
+            { prompt: "¿Qué cambió esta semana?", rubric: ["Resume hecho, pendiente y riesgos"] },
+          ],
+        },
+        {},
+      );
+      expect(r.content).toMatch(/^Propuesta #1 guardada/);
+      expect(ws.checkState(c)).toEqual([]);
     } finally {
       await ws.close();
     }

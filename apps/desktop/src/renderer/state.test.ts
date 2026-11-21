@@ -219,6 +219,7 @@ describe("dashboard", () => {
       cloud: [],
       activity: { actionsToday: 1, confirmedToday: 0, deniedToday: 0 },
       builder: { running: 0, review: 1 },
+      skills: { active: 0, pendingProposals: 0 },
       memory: { enabled: true, active: 3, pendingProposals: 2, openIdeas: [] },
     };
     const s = reduce(initialState, { kind: "core", message });

@@ -107,7 +107,7 @@ const usd = (n: number) => `US$ ${n.toFixed(2)}`;
 const SERIES = [
   { key: "chatUsd", label: "Chat y voz", cls: "s1" },
   { key: "builderUsd", label: "Builder", cls: "s2" },
-  { key: "reflectionUsd", label: "Reflexión", cls: "s3" },
+  { key: "reflectionUsd", label: "Reflexión y skills", cls: "s3" },
 ] as const;
 const total = (d: SpendDay) => d.chatUsd + d.builderUsd + d.reflectionUsd;
 const dayLabel = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString("es-AR", { day: "numeric", month: "short" });
@@ -224,6 +224,7 @@ export function Home({
   onOpenConversation,
   onShowMemory,
   onShowActivity,
+  onShowSkills,
 }: {
   data: Dashboard | undefined;
   proactive: Proactivity | undefined;
@@ -232,6 +233,7 @@ export function Home({
   onOpenConversation: (id: string) => void;
   onShowMemory: () => void;
   onShowActivity: () => void;
+  onShowSkills: () => void;
 }) {
   if (!data) {
     return (
@@ -242,7 +244,8 @@ export function Home({
   }
   const { spend, memory, builder, activity } = data;
   const ratio = spend.todayUsd / spend.dailyBudgetUsd;
-  const pending = memory.pendingProposals + builder.review;
+  const pending = memory.pendingProposals + builder.review + data.skills.pendingProposals;
+  const openPending = memory.pendingProposals ? onShowMemory : data.skills.pendingProposals ? onShowSkills : onShowActivity;
   return (
     <section className="activity home" aria-label="Inicio">
       <div className="activity-head">
@@ -272,12 +275,13 @@ export function Home({
           <span className="tile-value">{spend.cacheHitRate !== undefined ? `${Math.round(spend.cacheHitRate * 100)} %` : "—"}</span>
           <span className="tile-sub">de la entrada se leyó del caché (más barato)</span>
         </div>
-        <button className={`tile action-tile ${pending ? "attention" : ""}`} onClick={pending ? (memory.pendingProposals ? onShowMemory : onShowActivity) : onShowActivity}>
+        <button className={`tile action-tile ${pending ? "attention" : ""}`} onClick={openPending}>
           <span className="tile-label">Esperando tu OK</span>
           <span className="tile-value">{pending}</span>
           <span className="tile-sub">
             {memory.pendingProposals} {memory.pendingProposals === 1 ? "propuesta" : "propuestas"} de memoria · {builder.review}{" "}
-            {builder.review === 1 ? "tarea" : "tareas"} del Builder
+            {builder.review === 1 ? "tarea" : "tareas"} del Builder · {data.skills.pendingProposals}{" "}
+            {data.skills.pendingProposals === 1 ? "skill" : "skills"}
           </span>
         </button>
       </div>
@@ -352,7 +356,9 @@ export function Home({
               </li>
             ))}
           </ul>
-          <p className="hint">{memory.active} recuerdos activos.</p>
+          <p className="hint">
+            {memory.active} recuerdos activos · {data.skills.active} {data.skills.active === 1 ? "skill activa" : "skills activas"}.
+          </p>
         </div>
       </div>
     </section>

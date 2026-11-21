@@ -1,11 +1,18 @@
 # Handoff: estado del proyecto
 
-> Última actualización: **2026-11-20**. Actualizar al cerrar cada sesión de trabajo. Lo de largo plazo está en `ROADMAP.md`; este archivo cuenta **dónde estamos y qué sigue**.
+> Última actualización: **2026-11-21**. Actualizar al cerrar cada sesión de trabajo. Lo de largo plazo está en `ROADMAP.md`; este archivo cuenta **dónde estamos y qué sigue**.
 
 ## Dónde estamos
 - **Fase 0 (Diagnóstico):** completa, salvo la cuenta de la API de Anthropic, que la tiene que crear el owner.
 - **Fase 1 (L0: Core + chat):** implementada y en `main`. Falta validarla con la API real.
-- **Fase 7 (L5: Socio):** en curso. Panel **Inicio** en el PR #47 (ADR-025, protocolo 1.6): gasto de hoy y del mes con proyección, por uso y por conversación, caché, datos enviados a la nube, pendientes, actividad e ideas abiertas. **Proactividad** en el PR #48 (ADR-026, protocolo 1.7): recordatorios con confirmación, briefing diario local, horario silencioso y notificaciones de Windows. Jarvis ahora sabe la hora. Falta: skills propuestas con evals y clientes móviles.
+- **Fase 7 (L5: Socio):** **en curso**, en los PRs #47–#49 (apilados sobre #46):
+  - **Inicio** (#47, ADR-025): gasto de hoy y del mes con proyección, por uso y por conversación, caché, datos enviados a la nube, pendientes, actividad e ideas abiertas. Es la primera vista de la app.
+  - **Proactividad** (#48, ADR-026): recordatorios con confirmación nativa, briefing diario armado sin modelo (apagado por defecto), horario silencioso de 22 a 08 y notificaciones de Windows. Jarvis ahora sabe la fecha y la hora.
+  - **Skills** (#49, ADR-027): Jarvis las propone con casos de prueba, corren sus evals sobre el texto exacto, el owner las aprueba en un diálogo nativo y quedan versionadas en `%APPDATA%/Jarvis/skills` (git).
+  Falta:
+  - el cliente móvil (Telegram por túnel seguro), que necesita su propio ADR de seguridad;
+  - que la reflexión detecte pedidos repetidos y proponga skills;
+  - validar todo con la API real: casos 058–063, un recordatorio y una skill de verdad.
 - **Fase 6 (L4b: Memoria que aprende):** **implementada** en los PRs #45–#46 (apilados sobre #44, ADR-024):
   - memoria de datos, preferencias, procedimientos, ideas y episodios que se recupera en cada turno como datos;
   - guardar siempre pide confirmación nativa, con filtro de secretos;
@@ -34,9 +41,9 @@
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.7 (`dashboard.get`, `proactive.*`, `voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
+| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.8 (`dashboard.get`, `proactive.*`, `skills.*`, `voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
 | Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
-| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks`, 008 memoria (`memories` + FTS5, `memory_uses`, `memory_proposals`, `reflections`, `settings`) |
+| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks`, 008 memoria (`memories` + FTS5, `memory_uses`, `memory_proposals`, `reflections`, `settings`), 009 `reminders` y `briefings`, 010 skills (`skills`, `skill_proposals`, `skill_evals`) |
 | Secretos | Credential Manager | `anthropic-api-key` (falta) y `google-tts-api-key` (migrada el 2026-11-19) |
 | Claude | `packages/core/src/claude/` | Streaming, `effort: low`, caché, tope diario de US$3 |
 | Voice Service | `services/voice` (`python -m jarvis_voice.service`) | Proceso hijo del Core por stdio. Supervisor con backoff y estado `degradado` |
@@ -52,12 +59,15 @@
 | Wake word | `services/voice/.../stt/wake.py` | «Hey Jarvis» (openWakeWord sobre onnxruntime), apagada por defecto, indicador en la barra de tareas, `wake_events` |
 | Builder | `packages/core/src/builder/` + `tools/builder-server.ts` | Claude Agent SDK 0.3.319 en un git worktree por tarea (`%APPDATA%/Jarvis/workspaces`), sin settings del repo ni del owner, hook `PreToolUse` (rutas dentro del worktree, Bash con allowlist), presupuesto por tarea dentro del tope diario. Comandos que corren código: el owner los habilita en `builder.json`. Sección Builder en Actividad y notificación de Windows |
 | Memoria | `packages/core/src/memory/` + `tools/memory-server.ts` | Recuperación FTS5 por turno en `<recuerdos>` (sufijo del system), herramientas con confirmación, reflexión diaria (`JARVIS_REFLECTION=0` la apaga), panel Memoria, modos en `prompts/modes/`. Reporte: `node packages/core/dist/memory-stats.js` |
-| Evals | `evals/` | 50 conversaciones: 6 de voz, 10 de proyectos sobre `docs/` y 21 de la Fase 4 sobre un proyecto `demo` descartable (10 injections en total). Juez Opus 5.5 con el registro de acciones; umbral del 80% y 0 acciones sin confirmación |
+| Inicio | `packages/core/src/dashboard.ts` + `apps/desktop/src/renderer/Home.tsx` | Foto de solo lectura armada con la DB local (`dashboard.get`), sin llamar a ningún modelo. Gráfico de 30 días con vista de tabla |
+| Proactividad | `packages/core/src/proactive/` + `tools/reminders-server.ts` | El Core revisa cada 30 s y manda `proactive.notify`; nunca en horario silencioso ni sin una ventana abierta. Reglas en `settings` (`proactive.briefing`, `proactive.quiet`) |
+| Skills | `packages/core/src/skills/` + `tools/skills-server.ts` | `propose_skill` deja propuestas inertes; chequeos estáticos (`lint.ts`), evals propias sin herramientas con juez (`evaluate.ts`) y aprobación nativa (`service.ts`). Espejo git en `%APPDATA%/Jarvis/skills` |
+| Evals | `evals/` | 63 conversaciones: 6 de voz, 10 de proyectos sobre `docs/`, 21 de la Fase 4 sobre un proyecto `demo` descartable, 7 de memoria y modos, 4 de proactividad y 2 de skills (13 injections en total). Juez Opus 5.5 con el registro de acciones; umbral del 80% y 0 acciones sin confirmación. Chequeos de estado: archivos, git, `reminder` y `skillProposals` |
 
-## Pendiente del owner (bloquea el cierre de las Fases 1 a 4)
+## Pendiente del owner (bloquea el cierre de las Fases 1 a 7)
 1. Crear la cuenta de la API de Anthropic con **tope mensual de US$60** en la consola.
 2. Guardar la clave: `pnpm build` y después `node packages/core/dist/set-secret.js anthropic-api-key`.
-3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$3,5, 61 casos). Tienen que dar ≥ 80%, los 10 de proyectos 10/10 y **0 acciones sensibles sin confirmación**.
+3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$3,6, 63 casos). Tienen que dar ≥ 80%, los 10 de proyectos 10/10 y **0 acciones sensibles sin confirmación**.
 4. Usar Jarvis por texto y por voz: `pnpm --filter @jarvis/desktop start`, con `Ctrl+Shift+Space` o el botón «Mantené para hablar».
 5. Después de unas 20 conversaciones por voz: `node packages/core/dist/voice-stats.js`. Tiene que decir `OK: p50 … < 2000 ms`.
 6. **Wake word:**
@@ -77,16 +87,21 @@
       - pedile a Jarvis una tarea chica;
       - aprobá el arranque;
       - cuando llegue la notificación, pedile que la mergee y revisá el diff.
+10. **Socio (Fase 7):**
+    1. En **Inicio**, prendé el briefing diario y elegí la hora. Revisá el horario silencioso (de 22 a 08 por defecto).
+    2. Pedile «recordame en 5 minutos tomar agua», aprobá el diálogo y esperá la notificación de Windows con la app abierta.
+    3. Pedile que arme una skill para algo que le pidas seguido. En el panel **Skills**, corré sus evals (unos centavos) y, si pasan, aprobala. Después pedile eso mismo y fijate que la use («Siguiendo la skill…»).
 
 ## Próximos pasos (para quien retome)
-1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → … → #42 → #43 → #44 → #45 → #46 → #47 → #48. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
+0. **Prioridad:** validar con la API real antes de sumar features. Hay 9 fases de código sin probar contra Claude (key, evals, uso real). El cliente móvil saca a Jarvis fuera de la PC: conviene arrancarlo recién con lo anterior validado.
+1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → … → #42 → #43 → #44 → #45 → #46 → #47 → #48 → #49. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
 2. Con la key guardada:
    - correr las evals completas y ajustar `packages/core/prompts/system.md` y `voice.md`;
    - en la Fase 4, revisar sobre todo que una injection nunca genere un pedido de permiso, que anuncie el cambio antes de pedir el OK y que no reintente un rechazo.
 3. Medir la voz real con `voice-stats` (p50 menor a 2.0 s) y calibrar la wake word.
 4. Con la key, correr `builder-eval` y mirar los rechazos del hook en el reporte. Si el agente choca seguido con la allowlist, ajustar el prompt del Builder (`builder/runner.ts`), no la política.
 5. Si la aceptación de propuestas queda por debajo del 70 %, mirá qué se rechaza y ajustá `REFLECTION_SYSTEM` (`memory/reflection.ts`). Si `memory-eval` empieza a fallar con recuerdos reales, evaluá embeddings locales (ADR-024).
-6. **Fase 7 (Socio):** seguir con skills propuestas por Jarvis (gated por evals y aprobación, EVOLUTION.md) y después clientes móviles (Telegram por túnel seguro). Inicio y proactividad ya están (#47, #48).
+6. **Fase 7 (Socio):** falta el cliente móvil (Telegram por túnel seguro: necesita su propio ADR de seguridad) y que la reflexión detecte repeticiones para proponer skills. Inicio, proactividad y skills ya están (#47, #48, #49).
 
 ## Decisiones abiertas
 - **Costo:** el uso típico estimado (~US$2,2/día) supera el objetivo de US$1. Se decide con datos reales.
@@ -116,12 +131,14 @@
 - **pnpm 10:** los argumentos se pasan sin `--`.
 - **Agent SDK:** una key inválida llega como resultado `success` con `is_error`. El runner lo trata como error.
 - **Agent SDK:** pesa unos 330 MB (`claude.exe` firmado; Smart App Control lo deja correr).
+- **Notificaciones de Jarvis:** solo salen con la app de escritorio abierta. Con la app cerrada, los recordatorios esperan y salen al abrirla, marcados «(era para …)».
+- **Espejo de skills:** necesita `git` en el PATH. Si falla, queda un aviso en el log y la skill igual queda activa en la DB.
 - **Worktrees del Builder:** si el Core muere a mitad de una tarea, la tarea queda «falló» y su worktree sigue ahí hasta que se descarte.
 
 ## Cómo verificar el estado
 ```powershell
 pnpm install --frozen-lockfile
-pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 341 tests
+pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 355 tests
 pnpm --filter @jarvis/evals memory-eval               # recuperación de memoria, offline: 15/15
 cd services/voice; uv run python -m pytest -q         # 207 tests (en local incluye Parakeet, Silero y openWakeWord reales)
 ```

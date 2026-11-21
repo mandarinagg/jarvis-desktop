@@ -108,5 +108,8 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
   - [x] Recordatorios con confirmación, briefing diario local, horario silencioso y notificaciones de Windows (ADR-026)
   - [ ] Validación con la API real (casos 058–061)
 - Ciclo de evolución: skills propuestas por Jarvis, gated por evals + aprobación
+  - [x] Propuesta con casos de prueba, chequeos estáticos, evals propias con juez, aprobación nativa, espejo git y vuelta atrás en un paso (ADR-027)
+  - [ ] Detectar repeticiones en la reflexión diaria y proponer skills solo
+  - [ ] Validación con la API real (casos 062–063)
 - Clientes adicionales (Telegram/móvil vía túnel seguro)
 - Mejora continua de latencia y voz
