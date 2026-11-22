@@ -23,7 +23,7 @@ import { REMINDERS_SERVER, REMINDERS_TOOLS, createRemindersServer, remindersPrev
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
 import { openDatabase } from "./db.js";
 import { localDay } from "./db.js";
-import { AnthropicReflectionModel, Reflector } from "./memory/reflection.js";
+import { AnthropicReflectionModel, Reflector, SKILL_WINDOW_DAYS } from "./memory/reflection.js";
 import { retrieve } from "./memory/retrieve.js";
 import { MemoryService } from "./memory/service.js";
 import { MemoryStore } from "./memory/store.js";
@@ -121,10 +121,20 @@ async function main(): Promise<number> {
   // Daily reflection (ADR-024): episodes + proposals the owner decides. JARVIS_REFLECTION=0 turns it off.
   const reflectionKey = anthropicKey(env);
   let reflectionModel: { key: string; model: AnthropicReflectionModel } | undefined;
+  // Phase 7 (ADR-027): skills Jarvis proposes; created here so the reflection can propose them too (ADR-028).
+  const skillStore = new SkillStore(db);
   const reflector = new Reflector({
     db,
     memories,
     projects,
+    skills: {
+      names: () => skillStore.takenNames(new Date(Date.now() - SKILL_WINDOW_DAYS * 86_400_000).toISOString()),
+      pendingCount: () => skillStore.pendingProposals().length,
+      propose: (p) => {
+        skillStore.propose(p);
+        broadcast(skills.result("skills")); // declared below; the reflection only runs once the Core is up
+      },
+    },
     model: () => {
       const key = reflectionKey();
       if (!key) return undefined;
@@ -168,7 +178,6 @@ async function main(): Promise<number> {
   const remindersDeps = { store: proactiveStore, briefing: () => proactive.briefingNow(), conversationOfTurn: (t: string) => memories.conversationOfTurn(t) };
   await tools.addInProcess(REMINDERS_SERVER, createRemindersServer(remindersDeps), REMINDERS_TOOLS, remindersPreviews(remindersDeps));
   // Phase 7 (ADR-027): skills Jarvis proposes; active only after their evals pass and the owner approves.
-  const skillStore = new SkillStore(db);
   await tools.addInProcess(SKILLS_SERVER, createSkillsServer({ store: skillStore, conversationOfTurn: (t) => memories.conversationOfTurn(t) }), SKILLS_TOOLS);
   const skillKey = anthropicKey(env);
   let skillModel: { key: string; model: AnthropicSkillEvalModel } | undefined;

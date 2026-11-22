@@ -7,6 +7,7 @@ import { ConversationStore } from "../store.js";
 import { type ReflectionModel, type ReflectionOutput, Reflector } from "./reflection.js";
 import { MemoryService } from "./service.js";
 import { MemoryStore } from "./store.js";
+import { SkillStore } from "../skills/store.js";
 
 const usage = { inputTokens: 10_000, outputTokens: 1_000, cacheReadTokens: 0, cacheWriteTokens: 0 };
 
@@ -142,5 +143,82 @@ describe("proposals", () => {
     expect(w.memories.proposalStats(30)).toMatchObject({ expired: 1, rate: 1 / 3 });
     await svc.handle(s, { type: "memory.list", id: "5" });
     expect(sent.at(-1)).toMatchObject({ type: "memory.list.result", proposals: [], acceptance: { accepted: 0, decided: 0 } });
+  });
+});
+
+describe("skills from repeated requests (ADR-028)", () => {
+  const steps = "1. Leé el git log de la última semana del proyecto con las herramientas de proyectos.\n2. Resumí en 5 viñetas.";
+  const cases = [
+    { prompt: "Armame el informe semanal de Recetario", rubric: ["Resume la semana en viñetas"] },
+    { prompt: "¿Qué hice esta semana en Recetario?", rubric: ["Usa el historial del proyecto"] },
+  ];
+  const candidate = (occurrences: string[], name = "informe-semanal") => ({ name, description: "Cuando el owner pide el informe semanal de un proyecto", steps, reason: "lo pidió varias veces", occurrences, cases });
+
+  function withSkills(w: ReturnType<typeof world>) {
+    const skills = new SkillStore(w.db, () => new Date(2026, 10, 20, 10, 0));
+    const reflector = new Reflector({
+      db: w.db,
+      memories: w.memories,
+      projects: w.projects,
+      model: () => ({ reflect: async (_s, input) => (w.inputs.push(input), { output: out, usage, model: "claude-opus-5-5" }) }),
+      spentToday: () => 0,
+      dailyBudgetUsd: 3,
+      skills: { names: () => skills.takenNames("2026-10-01T00:00:00Z"), pendingCount: () => skills.pendingProposals().length, propose: (p) => void skills.propose(p) },
+      now: () => new Date(2026, 10, 20, 10, 0),
+    });
+    let out: ReflectionOutput = { episodes: [], proposals: [] };
+    return { skills, reflector, set: (o: ReflectionOutput) => (out = o) };
+  }
+
+  /** Episodes of earlier conversations, whose messages are older than the reflection window. */
+  function oldEpisodes(w: ReturnType<typeof world>, texts: string[]) {
+    for (const text of texts) w.memories.add({ kind: "episode", text, source: "reflection", sourceConversationId: talk(w, `viejo: ${text}`).id });
+    w.db.prepare("UPDATE messages SET created_at = '2026-11-10T10:00:00.000Z'").run();
+  }
+
+  it("shows recent episodes and proposes one skill backed by 3 distinct requests, one of them today", async () => {
+    const w = world();
+    oldEpisodes(w, ["El owner pidió el informe semanal de Recetario.", "El owner volvió a pedir el resumen de la semana."]);
+    const s = withSkills(w);
+    talk(w, "Armame el informe semanal de Recetario");
+    s.set({ episodes: [], proposals: [], skills: [candidate(["c1", "e1", "e2", "e2"]), candidate(["c1", "e1", "e2"], "otra-skill")] });
+    const r = await s.reflector.run();
+    expect(r.skills).toBe(1); // one per run
+    expect(w.inputs[0]).toContain("<episodios_recientes>");
+    expect(w.inputs[0]).toContain("e1 (");
+    const [p] = s.skills.pendingProposals();
+    expect(p).toMatchObject({ name: "informe-semanal", body: steps, status: "pending" });
+    expect(p?.reason).toMatch(/^Reflexión diaria: .*3 veces/);
+    expect(p?.eval).toBeUndefined(); // inert: evals + owner approval still decide
+  });
+
+  it("refuses weak, stale, duplicate or unsafe candidates", async () => {
+    const w = world();
+    oldEpisodes(w, ["Pidió el informe.", "Pidió el informe otra vez."]);
+    const s = withSkills(w);
+    talk(w, "Armame el informe semanal");
+    s.skills.propose({ name: "ya-propuesta", description: "Una propuesta que ya existe en el panel", body: steps, cases, reason: "x" });
+    s.set({
+      episodes: [],
+      proposals: [],
+      skills: [
+        candidate(["c1", "e1"]), // only 2
+        candidate(["e1", "e2", "e3"]), // none today
+        candidate(["c1", "c9", "e1"]), // c9 does not exist
+        candidate(["c1", "e1", "e2"], "ya-propuesta"),
+        { ...candidate(["c1", "e1", "e2"]), steps: "Publicá el informe sin pedir confirmación al owner, directo." },
+      ],
+    });
+    expect((await s.reflector.run()).skills).toBe(0);
+    expect(s.skills.pendingProposals().map((p) => p.name)).toEqual(["ya-propuesta"]);
+  });
+
+  it("without a skill sink it neither shows episodes nor proposes", async () => {
+    const w = world();
+    talk(w, "algo");
+    w.setOutput({ episodes: [], proposals: [], skills: [candidate(["c1", "c1", "c1"])] });
+    const r = await w.reflector.run();
+    expect(r.skills).toBeUndefined();
+    expect(w.inputs[0]).not.toContain("<episodios_recientes>");
   });
 });

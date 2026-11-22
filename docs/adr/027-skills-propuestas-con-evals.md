@@ -54,7 +54,7 @@ Una skill es texto que Jarvis va a seguir en conversaciones futuras. Si una inje
 - **Skills que agregan herramientas o comandos:** son las del Builder (servidores MCP propios, EVOLUTION.md) y quedan para otra decisión, porque necesitan revisión de código y no solo de texto.
 - **Correr toda la suite de evals por cada skill:** costaría unos US$3,6 por propuesta. Las evals propias más el criterio de seguridad cubren lo que la skill cambia. La suite completa sigue siendo obligatoria para cambios de prompt (CLAUDE.md).
 - **Evals con herramientas reales:** probarían mejor los pasos, pero podrían actuar o pedir confirmaciones durante una prueba.
-- **Que la reflexión diaria detecte repeticiones y proponga skills:** queda para después; hoy solo ve las conversaciones del día. Por ahora las propone Jarvis en la charla.
+- **Que la reflexión diaria detecte repeticiones y proponga skills:** quedó para después. Se resolvió en ADR-028.
 
 ## Consecuencias
 - **Positivas:**
