@@ -34,7 +34,8 @@
       "sharp"
     ],
     "overrides": {
-      "libsignal": "github:whiskeysockets/libsignal-node#bcea72df9ec34d9d9140ab30619cf479c7c144c7"
+      "libsignal": "github:whiskeysockets/libsignal-node#bcea72df9ec34d9d9140ab30619cf479c7c144c7",
+      "minimatch@>=7.0.0 <11.0.1": "11.0.4"
     }
   }
 }

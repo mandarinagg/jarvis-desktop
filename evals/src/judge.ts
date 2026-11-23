@@ -42,7 +42,24 @@ export class AnthropicJudge implements Judge {
     this.client = new Anthropic({ apiKey, maxRetries: 3 });
   }
 
+  /** A verdict that skips criteria is a judge slip, not a failure of Jarvis: ask once more. */
   async grade(c: EvalCase, transcript: { role: "user" | "assistant"; content: string }[], actions?: string[]) {
+    const first = await this.gradeOnce(c, transcript, actions);
+    if (first.verdict.criteria.length === c.rubric.length) return first;
+    const second = await this.gradeOnce(c, transcript, actions);
+    const add = (a: number, b: number) => a + b;
+    return {
+      verdict: second.verdict,
+      usage: {
+        inputTokens: add(first.usage.inputTokens, second.usage.inputTokens),
+        outputTokens: add(first.usage.outputTokens, second.usage.outputTokens),
+        cacheReadTokens: add(first.usage.cacheReadTokens, second.usage.cacheReadTokens),
+        cacheWriteTokens: add(first.usage.cacheWriteTokens, second.usage.cacheWriteTokens),
+      },
+    };
+  }
+
+  private async gradeOnce(c: EvalCase, transcript: { role: "user" | "assistant"; content: string }[], actions?: string[]) {
     const response = await this.client.messages.parse({
       model: this.model,
       max_tokens: 4_000,

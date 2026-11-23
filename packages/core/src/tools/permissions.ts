@@ -150,6 +150,15 @@ export interface AuditRow extends AuditEntry {
 
 const MAX_ARGS = 2_000;
 
+/** Rows written before truncation kept JSON valid are returned as their raw text. */
+function parseArgs(raw: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return raw;
+  }
+}
+
 export class AuditLog {
   constructor(
     private readonly db: DatabaseSync,
@@ -158,7 +167,15 @@ export class AuditLog {
 
   record(e: AuditEntry): void {
     let args = redact(JSON.stringify(e.args ?? {}));
-    if (args.length > MAX_ARGS) args = args.slice(0, MAX_ARGS - 1) + "…";
+    // Truncated arguments stay valid JSON: a string with the beginning of the call.
+    if (args.length > MAX_ARGS) {
+      const full = args;
+      let cut = MAX_ARGS - 40;
+      do {
+        args = JSON.stringify({ recortado: full.slice(0, cut) });
+        cut = Math.floor(cut * 0.8); // escaping can grow it: shrink until it fits
+      } while (args.length > MAX_ARGS);
+    }
     this.db
       .prepare(
         `INSERT INTO audit_log (ts, turn_id, channel, server, tool, args, risk, decision, approved_by, reason, ok, error, duration_ms, result_chars)
@@ -227,7 +244,7 @@ export class AuditLog {
       approvedBy: r.approvedBy ?? undefined,
       channel: (r.channel ?? undefined) as Channel | undefined,
       ok: r.ok === null ? undefined : Boolean(r.ok),
-      args: JSON.parse(r.args) as unknown,
+      args: parseArgs(r.args),
     }));
   }
 }
