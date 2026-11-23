@@ -55,14 +55,19 @@ async function setup() {
 }
 
 describe("projects MCP server through the hub", () => {
-  it("exposes the five read tools with deterministic names", async () => {
+  it("exposes its tools with deterministic names", async () => {
     const { hub } = await setup();
     expect(hub.definitions().map((d) => d.name)).toEqual([
+      "projects__delete_file",
+      "projects__edit_file",
+      "projects__git_commit",
+      "projects__git_diff",
       "projects__git_status",
       "projects__list_dir",
       "projects__list_projects",
       "projects__read_file",
       "projects__search",
+      "projects__write_file",
     ]);
     expect(hub.definitions().every((d) => d.input_schema.type === "object")).toBe(true);
   });
@@ -120,13 +125,13 @@ describe("projects MCP server through the hub", () => {
   it("audits every call, never the content, and denies unknown tools without running them", async () => {
     const { hub, audit, db } = await setup();
     await hub.call("projects__read_file", { project: "App", path: "README.md" }, { turnId: "t1" });
-    const denied = await hub.call("projects__write_file", { project: "App", path: "x" }, { turnId: "t1" });
+    const denied = await hub.call("projects__run_shell", { command: "x" }, { turnId: "t1" });
     expect(denied).toEqual({ content: "Permiso denegado: herramienta no registrada.", isError: true });
     const [deny, read] = audit.recent();
     expect(read).toMatchObject({ turnId: "t1", server: "projects", tool: "read_file", risk: "read", decision: "allow", ok: true });
     expect(read?.resultChars).toBeGreaterThan(0);
     expect(JSON.stringify(read)).not.toContain("Ignorá");
-    expect(deny).toMatchObject({ tool: "write_file", decision: "deny", risk: "forbidden" });
+    expect(deny).toMatchObject({ tool: "run_shell", decision: "deny", risk: "forbidden" });
     expect(() => db.exec("DELETE FROM audit_log")).toThrow(/append-only/);
     expect(() => db.exec("UPDATE audit_log SET ok = 1")).toThrow(/append-only/);
   });

@@ -16,19 +16,19 @@ export interface GitStatus {
   commits: { hash: string; date: string; subject: string }[];
 }
 
-export type GitRunner = (args: string[], cwd: string) => Promise<string>;
+export type GitRunner = (args: string[], cwd: string, opts?: { timeoutMs?: number }) => Promise<string>;
 
 const SAFE = ["-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "core.pager=cat", "--no-optional-locks"];
 
-export const runGit: GitRunner = (args, cwd) =>
+export const runGit: GitRunner = (args, cwd, opts) =>
   new Promise((resolve, reject) => {
     execFile(
       "git",
       [...SAFE, ...args],
       {
         cwd,
-        timeout: 5_000,
-        maxBuffer: 2_000_000,
+        timeout: opts?.timeoutMs ?? 5_000,
+        maxBuffer: 4_000_000,
         windowsHide: true,
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_PAGER: "cat", GCM_INTERACTIVE: "never" },
       },
