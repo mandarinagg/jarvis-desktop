@@ -6,7 +6,7 @@ import { MemorySecretStore } from "../secrets.js";
 import type { Session } from "../server.js";
 import { AuditLog, PermissionEngine } from "../tools/permissions.js";
 import { open, seal, sessionKey, WhatsAppAuthStore } from "./auth-store.js";
-import { baileysLogger, closeReason, toIncoming } from "./baileys-provider.js";
+import { baileysLogger, closeReason, selfOf, toIncoming } from "./baileys-provider.js";
 import { TEXTS, WhatsAppChannel, type WhatsAppStatus } from "./channel.js";
 import { composeTurn, MAX_AGE_MS, MAX_CHUNK, prepareOutgoing, REPLY_PREFIX, screen } from "./filter.js";
 import type { WaAuthState, WaConnection, WaEvents, WaIncoming, WaProvider, WaSelf } from "./provider.js";
@@ -171,6 +171,13 @@ describe("baileys mapping", () => {
     expect(toIncoming(wa({ protocolMessage: { type: 0 } }), "notify")).toBeNull();
   });
 
+  it("the account identity falls back to the saved credentials and drops the device suffix", () => {
+    expect(selfOf({ id: "595981000000:41@s.whatsapp.net" }, { lid: "123456789:41@lid" })).toEqual(SELF);
+    expect(selfOf(undefined, { id: "595981000000:41@s.whatsapp.net", lid: "123456789:41@lid" })).toEqual(SELF);
+    expect(selfOf({ id: "595981000000@s.whatsapp.net" }, undefined)).toEqual({ jid: SELF.jid, lid: undefined });
+    expect(selfOf(undefined, undefined)).toBeUndefined();
+  });
+
   it("maps close codes", () => {
     expect(closeReason(401, true).reason).toBe("logged_out");
     expect(closeReason(408, false).reason).toBe("qr_timeout");
@@ -295,6 +302,19 @@ describe("whatsapp channel", () => {
     await w.settle();
     expect(w.turns).toEqual([{ text: "hola Jarvis", mode: "whatsapp", conversationId: undefined }]);
     expect(w.provider.sent).toEqual([{ jid: SELF.jid, text: `${REPLY_PREFIX}eco: hola Jarvis` }]);
+  });
+
+  it("a LID reported after the socket opened makes the self-chat by LID work (seen right after linking)", async () => {
+    const w = world();
+    await w.channel.link();
+    ev(w).connected({ jid: SELF.jid }); // no LID yet
+    ev(w).message(msg({ remoteJid: "123456789@lid", text: "uno" }));
+    await w.settle();
+    expect(w.turns).toEqual([]);
+    ev(w).connected(SELF); // the provider refreshed the identity
+    ev(w).message(msg({ remoteJid: "123456789@lid", text: "dos" }));
+    await w.settle();
+    expect(w.turns.map((t) => t.text)).toEqual(["dos"]);
   });
 
   it("other chats never reach the model nor get an answer; they are only counted", async () => {

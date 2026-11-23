@@ -197,6 +197,16 @@ export function baileysLogger(logger: Logger): BaileysLogger {
   return self;
 }
 
+/** The linked account from the socket's user, falling back to the saved credentials. */
+export function selfOf(
+  user: { id?: string | null; lid?: string | null } | undefined,
+  me: { id?: string | null; lid?: string | null } | undefined,
+): WaSelf | undefined {
+  const jid = bareJid(user?.id ?? me?.id);
+  if (!jid) return undefined;
+  return { jid, lid: bareJid(user?.lid ?? me?.lid) };
+}
+
 const MINUTE = 60_000;
 
 export class BaileysProvider implements WaProvider {
@@ -246,19 +256,32 @@ export class BaileysProvider implements WaProvider {
         this.logger.log("error", "whatsapp.event_failed", { what, error: err instanceof Error ? redact(err.message).slice(0, 200) : String(err) });
       }
     };
+    // Right after linking, WhatsApp may report the account's LID after the socket opened. The
+    // self-chat often arrives by LID, so the identity is refreshed whenever it changes.
+    const refreshSelf = () => {
+      if (!self) return;
+      const next = selfOf(sock.user, creds.me);
+      if (next && (next.jid !== self.jid || next.lid !== self.lid)) {
+        self = next;
+        const linked = self;
+        guard("identity", () => events.connected(linked));
+      }
+    };
     // Baileys updates `creds` in place: the whole object is saved.
-    sock.ev.on("creds.update", () => guard("creds", () => auth.writeCreds(JSON.stringify(creds, BufferJSON.replacer))));
+    sock.ev.on("creds.update", () => {
+      guard("creds", () => auth.writeCreds(JSON.stringify(creds, BufferJSON.replacer)));
+      refreshSelf();
+    });
     sock.ev.on("connection.update", (u) => {
       if (u.qr) {
         const qr = u.qr;
         guard("qr", () => events.qr(qr));
       }
       if (u.connection === "open") {
-        const jid = bareJid(sock.user?.id);
-        if (!jid) return guard("open", () => events.closed("error", "WhatsApp no informó el número vinculado"));
-        self = { jid, lid: bareJid(sock.user?.lid) };
-        const linked = self;
-        guard("open", () => events.connected(linked));
+        const found = selfOf(sock.user, creds.me);
+        if (!found) return guard("open", () => events.closed("error", "WhatsApp no informó el número vinculado"));
+        self = found;
+        guard("open", () => events.connected(found));
       }
       if (u.connection === "close") {
         const error = u.lastDisconnect?.error as (Error & { output?: { statusCode?: number } }) | undefined;
@@ -267,6 +290,7 @@ export class BaileysProvider implements WaProvider {
       }
     });
     sock.ev.on("messages.upsert", ({ messages, type }) => {
+      refreshSelf();
       for (const m of messages) {
         const incoming = toIncoming(m, type);
         if (incoming) guard("message", () => events.message(incoming));
