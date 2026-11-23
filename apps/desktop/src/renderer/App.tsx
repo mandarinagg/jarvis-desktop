@@ -1,6 +1,15 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useReducer, useRef, useState } from "react";
+import { Activity } from "./Activity.js";
 import { Projects } from "./Projects.js";
-import { budgetLevel, initialState, pttPressed, reduce, voiceLabel } from "./state.js";
+import { type ToolStatus, budgetLevel, initialState, pttPressed, reduce, voiceLabel } from "./state.js";
+
+const TOOL_SUFFIX: Record<ToolStatus, string> = {
+  started: "…",
+  waiting: " · esperando tu confirmación",
+  done: "",
+  denied: " (sin permiso)",
+  error: " (falló)",
+};
 
 const usd = (n: number) => `US$ ${n.toFixed(2)}`;
 let seq = 0;
@@ -21,6 +30,7 @@ export function App() {
   const [draft, setDraft] = useState("");
   const [hotkey, setHotkey] = useState<string | null>(null);
   const [holding, setHolding] = useState(false);
+  const [view, setView] = useState<"chat" | "activity">("chat");
   const latest = useRef(state);
   latest.current = state;
   const transcriptEnd = useRef<HTMLDivElement>(null);
@@ -42,6 +52,8 @@ export function App() {
     const offMessage = jarvis.onMessage((message) => {
       dispatch({ kind: "core", message });
       if (message.type === "chat.done") jarvis.send({ type: "conversations.list", id: nextId("l") });
+      // A confirmation is a native dialog over this window: show the conversation it belongs to.
+      if (message.type === "permission.request") setView("chat");
     });
     const offStatus = jarvis.onStatus((s) => {
       dispatch({ kind: "status", connected: s.connected, ...(s.error ? { error: s.error } : {}) });
@@ -114,6 +126,11 @@ export function App() {
     }
   };
 
+  const showActivity = () => {
+    setView("activity");
+    jarvis.send({ type: "audit.list", id: nextId("al"), limit: 100 });
+  };
+
   const startNew = () => {
     if (busy) return;
     dispatch({ kind: "new" });
@@ -146,6 +163,9 @@ export function App() {
           ))}
         </nav>
         <Projects projects={state.projects} connected={state.connected} onError={(m) => dispatch({ kind: "core", message: { type: "error", code: "internal", message: m } })} />
+        <button className="link activity-link" onClick={showActivity} disabled={!state.connected} aria-pressed={view === "activity"}>
+          Actividad
+        </button>
       </aside>
 
       <main className="stage">
@@ -191,6 +211,15 @@ export function App() {
           )}
         </header>
 
+        {view === "activity" ? (
+          <Activity
+            entries={state.audit}
+            exported={state.auditExport}
+            onRefresh={showActivity}
+            onExport={() => jarvis.send({ type: "audit.export", id: nextId("ae") })}
+            onClose={() => setView("chat")}
+          />
+        ) : (
         <section className="transcript" aria-live="polite">
           {state.messages.length === 0 && (
             <div className="empty">
@@ -214,7 +243,7 @@ export function App() {
                     {m.tools.map((t, j) => (
                       <li key={j} className={`tool ${t.status}`}>
                         {t.summary}
-                        {t.status === "started" ? "…" : t.status === "denied" ? " (sin permiso)" : t.status === "error" ? " (falló)" : ""}
+                        {TOOL_SUFFIX[t.status]}
                       </li>
                     ))}
                   </ul>
@@ -229,6 +258,7 @@ export function App() {
           )}
           <div ref={transcriptEnd} />
         </section>
+        )}
 
         {(state.error ?? state.connectionError) && (
           <div className="notice" role="alert">

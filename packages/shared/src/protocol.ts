@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.2"; // 1.1: voice.* messages (Phase 2); 1.2: chat.tool (Phase 3)
+export const PROTOCOL_VERSION = "1.3"; // 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4)
 
 const Id = z.string().min(1).max(64);
 const SessionToken = z.string().regex(/^[0-9a-f]{64}$/, "token must be 256-bit lowercase hex");
@@ -104,7 +104,36 @@ export type VoicePtt = z.infer<typeof VoicePtt>;
 export const VoiceStatusGet = z.strictObject({ type: z.literal("voice.status.get"), id: Id });
 export type VoiceStatusGet = z.infer<typeof VoiceStatusGet>;
 
+// Phase 4 (ADR-018): the owner answers a permission.request. Only the desktop main process (native
+// dialog) and the CLI send this; the renderer, which shows model output, never can.
+export const PermissionRespond = z.strictObject({
+  type: z.literal("permission.respond"),
+  id: Id,
+  requestId: Id,
+  approved: z.boolean(),
+  /** Explicit approvals the owner gave (destructive actions need 2). */
+  confirmations: z.number().int().min(0).max(2),
+});
+export type PermissionRespond = z.infer<typeof PermissionRespond>;
+
+export const AuditList = z.strictObject({
+  type: z.literal("audit.list"),
+  id: Id,
+  limit: z.number().int().min(1).max(200).optional(),
+  beforeId: z.number().int().positive().optional(),
+});
+export type AuditList = z.infer<typeof AuditList>;
+
+/** Writes the whole audit log as JSONL inside the Jarvis folder (exports/). */
+export const AuditExport = z.strictObject({ type: z.literal("audit.export"), id: Id });
+export type AuditExport = z.infer<typeof AuditExport>;
+
+export type AuditMessage = AuditList | AuditExport;
+
 export const ClientMessage = z.discriminatedUnion("type", [
+  PermissionRespond,
+  AuditList,
+  AuditExport,
   VoicePtt,
   VoiceStatusGet,
   AuthHello,
@@ -177,7 +206,8 @@ export const ChatTool = z.strictObject({
   turnId: Id,
   tool: z.string().min(1).max(128),
   summary: z.string().max(300),
-  status: z.enum(["started", "done", "error", "denied"]),
+  /** waiting: Jarvis is waiting for the owner to confirm (Phase 4). */
+  status: z.enum(["started", "waiting", "done", "error", "denied"]),
 });
 export type ChatTool = z.infer<typeof ChatTool>;
 
@@ -268,7 +298,74 @@ export const VoiceTranscript = z.strictObject({
 });
 export type VoiceTranscript = z.infer<typeof VoiceTranscript>;
 
+export const RiskName = z.enum(["read", "prepare", "confirm", "destructive", "forbidden"]);
+export type RiskName = z.infer<typeof RiskName>;
+
+/**
+ * Jarvis needs the owner's OK before a tool runs (Phase 4, ADR-018). `title` and `detail` are
+ * written by the Core from validated arguments (detail may contain a diff of model-written text:
+ * show it as plain text). Sent to the desktop and CLI clients; the first answer wins.
+ */
+export const PermissionRequest = z.strictObject({
+  type: z.literal("permission.request"),
+  requestId: Id,
+  turnId: Id.optional(),
+  server: z.string().max(64),
+  tool: z.string().max(128),
+  risk: RiskName,
+  title: z.string().max(300),
+  detail: z.string().max(6_000),
+  confirmations: z.union([z.literal(1), z.literal(2)]),
+  expiresAt: z.string(),
+});
+export type PermissionRequest = z.infer<typeof PermissionRequest>;
+
+/** A request was answered (here or in another window), expired or was cancelled with its turn. */
+export const PermissionResolved = z.strictObject({
+  type: z.literal("permission.resolved"),
+  requestId: Id,
+  approved: z.boolean(),
+  reason: z.string().max(200).optional(),
+});
+export type PermissionResolved = z.infer<typeof PermissionResolved>;
+
+export const AuditEntryInfo = z.strictObject({
+  id: z.number().int().positive(),
+  ts: z.string(),
+  turnId: z.string().optional(),
+  server: z.string(),
+  tool: z.string(),
+  /** Redacted JSON of the arguments, at most 2000 characters. */
+  args: z.string().max(2_100),
+  risk: RiskName,
+  decision: z.enum(["allow", "deny"]),
+  approvedBy: z.string().optional(),
+  reason: z.string().optional(),
+  ok: z.boolean().optional(),
+  durationMs: z.number().nonnegative().optional(),
+});
+export type AuditEntryInfo = z.infer<typeof AuditEntryInfo>;
+
+export const AuditListResult = z.strictObject({
+  type: z.literal("audit.list.result"),
+  id: Id,
+  entries: z.array(AuditEntryInfo).max(200),
+});
+export type AuditListResult = z.infer<typeof AuditListResult>;
+
+export const AuditExported = z.strictObject({
+  type: z.literal("audit.exported"),
+  id: Id,
+  path: z.string(),
+  count: z.number().int().nonnegative(),
+});
+export type AuditExported = z.infer<typeof AuditExported>;
+
 export const CoreMessage = z.discriminatedUnion("type", [
+  PermissionRequest,
+  PermissionResolved,
+  AuditListResult,
+  AuditExported,
   VoiceStateMessage,
   VoiceTranscript,
   AuthOk,

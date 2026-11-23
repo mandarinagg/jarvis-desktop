@@ -64,6 +64,7 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 ## Fase 4 — L3: Manos
 - MCP Client Hub + servidores: filesystem acotado, git, (opcional) calendario/mail
 - Permission Engine + UI de confirmación + audit log consultable
+  - [x] Permission Engine v1, reglas del owner, confirmación en diálogo nativo, panel Actividad, export JSONL y `recent_activity` (ADR-018)
 - Wake word local configurable
 - Defensa contra prompt injection (tests adversariales en evals)
 

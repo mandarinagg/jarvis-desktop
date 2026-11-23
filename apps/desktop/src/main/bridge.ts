@@ -20,6 +20,10 @@ export const RENDERER_ALLOWED = [
   "projects.delete",
   "projects.reindex",
   "conversations.setProject",
+  // Phase 4. permission.respond is NOT here: confirmations are native dialogs in the main process
+  // (confirm-dialog.ts), so model output rendered here can never approve an action.
+  "audit.list",
+  "audit.export",
 ] as const;
 
 export type RendererMessage = Extract<ClientMessage, { type: (typeof RENDERER_ALLOWED)[number] }>;

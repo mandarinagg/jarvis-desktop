@@ -5,7 +5,9 @@
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 import {
+  type AuditMessage,
   type BudgetGet,
+  type PermissionRespond,
   type ChatCancel,
   type ChatSend,
   type ConversationsGet,
@@ -48,6 +50,8 @@ export interface Handlers {
   voicePtt?(session: Session, message: VoicePtt): void;
   voiceStatusGet?(session: Session, message: VoiceStatusGet): void;
   projects?(session: Session, message: ProjectsMessage): void | Promise<void>;
+  permissionRespond?(session: Session, message: PermissionRespond): void;
+  audit?(session: Session, message: AuditMessage): void | Promise<void>;
   disconnected?(session: Session): void;
 }
 
@@ -103,6 +107,11 @@ export class CoreServer {
 
   get clientCount(): number {
     return this.sockets.size;
+  }
+
+  /** Authenticated sessions right now (who can answer a permission.request). */
+  sessionList(): Session[] {
+    return [...this.sessions];
   }
 
   /** Sends to every authenticated client (voice state, voice turns streamed to all windows). */
@@ -247,6 +256,16 @@ export class CoreServer {
             return;
           }
           await h.projects(session, message);
+          return;
+        case "permission.respond":
+          return this.query(session, message, h.permissionRespond);
+        case "audit.list":
+        case "audit.export":
+          if (!h.audit) {
+            session.send({ type: "error", id: message.id, code: "upstream_error", message: `${message.type} is not available` });
+            return;
+          }
+          await h.audit(session, message);
           return;
       }
     } catch (err) {
