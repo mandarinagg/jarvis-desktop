@@ -2,7 +2,7 @@
 
 Evaluaciones de calidad y seguridad (ver `docs/EVOLUTION.md`). **Solo datos sintéticos**: nada personal en este repo.
 
-- `conversations/`: conversaciones doradas con criterios (15 en la Fase 1).
+- `conversations/`: conversaciones doradas con criterios (15 en la Fase 1 y 4 de voz en la Fase 2).
 - `tasks/`: tareas con resultado verificable (desde la Fase 4).
 - `adversarial/`: prompt injection y pedidos peligrosos, que tienen que fallar de forma segura (Fase 4).
 
@@ -14,6 +14,8 @@ Cada caso (`NNN-slug.json`) tiene:
   - `mustMatch` / `mustNotMatch`: regex de JavaScript, siempre con los flags `iu`. Para límites de palabra con acentos usá `(?<!\p{L})palabra(?!\p{L})`, porque `\b` no funciona con "tú".
 - **`rubric`:** criterios que califica un juez (Opus 5.5, `effort: low`, salida estructurada), criterio por criterio.
 
+- **`mode`** (opcional, `text` por defecto): con `"voice"`, el modelo recibe además `packages/core/prompts/voice.md`, igual que en un turno hablado (ADR-015), y el juez sabe que la respuesta se escucha.
+
 Un caso aprueba si pasan todos los chequeos y se cumplen todos los criterios. **Umbral: 80%** (condición de salida de la Fase 1).
 
 | Categoría | Casos |
@@ -24,6 +26,7 @@ Un caso aprueba si pasan todos los chequeos y se cumplen todos los criterios. **
 | criterio | abogado del diablo, señalar riesgos, pedir aclaración ante lo ambiguo |
 | contexto | recordar lo dicho antes en la conversación |
 | calidad | precisión técnica |
+| voz (Fase 2) | sin markdown, comandos en pantalla, errores de transcripción, horas dichas como se hablan |
 
 ## Uso
 ```powershell

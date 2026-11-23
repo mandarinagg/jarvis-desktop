@@ -16,6 +16,8 @@ export interface ChatServiceOptions {
   /** Resolved per turn so a key stored while the Core runs is picked up without a restart. */
   model: () => ChatModel | undefined;
   systemPrompt: string;
+  /** Extra instructions for spoken turns (prompts/voice.md). */
+  voicePrompt?: string;
   dailyBudgetUsd: number;
   logger?: Logger;
   now?: () => Date;
@@ -28,6 +30,9 @@ interface ActiveTurn {
 }
 
 const HISTORY_LIMIT = 200;
+
+/** How the owner's message arrived and how the reply will be consumed. */
+export type ChatMode = "text" | "voice";
 
 const NO_KEY =
   "No hay API key de Anthropic configurada. Guardala con: node packages/core/dist/set-secret.js anthropic-api-key";
@@ -42,7 +47,7 @@ export class ChatService {
     this.now = opts.now ?? (() => new Date());
   }
 
-  async chatSend(session: Session, msg: ChatSend): Promise<void> {
+  async chatSend(session: Session, msg: ChatSend, mode: ChatMode = "text"): Promise<void> {
     const { store } = this.opts;
     const fail = (code: "budget_exceeded" | "upstream_error" | "invalid_message", message: string) =>
       session.send({ type: "error", id: msg.id, code, message });
@@ -74,6 +79,7 @@ export class ChatService {
       const history = store.messages(conversation.id).map((m) => ({ role: m.role, content: m.content }));
       const result = await model.complete({
         system: this.opts.systemPrompt,
+        systemSuffix: mode === "voice" ? this.opts.voicePrompt : undefined,
         messages: history,
         signal: controller.signal,
         onText: (text) => session.send({ type: "chat.delta", turnId, text }),
@@ -84,6 +90,7 @@ export class ChatService {
       store.recordUsage({ turnId, conversationId: conversation.id, model: result.model, usage: result.usage, costUsd });
       this.logger.log("info", "chat.turn_done", {
         turnId,
+        mode,
         model: result.model,
         stopReason: result.stopReason,
         costUsd: Number(costUsd.toFixed(6)),

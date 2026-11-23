@@ -67,6 +67,7 @@ Los logs registran la duración y la latencia de cada frase, pero **nunca el tex
 - El stream de Claude también llega a la UI como texto, por broadcast.
 - Sin conversación indicada, un turno nuevo sigue la última conversación de voz si pasaron menos de 10 minutos.
 - **Barge-in:** apretar el atajo mientras Jarvis piensa o habla cancela el stream de Claude y manda `tts.cancel`. Si el texto ya se había guardado entero, la respuesta queda marcada como interrumpida.
+- **Modo voz (ADR-015):** los turnos hablados agregan `prompts/voice.md` después del system prompt: respuestas de una a tres oraciones, sin markdown, con números y horas como se dicen, y el código en un bloque que queda en pantalla.
 - **Errores hablados:** frases cortas y presintetizadas (tope de gasto, falla de Claude). El detalle queda en pantalla.
 - **Métricas:** tabla `voice_turns` (migración 002), solo con tiempos y nunca con texto. Reporte: `node packages/core/dist/voice-stats.js`.
 

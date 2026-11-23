@@ -1,0 +1,26 @@
+{
+  "id": "017-voz-comando-en-pantalla",
+  "category": "voz",
+  "mode": "voice",
+  "turns": [
+    "¿Cómo veo qué programa está usando el puerto tres mil en Windows?"
+  ],
+  "checks": {
+    "maxChars": 700,
+    "mustMatch": [
+      "```",
+      "3000"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})quieres(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "El comando es correcto para Windows (por ejemplo netstat -ano con findstr, o Get-NetTCPConnection) y permite llegar al proceso.",
+    "La parte hablada (fuera del bloque de código) es breve y explica qué hace el comando sin leerlo carácter por carácter.",
+    "El comando está en un bloque de código."
+  ]
+}

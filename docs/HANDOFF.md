@@ -1,55 +1,64 @@
 # Handoff: estado del proyecto
 
-> Última actualización: **2026-11-13**. Actualizar al cerrar cada sesión de trabajo. Lo de largo plazo está en `ROADMAP.md`; este archivo cuenta **dónde estamos y qué sigue**.
+> Última actualización: **2026-11-19**. Actualizar al cerrar cada sesión de trabajo. Lo de largo plazo está en `ROADMAP.md`; este archivo cuenta **dónde estamos y qué sigue**.
 
 ## Dónde estamos
 - **Fase 0 (Diagnóstico):** completa, salvo la cuenta de la API de Anthropic, que la tiene que crear el owner.
-- **Fase 1 (L0: Core + chat):** **implementada y mergeada en `main`** (PRs #20–#25, CI en verde). Falta validarla con la API real.
-- **Fase 2 (Voz):** sin empezar. Se recomienda arrancarla después de tener datos reales de la API (latencia y costo).
+- **Fase 1 (L0: Core + chat):** implementada y en `main`. Falta validarla con la API real.
+- **Fase 2 (L1: Voz):** **implementada y en `main`** (PRs #27–#31 y el modo voz del prompt, ADR-013 a ADR-015). Se probó de punta a punta con micrófono, Parakeet y Neural2 reales. Falta validarla con la API real: 20 conversaciones y p50 voz→primer audio menor a 2.0 s.
 
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Protocolo v1.0, objetos estrictos, frame máximo de 1 MB |
-| Core daemon | `packages/core` | Named pipe + token de sesión, instancia única, logs con redacción de secretos |
-| Persistencia | `packages/core/src/store.ts` | `node:sqlite` (WAL) en `%APPDATA%/Jarvis/jarvis.db` |
-| Secretos | `packages/core/src/secrets.ts` | Credential Manager; `set-secret` |
-| Claude | `packages/core/src/claude/` | SDK 1.8, streaming, `effort: low`, caché, fallbacks del lado del servidor |
-| Costo y tope | `chat.ts`, `pricing.ts` | Tope diario por defecto de US$3 (`JARVIS_DAILY_BUDGET_USD`) |
-| Chat por terminal | `packages/core/dist/chat-cli.js` | Cliente IPC |
-| App de escritorio | `apps/desktop` | Electron 45 + React 19. Si el Core no está corriendo, lo arranca con el Node de Electron |
-| Evals | `evals/` | 15 conversaciones, juez Opus 5.5, umbral del 80% |
-| Benchmarks de voz | `services/voice` | STT: Parakeet (ADR-010). TTS: Google Neural2 (ADR-011) |
+| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.1 (`voice.*`). Voz: protocolo propio 1.0, con fixtures compartidos con Python |
+| Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
+| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migración 002: `voice_turns` (solo tiempos) |
+| Secretos | Credential Manager | `anthropic-api-key` (falta) y `google-tts-api-key` (migrada el 2026-11-19) |
+| Claude | `packages/core/src/claude/` | Streaming, `effort: low`, caché, tope diario de US$3 |
+| Voice Service | `services/voice` (`python -m jarvis_voice.service`) | Proceso hijo del Core por stdio. Supervisor con backoff y estado `degradado` |
+| TTS | `services/voice/.../tts/` | Neural2 (2.5 s + 1 reintento), fallback a Piper `--output-raw`, caché de acuses, síntesis superpuesta, fade de 30 ms |
+| STT | `services/voice/.../stt/` | Parakeet en proceso vía `parakeet.dll` (~100 ms), micrófono abierto solo durante el push-to-talk, corrección post-STT |
+| Turnos de voz | `packages/core/src/voice/turns.ts` | Push-to-talk → STT → Claude → segmentador → TTS, barge-in, errores dichos por voz, métricas |
+| App de escritorio | `apps/desktop` | Chat + chip de voz + «Mantené para hablar» + atajo `Ctrl+Shift+Space` (interruptor) + overlay |
+| Modo voz del prompt | `packages/core/prompts/voice.md` | Se agrega en los turnos hablados como segundo bloque de `system` (ADR-015) |
+| Evals | `evals/` | 19 conversaciones (4 de voz con `mode: voice`), juez Opus 5.5, umbral del 80% |
 
-## Pendiente del owner (bloquea el cierre de la Fase 1)
+## Pendiente del owner (bloquea el cierre de las Fases 1 y 2)
 1. Crear la cuenta de la API de Anthropic con **tope mensual de US$60** en la consola.
 2. Guardar la clave: `pnpm build` y después `node packages/core/dist/set-secret.js anthropic-api-key`.
-3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$0,32; tiene que dar ≥ 80%).
-4. Usar Jarvis por texto durante una semana: `pnpm --filter @jarvis/desktop start`.
+3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$0,40, 19 casos; tienen que dar ≥ 80%).
+4. Usar Jarvis por texto y por voz: `pnpm --filter @jarvis/desktop start`, con `Ctrl+Shift+Space` o el botón «Mantené para hablar».
+5. Después de unas 20 conversaciones por voz: `node packages/core/dist/voice-stats.js`. Tiene que decir `OK: p50 … < 2000 ms`.
 
 ## Próximos pasos (para quien retome)
-1. Cuando la clave esté guardada: correr las evals, revisar los criterios que fallen y ajustar `packages/core/prompts/system.md`. Cada cambio de prompt se vuelve a medir con las evals.
-2. Probar el chat real y anotar la latencia hasta el primer token y el costo por turno para recalibrar `CLAUDE_API.md` §4.1. Hoy el estimado de uso típico es de ~US$2,2/día, por encima del objetivo de US$1.
-3. Con esos datos, planificar la **Fase 2 (voz)**: Voice Service como proceso hijo del Core por stdio (ADR-008), Parakeet para STT, Neural2 para TTS, más las mitigaciones de latencia de ADR-011 (caché de acuses, síntesis superpuesta).
+1. Con la clave guardada: correr las evals, ajustar `packages/core/prompts/system.md` y volver a medir.
+2. Medir la voz real con `voice-stats`. Si el p50 no baja de 2.0 s, revisar primero el TTS (ADR-011): proveedor más cercano o streaming real. Después, adelantar el primer corte del segmentador.
+3. **Modo voz:** ya está implementado (ADR-015), pero las 4 evals de voz (016–019) nunca corrieron con la API real. Ajustar `prompts/voice.md` según esos resultados.
+4. Pendiente de la Fase 2 que no bloquea: barge-in por VAD (Silero) para hablar sin apretar el atajo. Hoy el barge-in es volver a apretar el atajo.
+5. Después, la **Fase 3** (proyectos y contexto), según `ROADMAP.md`.
 
 ## Decisiones abiertas
-- **Costo:** el uso típico estimado (~US$2,2/día) supera el objetivo de US$1. Hay que decidir si se sube el objetivo o se ajusta `effort`, el largo de las respuestas o el router, con datos reales.
-- **Latencia del TTS:** Google tarda ~1,2 s hasta el primer audio, contra 300 ms de presupuesto (ADR-011). Se revisa en la Fase 2.
-- **Fallbacks del lado del servidor:** están activados por defecto (`fallbacks: "default"`). El owner puede desactivarlos.
-- **Pendientes de ADR-007:** el cifrado AES-GCM de campos (Fase 3) y los backups `VACUUM INTO`.
+- **Costo:** el uso típico estimado (~US$2,2/día) supera el objetivo de US$1. Se decide con datos reales.
+- **Latencia del TTS:** Neural2 tarda ~1.2 s hasta el primer audio, y los acuses en caché salen en ~0 ms. El primer e2e (una frase de error, sin Claude) dio 1367 ms de voz a primer audio.
+- **Atajo como interruptor:** Electron no informa cuándo se suelta la tecla. Para mantener apretado en todo el sistema haría falta un hook de teclado nativo, que tiene problemas con Smart App Control. Por ahora alcanza con el interruptor más el botón dentro de la ventana.
+- **Fallbacks del lado del servidor** de Claude: activados por defecto. El owner puede desactivarlos.
+- **Pendientes de ADR-007:** cifrado AES-GCM de campos (Fase 3) y backups `VACUUM INTO`.
 
 ## Trampas conocidas
-- **Smart App Control:** bloquea los `.exe` nuevos que genera `uv` y los intérpretes sin firmar. Hay que usar `uv run python -m …` (ver `TROUBLESHOOTING.md`).
+- **Smart App Control:** bloquea los `.exe` nuevos que genera `uv`. Usar siempre `uv run python -m …`.
 - **Git Bash convierte `\\.\pipe\…`** en las variables de entorno. Las pruebas con named pipes van desde PowerShell.
-- **`tsc` emite aunque haya errores:** si el build falla, `dist/` puede quedar roto. Revisá la salida antes de probar.
-- **Electron oculto no se repinta:** el modo smoke usa `showInactive()` para que `capturePage` funcione.
-- **SDK 1.x** autentica con `Authorization: Bearer` y no con `x-api-key`. Tenelo en cuenta en los mocks.
-- **pnpm 10:** los argumentos se pasan sin `--` (`pnpm --filter @jarvis/evals eval --dry-run`).
-- **Credenciales:** la API key de Google TTS ya está en el Credential Manager (`google-tts-api-key`, migrada el 2026-11-19). La variable de usuario `JARVIS_GOOGLE_TTS_API_KEY` sigue existiendo como fallback de desarrollo y el owner puede borrarla.
+- **`Start-Process -Wait` no vuelve** cuando la app arranca el Core, porque espera también a los descendientes y el Core queda desacoplado. Usar `-PassThru` y `WaitForExit()`.
+- **`parakeet-cli.exe` recarga el modelo en cada llamada (4.7 s).** El servicio usa la DLL en proceso, y los detalles del ABI están en ADR-014. Si se cambian los binarios de whisper.cpp, hay que correr `test_real_parakeet_in_process` en local.
+- **Piper:** `-f -` está roto en Windows y, sin flags, reproduce por los parlantes. Usar `--output-raw`.
+- **`Ctrl+Alt+Space` está tomado** por otra app en la PC del owner. El atajo por defecto es `Ctrl+Shift+Space`.
+- **Smoke con voz:** usar un `JARVIS_DATA_DIR` temporal con junctions a `models`, `bin` y `cache` del `%APPDATA%\Jarvis` real.
+- **`tsc` emite aunque haya errores:** revisá la salida del build antes de probar.
+- **SDK 1.x** autentica con `Authorization: Bearer`.
+- **pnpm 10:** los argumentos se pasan sin `--`.
 
 ## Cómo verificar el estado
 ```powershell
 pnpm install --frozen-lockfile
-pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 74 tests
-cd services/voice; uv run pytest -q                   # 51 tests
+pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 190 tests
+cd services/voice; uv run pytest -q                   # 170 tests (en local incluye Parakeet real)
 ```

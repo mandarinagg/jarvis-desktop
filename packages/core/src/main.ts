@@ -11,7 +11,7 @@ import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.
 import { openDatabase } from "./db.js";
 import { createLogger } from "./log.js";
 import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
-import { loadSystemPrompt } from "./prompt.js";
+import { loadSystemPrompt, loadVoicePrompt } from "./prompt.js";
 import { KeyringSecretStore } from "./secrets.js";
 import { AlreadyRunningError, CoreServer } from "./server.js";
 import { ConversationStore } from "./store.js";
@@ -64,6 +64,7 @@ async function main(): Promise<number> {
     store,
     model: modelResolver(env),
     systemPrompt: loadSystemPrompt(),
+    voicePrompt: loadVoicePrompt(),
     dailyBudgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 3,
     logger,
   });

@@ -9,7 +9,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { AnthropicChatModel, KeyringSecretStore, jarvisHome, loadSystemPrompt } from "@jarvis/core";
+import { AnthropicChatModel, KeyringSecretStore, jarvisHome, loadSystemPrompt, loadVoicePrompt } from "@jarvis/core";
 import { loadCases } from "./cases.js";
 import { AnthropicJudge } from "./judge.js";
 import { PASS_THRESHOLD, runAll } from "./runner.js";
@@ -41,7 +41,7 @@ async function main(): Promise<number> {
   }
   const maxCostUsd = Number(values["max-cost"]);
   const model = new AnthropicChatModel({ apiKey, effort: "low" });
-  const summary = await runAll(cases, model, new AnthropicJudge(apiKey), loadSystemPrompt(), {
+  const summary = await runAll(cases, model, new AnthropicJudge(apiKey), { system: loadSystemPrompt(), voice: loadVoicePrompt() }, {
     maxCostUsd: Number.isFinite(maxCostUsd) ? maxCostUsd : 1.5,
     onResult: (r) => {
       out(`${r.passed ? "✓" : "✗"} ${r.id}  (US$ ${r.costUsd.toFixed(4)})`);

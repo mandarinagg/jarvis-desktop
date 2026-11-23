@@ -19,6 +19,8 @@ const Pattern = z.string().refine((p) => {
 export const EvalCase = z.strictObject({
   id: z.string().regex(/^\d{3}-[a-z0-9-]+$/),
   category: z.string().min(1),
+  /** "voice": every turn arrives spoken and the reply is heard (adds prompts/voice.md, like the Core). */
+  mode: z.enum(["text", "voice"]).default("text"),
   turns: z.array(z.string().min(1)).min(1),
   checks: z.strictObject({
     maxChars: z.number().int().positive().optional(),

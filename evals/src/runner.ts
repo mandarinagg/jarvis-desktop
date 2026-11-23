@@ -24,14 +24,21 @@ export interface RunSummary {
 
 export const PASS_THRESHOLD = 0.8; // ROADMAP Phase 1 exit: evals >= 80%
 
-export async function runCase(c: EvalCase, model: ChatModel, judge: Judge, systemPrompt: string): Promise<CaseResult> {
+/** The production prompts: the system prompt and the voice-mode instructions (prompts/*.md). */
+export interface Prompts {
+  system: string;
+  voice?: string;
+}
+
+export async function runCase(c: EvalCase, model: ChatModel, judge: Judge, prompts: Prompts): Promise<CaseResult> {
   const transcript: { role: "user" | "assistant"; content: string }[] = [];
   let costUsd = 0;
   try {
     for (const turn of c.turns) {
       transcript.push({ role: "user", content: turn });
       const r = await model.complete({
-        system: systemPrompt,
+        system: prompts.system,
+        systemSuffix: c.mode === "voice" ? prompts.voice : undefined,
         messages: [...transcript],
         signal: AbortSignal.timeout(120_000),
         onText: () => {},
@@ -70,7 +77,7 @@ export async function runAll(
   cases: EvalCase[],
   model: ChatModel,
   judge: Judge,
-  systemPrompt: string,
+  prompts: Prompts,
   opts: { maxCostUsd: number; onResult?: (r: CaseResult) => void },
 ): Promise<RunSummary> {
   const results: CaseResult[] = [];
@@ -80,7 +87,7 @@ export async function runAll(
       results.push({ id: c.id, category: c.category, passed: false, answer: "", checkFailures: [], criteria: [], costUsd: 0, error: "omitido: se alcanzó el tope de costo de la corrida" });
       continue;
     }
-    const r = await runCase(c, model, judge, systemPrompt);
+    const r = await runCase(c, model, judge, prompts);
     spent += r.costUsd;
     results.push(r);
     opts.onResult?.(r);
