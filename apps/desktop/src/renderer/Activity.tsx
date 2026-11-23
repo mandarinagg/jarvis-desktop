@@ -115,6 +115,7 @@ export function Activity({
               </span>
               <span className="project-meta">
                 {new Date(e.ts).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })} · {RISK[e.risk]}
+                {e.channel === "whatsapp" ? " · 📱 desde WhatsApp" : e.channel === "voice" ? " · por voz" : ""}
               </span>
             </div>
             <code className="audit-args">{e.args}</code>

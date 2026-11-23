@@ -1,5 +1,5 @@
 /** Pure chat state for the renderer: every Core message and UI action goes through `reduce`. */
-import type { DashboardResult, ProactiveState, SkillInfo, SkillProposalInfo, AuditEntryInfo, BuilderTaskInfo, ConversationSummary, MemoryInfo, ProposalInfo, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
+import type { DashboardResult, ProactiveState, WhatsAppState, SkillInfo, SkillProposalInfo, AuditEntryInfo, BuilderTaskInfo, ConversationSummary, MemoryInfo, ProposalInfo, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
 
 export interface UiMessage {
   role: "user" | "assistant";
@@ -44,6 +44,8 @@ export interface State {
   skillsNotice?: string;
   /** Proactivity (Phase 7): rules, pending reminders and today's briefing. */
   proactive?: Omit<ProactiveState, "type" | "id">;
+  /** WhatsApp channel (ADR-029). The QR never reaches the renderer. */
+  whatsapp?: Omit<WhatsAppState, "type" | "id" | "qr">;
   error?: string;
 }
 
@@ -248,6 +250,10 @@ function reduceCore(state: State, m: CoreMessage): State {
       if (m.notice) next.skillsNotice = m.notice;
       else if (m.id !== "skills") delete next.skillsNotice;
       return next;
+    }
+    case "whatsapp.state": {
+      const { type: _type, id: _id, qr: _qr, ...whatsapp } = m;
+      return { ...state, whatsapp };
     }
     case "proactive.state": {
       const { type: _type, id: _id, ...proactive } = m;

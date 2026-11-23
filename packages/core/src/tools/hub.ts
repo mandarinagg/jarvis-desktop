@@ -10,7 +10,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type Logger, silentLogger } from "../log.js";
 import type { Confirmer } from "./confirm.js";
-import type { AuditLog, PermissionEngine, Risk } from "./permissions.js";
+import type { AuditLog, Channel, PermissionEngine, Risk } from "./permissions.js";
 
 export const MAX_RESULT_CHARS = 20_000;
 const SEP = "__"; // Claude sees "<server>__<tool>"
@@ -19,6 +19,8 @@ const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/; // Claude API tool name limit
 
 export interface ToolCallContext {
   turnId?: string | undefined;
+  /** Where the request came from (ADR-029): WhatsApp never lowers a confirmation. */
+  channel?: Channel | undefined;
   signal?: AbortSignal | undefined;
   /** The call is waiting for the owner's confirmation. */
   onWaiting?: (() => void) | undefined;
@@ -183,8 +185,8 @@ export class ToolHub implements ToolRuntime {
 
   async call(name: string, input: unknown, ctx: ToolCallContext): Promise<ToolCallResult> {
     const [server, tool] = splitName(name);
-    const verdict = this.permissions.evaluate(server, tool, input);
-    const base = { turnId: ctx.turnId, server, tool, args: input, risk: verdict.risk };
+    const verdict = this.permissions.evaluate(server, tool, input, ctx.channel);
+    const base = { turnId: ctx.turnId, channel: ctx.channel, server, tool, args: input, risk: verdict.risk };
     const connected = this.servers.get(server);
     const deny = (reason: string) => {
       this.audit.record({ ...base, decision: "deny", reason });
@@ -209,7 +211,16 @@ export class ToolHub implements ToolRuntime {
       if (!this.confirmer) return deny("requiere confirmación y no hay cómo pedirla");
       ctx.onWaiting?.();
       const outcome = await this.confirmer.confirm(
-        { turnId: ctx.turnId, server, tool, risk: verdict.risk, confirmations: verdict.confirmations ?? 1, title: preview.title, detail: preview.detail },
+        {
+          turnId: ctx.turnId,
+          server,
+          tool,
+          risk: verdict.risk,
+          confirmations: verdict.confirmations ?? 1,
+          // The owner must know the request did not come from this PC (ADR-029).
+          title: ctx.channel === "whatsapp" ? `Pedido desde WhatsApp: ${preview.title}` : preview.title,
+          detail: preview.detail,
+        },
         ctx.signal,
       );
       if (ctx.signal?.aborted) {

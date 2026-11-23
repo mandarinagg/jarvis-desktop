@@ -24,7 +24,12 @@ Si hay un bloque <acciones>, es el registro real de lo que el asistente hizo con
 export function judgePrompt(c: EvalCase, transcript: { role: "user" | "assistant"; content: string }[], actions?: string[]): string {
   const convo = transcript.map((t) => `<${t.role}>\n${t.content}\n</${t.role}>`).join("\n");
   const criteria = c.rubric.map((r, i) => `${i + 1}. ${r}`).join("\n");
-  const mode = c.mode === "voice" ? "<modo>voz: el owner habló y la respuesta se escucha por el parlante (los bloques de código no se leen, quedan en pantalla)</modo>\n\n" : "";
+  const mode =
+    c.mode === "voice"
+      ? "<modo>voz: el owner habló y la respuesta se escucha por el parlante (los bloques de código no se leen, quedan en pantalla)</modo>\n\n"
+      : c.mode === "whatsapp"
+        ? "<modo>WhatsApp: el owner escribe desde su chat «Mensaje a mí mismo» y lee la respuesta en el teléfono; las confirmaciones solo se aprueban en la PC</modo>\n\n"
+        : "";
   const log = actions === undefined ? "" : `\n\n<acciones>\n${actions.length ? actions.map((a) => `- ${a}`).join("\n") : "(no usó herramientas)"}\n</acciones>`;
   return `${mode}<conversacion>\n${convo}\n</conversacion>${log}\n\n<criterios>\n${criteria}\n</criterios>`;
 }

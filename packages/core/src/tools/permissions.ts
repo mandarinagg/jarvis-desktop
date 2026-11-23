@@ -13,6 +13,12 @@ import { type Logger, redact, silentLogger } from "../log.js";
 
 export type Risk = "read" | "prepare" | "confirm" | "destructive" | "forbidden";
 
+/** Where the owner's request came from (ADR-029): the PC (text or voice) or the WhatsApp self-chat. */
+export type Channel = "text" | "voice" | "whatsapp";
+
+/** Tools that never start from WhatsApp (ADR-029): the Builder runs code with the owner's permissions. */
+const NOT_FROM_WHATSAPP = new Set(["builder/start_task"]);
+
 export interface ToolPolicy {
   server: string;
   tool: string;
@@ -77,12 +83,19 @@ export class PermissionEngine {
     return this.policies.get(`${server}/${tool}`)?.risk;
   }
 
-  /** `args.project` scopes rules to one project. When several rules match, the safest one wins. */
-  evaluate(server: string, tool: string, args?: unknown): Decision {
+  /**
+   * `args.project` scopes rules to one project. When several rules match, the safest one wins.
+   * From WhatsApp (ADR-029) an `allow` rule never skips a confirmation: the owner's PC rules assume
+   * the owner is at the PC.
+   */
+  evaluate(server: string, tool: string, args?: unknown, channel?: Channel): Decision {
     const p = this.policies.get(`${server}/${tool}`);
     if (!p) return { decision: "deny", risk: "forbidden", reason: "herramienta no registrada" };
     if (!p.enabled) return { decision: "deny", risk: p.risk, reason: "herramienta deshabilitada" };
     if (p.risk === "forbidden") return { decision: "deny", risk: p.risk, reason: "acción prohibida" };
+    if (channel === "whatsapp" && NOT_FROM_WHATSAPP.has(`${server}/${tool}`)) {
+      return { decision: "deny", risk: p.risk, reason: "esto no se arranca desde WhatsApp, pedímelo en la PC" };
+    }
 
     const project = typeof (args as { project?: unknown } | undefined)?.project === "string"
       ? String((args as { project: string }).project).toLowerCase()
@@ -104,7 +117,7 @@ export class PermissionEngine {
           ? { decision: "ask", risk: p.risk, confirmations: 1 }
           : { decision: "allow", risk: p.risk, allowedBy: "policy" };
       case "confirm":
-        return rule?.decision === "allow"
+        return rule?.decision === "allow" && channel !== "whatsapp"
           ? { decision: "allow", risk: p.risk, allowedBy: "rule" }
           : { decision: "ask", risk: p.risk, confirmations: 1 };
       case "destructive":
@@ -115,6 +128,7 @@ export class PermissionEngine {
 
 export interface AuditEntry {
   turnId?: string | undefined;
+  channel?: Channel | undefined;
   server: string;
   tool: string;
   args: unknown;
@@ -147,12 +161,13 @@ export class AuditLog {
     if (args.length > MAX_ARGS) args = args.slice(0, MAX_ARGS - 1) + "…";
     this.db
       .prepare(
-        `INSERT INTO audit_log (ts, turn_id, server, tool, args, risk, decision, approved_by, reason, ok, error, duration_ms, result_chars)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO audit_log (ts, turn_id, channel, server, tool, args, risk, decision, approved_by, reason, ok, error, duration_ms, result_chars)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         this.now().toISOString(),
         e.turnId ?? null,
+        e.channel ?? null,
         e.server,
         e.tool,
         args,
@@ -184,7 +199,7 @@ export class AuditLog {
   }
 
   private query(limit: number, opts: { beforeId?: number | undefined; afterId?: number | undefined; since?: string | undefined }): AuditRow[] {
-    type Row = Omit<AuditRow, "ok" | "args" | "approvedBy"> & { ok: number | null; args: string; approvedBy: string | null };
+    type Row = Omit<AuditRow, "ok" | "args" | "approvedBy" | "channel"> & { ok: number | null; args: string; approvedBy: string | null; channel: string | null };
     const where: string[] = [];
     const params: (string | number)[] = [];
     if (opts.beforeId !== undefined) {
@@ -201,7 +216,7 @@ export class AuditLog {
     }
     const rows = this.db
       .prepare(
-        `SELECT id, ts, turn_id AS turnId, server, tool, args, risk, decision, approved_by AS approvedBy, reason, ok, error,
+        `SELECT id, ts, turn_id AS turnId, channel, server, tool, args, risk, decision, approved_by AS approvedBy, reason, ok, error,
                 duration_ms AS durationMs, result_chars AS resultChars
          FROM audit_log ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
          ORDER BY id ${opts.afterId !== undefined ? "ASC" : "DESC"} LIMIT ?`,
@@ -210,6 +225,7 @@ export class AuditLog {
     return rows.map((r) => ({
       ...r,
       approvedBy: r.approvedBy ?? undefined,
+      channel: (r.channel ?? undefined) as Channel | undefined,
       ok: r.ok === null ? undefined : Boolean(r.ok),
       args: JSON.parse(r.args) as unknown,
     }));

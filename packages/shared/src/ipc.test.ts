@@ -143,6 +143,9 @@ describe("schemas", () => {
       "voice.ptt",
       "voice.status.get",
       "voice.wake",
+      "whatsapp.get",
+      "whatsapp.link",
+      "whatsapp.unlink",
     ]);
   });
 });

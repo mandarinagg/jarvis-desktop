@@ -23,6 +23,7 @@ export function toInfo(r: AuditRow): AuditEntryInfo {
     risk: r.risk,
     decision: r.decision,
     ...(r.approvedBy ? { approvedBy: r.approvedBy } : {}),
+    ...(r.channel ? { channel: r.channel } : {}),
     ...(r.reason ? { reason: r.reason } : {}),
     ...(r.ok !== undefined ? { ok: r.ok } : {}),
     ...(r.durationMs != null ? { durationMs: r.durationMs } : {}),

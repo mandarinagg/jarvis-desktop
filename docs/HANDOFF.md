@@ -11,7 +11,7 @@
   - **Skills** (#49, ADR-027): Jarvis las propone con casos de prueba, corren sus evals sobre el texto exacto, el owner las aprueba en un diálogo nativo y quedan versionadas en `%APPDATA%/Jarvis/skills` (git).
   - **Skills desde la reflexión** (#50, ADR-028): la reflexión diaria ve los episodios de 30 días y, si el owner repitió un pedido 3 veces (una de hoy), deja como mucho 1 propuesta inerte en el panel Skills.
   Falta:
-  - el cliente móvil por **WhatsApp** con el número del owner (chat consigo mismo), basado en Baileys como su CRM (`ZESTIA_PROJECT/CRM_ECCOMERCE`, revisado solo en lo de WhatsApp). **ADR-029 aceptado** (rama `feat/phase7-whatsapp`), implementación en curso;
+  - el cliente móvil por **WhatsApp** con el número del owner (chat consigo mismo), basado en Baileys como su CRM (`ZESTIA_PROJECT/CRM_ECCOMERCE`, revisado solo en lo de WhatsApp). **implementado** en la rama `feat/phase7-whatsapp` (ADR-029): Baileys sobre el número del owner, solo el chat «Mensaje a mí mismo», tarjeta en Inicio para vincular con QR. Falta vincularlo de verdad y correr las evals 064–067;
   - validar todo con la API real: casos 058–063, un recordatorio y una skill de verdad.
 - **Fase 6 (L4b: Memoria que aprende):** **implementada** en los PRs #45–#46 (apilados sobre #44, ADR-024):
   - memoria de datos, preferencias, procedimientos, ideas y episodios que se recupera en cada turno como datos;
@@ -41,10 +41,10 @@
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.8 (`dashboard.get`, `proactive.*`, `skills.*`, `voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
+| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.9 (`whatsapp.*`, `dashboard.get`, `proactive.*`, `skills.*`, `voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
 | Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
-| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks`, 008 memoria (`memories` + FTS5, `memory_uses`, `memory_proposals`, `reflections`, `settings`), 009 `reminders` y `briefings`, 010 skills (`skills`, `skill_proposals`, `skill_evals`) |
-| Secretos | Credential Manager | `anthropic-api-key` (falta) y `google-tts-api-key` (migrada el 2026-11-19) |
+| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks`, 008 memoria (`memories` + FTS5, `memory_uses`, `memory_proposals`, `reflections`, `settings`), 009 `reminders` y `briefings`, 010 skills (`skills`, `skill_proposals`, `skill_evals`), 011 WhatsApp (`whatsapp_session`, `whatsapp_keys` cifradas; `audit_log.channel`) |
+| Secretos | Credential Manager | `anthropic-api-key` (falta), `google-tts-api-key` (migrada el 2026-11-19) y `whatsapp-session-key` (se crea sola al vincular) |
 | Claude | `packages/core/src/claude/` | Streaming, `effort: low`, caché, tope diario de US$3 |
 | Voice Service | `services/voice` (`python -m jarvis_voice.service`) | Proceso hijo del Core por stdio. Supervisor con backoff y estado `degradado` |
 | TTS | `services/voice/.../tts/` | Neural2 (2.5 s + 1 reintento), fallback a Piper `--output-raw`, caché de acuses, síntesis superpuesta, fade de 30 ms |
@@ -62,12 +62,13 @@
 | Inicio | `packages/core/src/dashboard.ts` + `apps/desktop/src/renderer/Home.tsx` | Foto de solo lectura armada con la DB local (`dashboard.get`), sin llamar a ningún modelo. Gráfico de 30 días con vista de tabla |
 | Proactividad | `packages/core/src/proactive/` + `tools/reminders-server.ts` | El Core revisa cada 30 s y manda `proactive.notify`; nunca en horario silencioso ni sin una ventana abierta. Reglas en `settings` (`proactive.briefing`, `proactive.quiet`) |
 | Skills | `packages/core/src/skills/` + `tools/skills-server.ts` | `propose_skill` deja propuestas inertes; chequeos estáticos (`lint.ts`), evals propias sin herramientas con juez (`evaluate.ts`) y aprobación nativa (`service.ts`). Espejo git en `%APPDATA%/Jarvis/skills` |
-| Evals | `evals/` | 63 conversaciones: 6 de voz, 10 de proyectos sobre `docs/`, 21 de la Fase 4 sobre un proyecto `demo` descartable, 7 de memoria y modos, 4 de proactividad y 2 de skills (13 injections en total). Juez Opus 5.5 con el registro de acciones; umbral del 80% y 0 acciones sin confirmación. Chequeos de estado: archivos, git, `reminder` y `skillProposals` |
+| WhatsApp | `packages/core/src/whatsapp/` + `apps/desktop/src/main/whatsapp-qr.ts` | Baileys 6.7.24 (libsignal fijado a un commit). `filter.ts` decide en código: solo el chat propio, `fromMe`, en vivo y de hace menos de 10 min; el resto se descarta sin guardar. Envío solo al chat propio (dos barreras), prefijo «🤖 », filtro de secretos en la salida, 30 mensajes/hora. Turnos con el canal `whatsapp`: una regla `allow` no saltea la confirmación y el Builder no arranca. QR en una ventana propia del proceso principal, sin JS |
+| Evals | `evals/` | 67 conversaciones: 6 de voz, 10 de proyectos sobre `docs/`, 21 de la Fase 4 sobre un proyecto `demo` descartable, 7 de memoria y modos, 4 de proactividad, 2 de skills y 4 de WhatsApp (14 injections en total). Juez Opus 5.5 con el registro de acciones; umbral del 80% y 0 acciones sin confirmación. Chequeos de estado: archivos, git, `reminder` y `skillProposals` |
 
 ## Pendiente del owner (bloquea el cierre de las Fases 1 a 7)
 1. Crear la cuenta de la API de Anthropic con **tope mensual de US$60** en la consola.
 2. Guardar la clave: `pnpm build` y después `node packages/core/dist/set-secret.js anthropic-api-key`.
-3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$3,6, 63 casos). Tienen que dar ≥ 80%, los 10 de proyectos 10/10 y **0 acciones sensibles sin confirmación**.
+3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$3,8, 67 casos). Tienen que dar ≥ 80%, los 10 de proyectos 10/10 y **0 acciones sensibles sin confirmación**.
 4. Usar Jarvis por texto y por voz: `pnpm --filter @jarvis/desktop start`, con `Ctrl+Shift+Space` o el botón «Mantené para hablar».
 5. Después de unas 20 conversaciones por voz: `node packages/core/dist/voice-stats.js`. Tiene que decir `OK: p50 … < 2000 ms`.
 6. **Wake word:**
@@ -91,6 +92,12 @@
     1. En **Inicio**, prendé el briefing diario y elegí la hora. Revisá el horario silencioso (de 22 a 08 por defecto).
     2. Pedile «recordame en 5 minutos tomar agua», aprobá el diálogo y esperá la notificación de Windows con la app abierta.
     3. Pedile que arme una skill para algo que le pidas seguido. En el panel **Skills**, corré sus evals (unos centavos) y, si pasan, aprobala. Después pedile eso mismo y fijate que la use («Siguiendo la skill…»).
+11. **WhatsApp (Fase 7, ADR-029):**
+    1. En **Inicio** → tarjeta WhatsApp → «Vincular WhatsApp», leé el diálogo y escaneá el QR desde WhatsApp → Dispositivos vinculados.
+    2. En tu chat «Mensaje a mí mismo», escribí «hola Jarvis»: tiene que responder con «🤖 ».
+    3. Pedile algo que necesite confirmación (por ejemplo, crear un archivo en un proyecto): tiene que avisarte por WhatsApp y mostrar el diálogo «Pedido desde WhatsApp: …» en la PC.
+    4. Reenviale un mensaje de otra persona con una instrucción: no tiene que ejecutarla.
+    5. Verificá que no conteste en ningún otro chat. El contador de descartados de la tarjeta tiene que subir.
 
 ## Próximos pasos (para quien retome)
 0. **Prioridad:** validar con la API real antes de sumar features. Hay 9 fases de código sin probar contra Claude (key, evals, uso real). El cliente móvil saca a Jarvis fuera de la PC: conviene arrancarlo recién con lo anterior validado.
@@ -133,12 +140,13 @@
 - **Agent SDK:** pesa unos 330 MB (`claude.exe` firmado; Smart App Control lo deja correr).
 - **Notificaciones de Jarvis:** solo salen con la app de escritorio abierta. Con la app cerrada, los recordatorios esperan y salen al abrirla, marcados «(era para …)».
 - **Espejo de skills:** necesita `git` en el PATH. Si falla, queda un aviso en el log y la skill igual queda activa en la DB.
+- **WhatsApp:** el canal vive en el Core; con la PC apagada no responde y, al volver, no ejecuta pedidos de hace más de 10 minutos. Si WhatsApp desvincula a Jarvis desde el teléfono, se borra la sesión y hay que escanear de nuevo. Cualquier otra sesión de WhatsApp Web del owner también le puede escribir al chat propio.
 - **Worktrees del Builder:** si el Core muere a mitad de una tarea, la tarea queda «falló» y su worktree sigue ahí hasta que se descarte.
 
 ## Cómo verificar el estado
 ```powershell
 pnpm install --frozen-lockfile
-pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 355 tests
+pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 395 tests
 pnpm --filter @jarvis/evals memory-eval               # recuperación de memoria, offline: 15/15
 cd services/voice; uv run python -m pytest -q         # 207 tests (en local incluye Parakeet, Silero y openWakeWord reales)
 ```

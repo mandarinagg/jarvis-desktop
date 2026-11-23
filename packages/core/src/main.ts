@@ -33,7 +33,7 @@ import { projectCard } from "./projects/context.js";
 import { ProjectIndex } from "./projects/indexer.js";
 import { ProjectsService } from "./projects/service.js";
 import { ProjectStore } from "./projects/store.js";
-import { loadModePrompts, loadSystemPrompt, loadVoicePrompt } from "./prompt.js";
+import { loadModePrompts, loadSystemPrompt, loadVoicePrompt, loadWhatsAppPrompt } from "./prompt.js";
 import { KeyringSecretStore, mcpSecret } from "./secrets.js";
 import { AlreadyRunningError, CoreServer } from "./server.js";
 import { ConversationStore } from "./store.js";
@@ -51,6 +51,9 @@ import { VoiceMetricsStore } from "./voice/metrics.js";
 import { createVoiceSpawner } from "./voice/spawn.js";
 import { VoiceSupervisor } from "./voice/supervisor.js";
 import { VoiceTurns } from "./voice/turns.js";
+import { sessionKey, WhatsAppAuthStore } from "./whatsapp/auth-store.js";
+import { BaileysProvider } from "./whatsapp/baileys-provider.js";
+import { WhatsAppChannel, type WhatsAppStatus } from "./whatsapp/channel.js";
 
 export const CORE_VERSION = "0.1.0";
 const EFFORTS: readonly Effort[] = ["low", "medium", "high", "xhigh", "max"];
@@ -209,6 +212,7 @@ async function main(): Promise<number> {
     systemPrompt,
     skillsContext: () => skillsIndex(skillStore),
     voicePrompt: loadVoicePrompt(),
+    whatsappPrompt: loadWhatsAppPrompt(),
     tools,
     projects,
     projectContext: async (conversationId) => {
@@ -226,6 +230,35 @@ async function main(): Promise<number> {
       const mode = store.thinkingMode(conversationId);
       return mode ? modePrompts[mode] : undefined;
     },
+    logger,
+  });
+
+  // Phase 7 (ADR-029): Jarvis on the owner's WhatsApp, self-chat only. Off until the owner links it
+  // from the desktop app (native confirmation + QR in the main process).
+  const whatsappSecrets = new KeyringSecretStore();
+  const setting = (key: string) => ({
+    get: () => (db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined)?.value === "1",
+    set: (on: boolean) => {
+      db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, on ? "1" : "0");
+    },
+  });
+  const whatsappState = (s: WhatsAppStatus, id?: string): CoreMessage => ({
+    type: "whatsapp.state",
+    ...(id ? { id } : {}),
+    state: s.state,
+    ...(s.qr ? { qr: s.qr } : {}),
+    ...(s.phone ? { phone: s.phone } : {}),
+    ...(s.detail ? { detail: s.detail.slice(0, 300) } : {}),
+    discarded: s.discarded,
+  });
+  const whatsapp = new WhatsAppChannel({
+    provider: new BaileysProvider(logger),
+    auth: new WhatsAppAuthStore(db, () => sessionKey(whatsappSecrets)),
+    chat,
+    enabled: setting("whatsapp.enabled"),
+    onStatus: (s) => broadcast(whatsappState(s)),
+    broadcast: (m) => broadcast(m),
+    canConfirm: () => sessions().some((x) => x.client === "desktop" || x.client === "cli"),
     logger,
   });
 
@@ -266,6 +299,7 @@ async function main(): Promise<number> {
     logger.log("info", "core.stopping", { reason });
     chat.cancelAll();
     confirmations.cancelAll();
+    await whatsapp.stop();
     await builder.close();
     if (reflectionTimer) clearInterval(reflectionTimer);
     clearInterval(proactiveTimer);
@@ -297,6 +331,11 @@ async function main(): Promise<number> {
       conversationsSetMode: (s, m) => chat.conversationsSetMode(s, m),
       proactive: (s, m) => proactive.handle(s, m),
       skills: (s, m) => skills.handle(s, m),
+      whatsapp: async (s, m) => {
+        if (m.type === "whatsapp.link") await whatsapp.link();
+        if (m.type === "whatsapp.unlink") await whatsapp.unlink();
+        s.send(whatsappState(whatsapp.current, m.id));
+      },
       dashboardGet: (s, m) =>
         s.send({ type: "dashboard.result", id: m.id, ...dashboard(db, { dailyBudgetUsd, googleTts: tts().engine === "google" }) }),
       builder: (s, m) => {
@@ -332,6 +371,7 @@ async function main(): Promise<number> {
   sessions = () => server.sessionList();
   logger.log("info", "core.ready", { pipe, version: CORE_VERSION, dailyBudgetUsd: budget });
   voice?.start();
+  void whatsapp.resume().catch((err: unknown) => logger.log("error", "whatsapp.resume_failed", { error: err instanceof Error ? err.message : String(err) }));
   // A reflection missed while the Core was off runs shortly after startup.
   if (reflectionTimer) setTimeout(() => void reflector.runIfDue(), 2 * 60_000).unref();
   // Phase 4 (ADR-020): third-party MCP servers the owner listed, each in its own process. In the

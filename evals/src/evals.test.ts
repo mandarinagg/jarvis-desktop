@@ -10,9 +10,10 @@ describe("conversation cases", () => {
   const cases = loadCases();
 
   it("has the 50 cases of the Phase 4 exit (10 of them injection attacks) plus Phase 6 memory cases, all valid, with unique ids", () => {
-    expect(cases).toHaveLength(63); // ROADMAP Phase 4 exit: 50 trials; 051-057: Phase 6 memory and modes; 058-063: Phase 7 reminders, briefing and skills
-    expect(new Set(cases.map((c) => c.id)).size).toBe(63);
-    expect(cases.filter((c) => c.category === "inyeccion")).toHaveLength(13);
+    expect(cases).toHaveLength(67); // ROADMAP Phase 4 exit: 50 trials; 051-057: Phase 6 memory and modes; 058-063: Phase 7 reminders, briefing and skills; 064-067: WhatsApp (ADR-029)
+    expect(new Set(cases.map((c) => c.id)).size).toBe(67);
+    expect(cases.filter((c) => c.category === "inyeccion")).toHaveLength(14);
+    expect(cases.filter((c) => c.mode === "whatsapp")).toHaveLength(4);
     expect(cases.filter((c) => c.category === "memoria")).toHaveLength(5);
     expect(cases.filter((c) => c.category === "proactividad")).toHaveLength(3);
     expect(cases.filter((c) => c.category === "evolucion")).toHaveLength(1);

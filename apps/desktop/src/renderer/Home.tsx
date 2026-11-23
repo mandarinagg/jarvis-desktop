@@ -1,4 +1,4 @@
-import type { DashboardResult, ProactiveSettingsInfo, ProactiveState, SpendDay } from "@jarvis/shared";
+import type { DashboardResult, ProactiveSettingsInfo, ProactiveState, SpendDay, WhatsAppState } from "@jarvis/shared";
 import { useState } from "react";
 
 type Dashboard = Omit<DashboardResult, "type" | "id">;
@@ -98,6 +98,55 @@ function Proactive({ data, onAction }: { data: Proactivity | undefined; onAction
           </li>
         </ul>
         <p className="hint">En el horario silencioso no aparece ninguna notificación: lo que caiga ahí sale cuando termina. Si la app está cerrada, sale cuando la abrís.</p>
+      </div>
+    </div>
+  );
+}
+
+type WhatsApp = Omit<WhatsAppState, "type" | "id" | "qr">;
+
+const WA_LABEL: Record<WhatsApp["state"], string> = {
+  off: "Apagado",
+  connecting: "Conectando…",
+  waiting_qr: "Esperando que escanees el QR",
+  connected: "Conectado",
+  degraded: "Con problemas: reintentando",
+};
+
+/**
+ * WhatsApp (ADR-029): Jarvis on the owner's number, self-chat only. Linking and unlinking are
+ * confirmed in native dialogs; the QR is shown by the main process in its own window.
+ */
+function WhatsAppCard({ data, onAction }: { data: WhatsApp | undefined; onAction: (a: "link" | "unlink") => void }) {
+  if (!data) return null;
+  const on = data.state !== "off";
+  return (
+    <div className="home-grid">
+      <div>
+        <h3>WhatsApp</h3>
+        <p>
+          {WA_LABEL[data.state]}
+          {data.phone && on ? ` · +${data.phone}` : ""}
+        </p>
+        {data.detail && <p className="hint">{data.detail}</p>}
+        <p className="hint">
+          Escribile a Jarvis en tu chat «Mensaje a mí mismo». Solo lee y responde ese chat: los demás se descartan sin guardarse
+          {data.discarded ? ` (${data.discarded} desde que arrancó)` : ""}. Lo que pida confirmación se aprueba acá, en la PC.
+        </p>
+      </div>
+      <div>
+        <div className="project-actions">
+          {on ? (
+            <button className="link" onClick={() => onAction("unlink")}>
+              Desvincular
+            </button>
+          ) : (
+            <button onClick={() => onAction("link")}>Vincular WhatsApp</button>
+          )}
+        </div>
+        <p className="hint">
+          Usa un cliente no oficial: WhatsApp podría restringir tu número. Cualquier otra sesión de WhatsApp Web que tengas abierta también le puede escribir.
+        </p>
       </div>
     </div>
   );
@@ -220,6 +269,8 @@ export function Home({
   data,
   proactive,
   onProactive,
+  whatsapp,
+  onWhatsApp,
   onRefresh,
   onOpenConversation,
   onShowMemory,
@@ -229,6 +280,8 @@ export function Home({
   data: Dashboard | undefined;
   proactive: Proactivity | undefined;
   onProactive: (a: ProactiveAction) => void;
+  whatsapp: WhatsApp | undefined;
+  onWhatsApp: (a: "link" | "unlink") => void;
   onRefresh: () => void;
   onOpenConversation: (id: string) => void;
   onShowMemory: () => void;
@@ -258,6 +311,8 @@ export function Home({
       </div>
 
       <Proactive data={proactive} onAction={onProactive} />
+
+      <WhatsAppCard data={whatsapp} onAction={onWhatsApp} />
 
       <div className="tiles">
         <div className={`tile ${ratio >= 1 ? "over" : ratio >= 0.8 ? "warn" : ""}`}>

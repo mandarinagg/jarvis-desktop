@@ -27,6 +27,14 @@
     "onlyBuiltDependencies": [
       "electron",
       "esbuild"
-    ]
+    ],
+    "ignoredBuiltDependencies": [
+      "baileys",
+      "protobufjs",
+      "sharp"
+    ],
+    "overrides": {
+      "libsignal": "github:whiskeysockets/libsignal-node#bcea72df9ec34d9d9140ab30619cf479c7c144c7"
+    }
   }
 }

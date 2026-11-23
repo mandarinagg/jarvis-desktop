@@ -27,6 +27,10 @@ contextBridge.exposeInMainWorld("jarvis", {
   createProject(info: unknown): Promise<unknown> {
     return ipcRenderer.invoke("jarvis:create-project", info);
   },
+  /** Asks to link or unlink WhatsApp; the main process confirms in a native dialog (ADR-029). */
+  whatsapp(action: unknown): Promise<unknown> {
+    return ipcRenderer.invoke("jarvis:whatsapp", action);
+  },
   /** The global push-to-talk shortcut was pressed (the renderer decides start/stop). */
   onHotkey(listener: () => void): () => void {
     const wrapped = () => listener();

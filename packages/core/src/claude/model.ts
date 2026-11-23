@@ -6,6 +6,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Usage } from "@jarvis/shared";
 import type { ToolRuntime } from "../tools/hub.js";
+import type { Channel } from "../tools/permissions.js";
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -19,6 +20,8 @@ export interface ChatTurnRequest {
   /** Read tools (ADR-017). The adapter runs the tool loop; every call goes through the runtime's gate. */
   tools?: ToolRuntime | undefined;
   turnId?: string | undefined;
+  /** Where the owner's request came from; the tool gate uses it (ADR-029). */
+  channel?: Channel | undefined;
   onTool?: ((event: ToolEvent) => void) | undefined;
 }
 
@@ -152,6 +155,7 @@ export class AnthropicChatModel implements ChatModel {
           req.onTool?.({ name: use.name, summary, status: "started" });
           const r = await req.tools.call(use.name, use.input, {
             turnId: req.turnId,
+            channel: req.channel,
             signal: req.signal,
             onWaiting: () => req.onTool?.({ name: use.name, summary, status: "waiting" }),
           });
