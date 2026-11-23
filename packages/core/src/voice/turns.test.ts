@@ -1,9 +1,9 @@
 import type { ChatCancel, ChatSend, CoreMessage, ToVoiceMessage } from "@jarvis/shared";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { openDatabase } from "../db.js";
 import type { Session } from "../server.js";
 import { VoiceMetricsStore } from "./metrics.js";
-import { PHRASES, VoiceTurns } from "./turns.js";
+import { PHRASES, VoiceTurns, stripWakePrefix } from "./turns.js";
 
 class FakeChat {
   sent: { session: Session; msg: ChatSend; mode: string }[] = [];
@@ -20,7 +20,7 @@ class FakeChat {
   }
 }
 
-function setup(extra: { vadBargeIn?: boolean } = {}) {
+function setup(extra: { vadBargeIn?: boolean; wakeWord?: { enabled: boolean; threshold?: number }; wakeCommandMs?: number } = {}) {
   let clock = 1_000;
   const toVoice: ToVoiceMessage[] = [];
   const broadcast: CoreMessage[] = [];
@@ -304,6 +304,69 @@ describe("VoiceTurns", () => {
     const replies: CoreMessage[] = [];
     t.turns.statusGet({ id: "x", client: "desktop", send: (m) => replies.push(m), close() {} }, { type: "voice.status.get", id: "s1" });
     expect(replies).toEqual([{ type: "voice.state", id: "s1", state: "idle", micOpen: false }]);
+  });
+});
+
+describe("wake word", () => {
+  afterEach(() => vi.useRealTimers());
+
+  const listening = (t: ReturnType<typeof setup>) => {
+    const enable = t.of("wake.enable").at(-1);
+    t.turns.onVoiceMessage({ type: "wake.listening", id: enable?.id ?? "", open: true });
+  };
+
+  it("is off by default; on, it starts with the voice service and shows its own indicator", () => {
+    expect(setup().of("wake.enable")).toEqual([]);
+    const t = setup({ wakeWord: { enabled: true, threshold: 0.6 } });
+    expect(t.of("wake.enable")[0]).toMatchObject({ threshold: 0.6 });
+    listening(t);
+    expect(t.broadcast.at(-1)).toMatchObject({ type: "voice.state", state: "idle", micOpen: false, wake: true });
+  });
+
+  it("'Hey Jarvis' arms the VAD; the command becomes a turn without the wake phrase", () => {
+    const t = setup({ wakeWord: { enabled: true } });
+    listening(t);
+    t.turns.onVoiceMessage({ type: "wake.detected", id: "w", score: 0.81 });
+    const arm = t.of("vad.arm")[0];
+    expect(arm).toBeDefined();
+    expect(t.states().at(-1)).toBe("listening");
+    t.turns.onVoiceMessage({ type: "vad.speech", id: arm?.id ?? "" });
+    t.turns.onVoiceMessage({ type: "stt.listening", id: arm?.id ?? "", open: false });
+    t.turns.onVoiceMessage({ type: "stt.final", id: arm?.id ?? "", text: "vis, ¿qué hora es?", audioMs: 1_500, sttMs: 90 });
+    expect(t.chat.sent[0]?.msg.text).toBe("¿qué hora es?");
+    expect(t.metrics.wakeDays()[0]).toMatchObject({ activations: 1, unused: 0 });
+  });
+
+  it("goes back to waiting when nothing is said, and counts it as unused", () => {
+    vi.useFakeTimers();
+    const t = setup({ wakeWord: { enabled: true }, wakeCommandMs: 3_000 });
+    listening(t);
+    t.turns.onVoiceMessage({ type: "wake.detected", id: "w", score: 0.55 });
+    const arm = t.of("vad.arm")[0];
+    vi.advanceTimersByTime(3_001);
+    expect(t.of("vad.disarm").map((m) => m.id)).toEqual([arm?.id]);
+    expect(t.states().at(-1)).toBe("idle");
+    expect(t.chat.sent).toEqual([]);
+    expect(t.metrics.wakeDays()[0]).toMatchObject({ activations: 1, unused: 1 });
+  });
+
+  it("ignores the wake word while Jarvis is busy, and stops when the owner turns it off", () => {
+    const t = setup({ wakeWord: { enabled: true } });
+    listening(t);
+    t.ptt(true);
+    t.turns.onVoiceMessage({ type: "wake.detected", id: "w", score: 0.9 });
+    expect(t.of("vad.arm")).toEqual([]);
+    t.turns.voiceWake(t.client, { type: "voice.wake", id: "x", enabled: false });
+    expect(t.of("wake.disable")).toHaveLength(1);
+    t.turns.onVoiceMessage({ type: "wake.listening", id: t.of("wake.disable")[0]?.id ?? "", open: false });
+    expect(t.broadcast.at(-1)).not.toHaveProperty("wake");
+  });
+
+  it("strips what the STT keeps of the wake phrase", () => {
+    expect(stripWakePrefix("Hey Jarvis, ¿qué hora es?")).toBe("¿qué hora es?");
+    expect(stripWakePrefix("Yarvis poné música")).toBe("poné música");
+    expect(stripWakePrefix("¿Viste lo de Jarvis?")).toBe("¿Viste lo de Jarvis?");
+    expect(stripWakePrefix("Jarvis")).toBe("");
   });
 });
 

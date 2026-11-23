@@ -86,6 +86,19 @@
       {
         "type": "vad.disarm",
         "id": "b1"
+      },
+      {
+        "type": "wake.enable",
+        "id": "w1",
+        "threshold": 0.5
+      },
+      {
+        "type": "wake.enable",
+        "id": "w2"
+      },
+      {
+        "type": "wake.disable",
+        "id": "w3"
       }
     ],
     "invalid": [
@@ -231,6 +244,21 @@
         "type": "vad.arm",
         "id": "b1",
         "turnId": "t1"
+      },
+      {
+        "type": "wake.enable",
+        "id": "w1",
+        "threshold": 1.5
+      },
+      {
+        "type": "wake.enable",
+        "id": "w1",
+        "threshold": true
+      },
+      {
+        "type": "wake.disable",
+        "id": "w1",
+        "extra": 1
       }
     ]
   },
@@ -310,6 +338,16 @@
       {
         "type": "vad.speech",
         "id": "b1"
+      },
+      {
+        "type": "wake.listening",
+        "id": "w1",
+        "open": true
+      },
+      {
+        "type": "wake.detected",
+        "id": "w1",
+        "score": 0.73
       }
     ],
     "invalid": [
@@ -376,6 +414,19 @@
         "type": "vad.speech",
         "id": "b1",
         "prob": 0.9
+      },
+      {
+        "type": "wake.detected",
+        "id": "w1"
+      },
+      {
+        "type": "wake.detected",
+        "id": "w1",
+        "score": -0.1
+      },
+      {
+        "type": "wake.listening",
+        "id": "w1"
       }
     ]
   }

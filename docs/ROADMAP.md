@@ -68,6 +68,8 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 - Permission Engine + UI de confirmación + audit log consultable
   - [x] Permission Engine v1, reglas del owner, confirmación en diálogo nativo, panel Actividad, export JSONL y `recent_activity` (ADR-018)
 - Wake word local configurable
+  - [x] «Hey Jarvis» local, umbral configurable, indicador y métrica de falsas activaciones (ADR-021)
+  - [ ] Validación: calibrar con la voz del owner y < 1 falsa activación/día en uso real
 - Defensa contra prompt injection (tests adversariales en evals)
 
 **Exit:** 0 acciones sensibles sin confirmación en 50 pruebas, incluyendo 10 ataques de injection; < 1 falsa activación/día.
