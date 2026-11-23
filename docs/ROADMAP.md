@@ -109,7 +109,7 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
   - [ ] Validación con la API real (casos 058–061)
 - Ciclo de evolución: skills propuestas por Jarvis, gated por evals + aprobación
   - [x] Propuesta con casos de prueba, chequeos estáticos, evals propias con juez, aprobación nativa, espejo git y vuelta atrás en un paso (ADR-027)
-  - [ ] Detectar repeticiones en la reflexión diaria y proponer skills solo
+  - [x] Detectar repeticiones en la reflexión diaria y proponer skills solo (ADR-028)
   - [ ] Validación con la API real (casos 062–063)
-- Clientes adicionales (Telegram/móvil vía túnel seguro)
+- Clientes adicionales: móvil por WhatsApp (elegido por el owner en lugar de Telegram), sobre su proyecto existente; requiere ADR de seguridad
 - Mejora continua de latencia y voz

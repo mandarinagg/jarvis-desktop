@@ -109,6 +109,14 @@ export class SkillStore {
     return (this.db.prepare(`SELECT ${P_COLS} FROM skill_proposals WHERE status = 'pending' ORDER BY created_at DESC LIMIT 50`).all() as ProposalRow[]).map(toProposal);
   }
 
+  /** Names the daily reflection must not propose again: skills, pending proposals and recent decisions. */
+  takenNames(sinceIso: string): string[] {
+    const rows = this.db
+      .prepare("SELECT name FROM skills UNION SELECT name FROM skill_proposals WHERE status = 'pending' OR created_at >= ?")
+      .all(sinceIso) as { name: string }[];
+    return rows.map((r) => r.name);
+  }
+
   recordEval(proposalId: number, sha: string, e: SkillEval, day: string): void {
     this.db.prepare("UPDATE skill_proposals SET eval = ?, eval_sha = ? WHERE id = ?").run(JSON.stringify(e), sha, proposalId);
     this.db
