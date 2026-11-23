@@ -8,6 +8,7 @@ import {
   type AuditMessage,
   type BuilderMessage,
   type ConversationsSetMode,
+  type DashboardGet,
   type MemoryMessage,
   type BudgetGet,
   type PermissionRespond,
@@ -60,6 +61,7 @@ export interface Handlers {
   builder?(session: Session, message: BuilderMessage): void | Promise<void>;
   memory?(session: Session, message: MemoryMessage): void | Promise<void>;
   conversationsSetMode?(session: Session, message: ConversationsSetMode): void;
+  dashboardGet?(session: Session, message: DashboardGet): void;
   disconnected?(session: Session): void;
 }
 
@@ -300,6 +302,8 @@ export class CoreServer {
           return;
         case "conversations.setMode":
           return this.query(session, message, h.conversationsSetMode);
+        case "dashboard.get":
+          return this.query(session, message, h.dashboardGet);
       }
     } catch (err) {
       this.logger.log("error", "ipc.handler_failed", {

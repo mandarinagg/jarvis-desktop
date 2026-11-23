@@ -1,5 +1,6 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useReducer, useRef, useState } from "react";
 import { Activity } from "./Activity.js";
+import { Home } from "./Home.js";
 import { Memory, type MemoryAction } from "./Memory.js";
 import { Projects } from "./Projects.js";
 import { type ToolStatus, budgetLevel, initialState, pttPressed, reduce, voiceLabel } from "./state.js";
@@ -31,7 +32,7 @@ export function App() {
   const [draft, setDraft] = useState("");
   const [hotkey, setHotkey] = useState<string | null>(null);
   const [holding, setHolding] = useState(false);
-  const [view, setView] = useState<"chat" | "activity" | "memory">("chat");
+  const [view, setView] = useState<"home" | "chat" | "activity" | "memory">("home");
   const latest = useRef(state);
   latest.current = state;
   const transcriptEnd = useRef<HTMLDivElement>(null);
@@ -45,6 +46,7 @@ export function App() {
       jarvis.send({ type: "voice.status.get", id: nextId("v") });
       jarvis.send({ type: "projects.list", id: nextId("pl") });
       jarvis.send({ type: "builder.list", id: nextId("bl") });
+      jarvis.send({ type: "dashboard.get", id: nextId("d") });
     };
     const offHotkey = jarvis.onHotkey(() => {
       const s = latest.current;
@@ -56,6 +58,8 @@ export function App() {
       if (message.type === "chat.done") jarvis.send({ type: "conversations.list", id: nextId("l") });
       // A confirmation is a native dialog over this window: show the conversation it belongs to.
       if (message.type === "permission.request") setView("chat");
+      // A spoken turn shows up in the conversation, wherever the window was.
+      if (message.type === "voice.transcript") setView("chat");
     });
     const offStatus = jarvis.onStatus((s) => {
       dispatch({ kind: "status", connected: s.connected, ...(s.error ? { error: s.error } : {}) });
@@ -96,6 +100,7 @@ export function App() {
     if (!text || busy || !state.connected) return;
     const requestId = nextId("m");
     dispatch({ kind: "send", requestId, text });
+    setView("chat");
     jarvis.send({
       type: "chat.send",
       id: requestId,
@@ -117,6 +122,7 @@ export function App() {
   const open = (conversationId: string) => {
     if (busy) return;
     dispatch({ kind: "select", conversationId });
+    setView("chat");
     jarvis.send({ type: "conversations.get", id: nextId("g"), conversationId });
   };
 
@@ -132,6 +138,11 @@ export function App() {
     setView("activity");
     jarvis.send({ type: "audit.list", id: nextId("al"), limit: 100 });
     jarvis.send({ type: "builder.list", id: nextId("bl") });
+  };
+
+  const showHome = () => {
+    setView("home");
+    jarvis.send({ type: "dashboard.get", id: nextId("d") });
   };
 
   const showMemory = () => {
@@ -152,6 +163,7 @@ export function App() {
   const startNew = () => {
     if (busy) return;
     dispatch({ kind: "new" });
+    setView("chat");
     input.current?.focus();
   };
 
@@ -162,6 +174,9 @@ export function App() {
           <span className={`signal ${state.connected ? "on" : "off"}`} aria-hidden="true" />
           <span className="brand-name">Jarvis</span>
         </div>
+        <button className="link activity-link home-link" onClick={showHome} disabled={!state.connected} aria-pressed={view === "home"}>
+          Inicio
+        </button>
         <button className="new" onClick={startNew} disabled={busy}>
           Nueva conversación
         </button>
@@ -264,7 +279,9 @@ export function App() {
           )}
         </header>
 
-        {view === "memory" ? (
+        {view === "home" ? (
+          <Home data={state.dashboard} onRefresh={showHome} onOpenConversation={open} onShowMemory={showMemory} onShowActivity={showActivity} />
+        ) : view === "memory" ? (
           <Memory data={state.memory} notice={state.memoryNotice} onAction={memoryAction} onClose={() => setView("chat")} />
         ) : view === "activity" ? (
           <Activity

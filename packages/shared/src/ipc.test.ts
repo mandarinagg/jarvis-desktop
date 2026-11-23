@@ -117,6 +117,7 @@ describe("schemas", () => {
       "conversations.setProject",
       "core.ping",
       "core.shutdown",
+      "dashboard.get",
       "memory.decide",
       "memory.delete",
       "memory.forget",
