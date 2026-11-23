@@ -11,7 +11,7 @@
   - **Skills** (#49, ADR-027): Jarvis las propone con casos de prueba, corren sus evals sobre el texto exacto, el owner las aprueba en un diálogo nativo y quedan versionadas en `%APPDATA%/Jarvis/skills` (git).
   - **Skills desde la reflexión** (#50, ADR-028): la reflexión diaria ve los episodios de 30 días y, si el owner repitió un pedido 3 veces (una de hoy), deja como mucho 1 propuesta inerte en el panel Skills.
   Falta:
-  - el cliente móvil (Telegram por túnel seguro), que necesita su propio ADR de seguridad;
+  - el cliente móvil: el owner prefiere **WhatsApp** en lugar de Telegram, reutilizando un proyecto suyo que ya conecta con WhatsApp (lo va a compartir). Necesita su propio ADR de seguridad;
   - validar todo con la API real: casos 058–063, un recordatorio y una skill de verdad.
 - **Fase 6 (L4b: Memoria que aprende):** **implementada** en los PRs #45–#46 (apilados sobre #44, ADR-024):
   - memoria de datos, preferencias, procedimientos, ideas y episodios que se recupera en cada turno como datos;
@@ -101,7 +101,7 @@
 3. Medir la voz real con `voice-stats` (p50 menor a 2.0 s) y calibrar la wake word.
 4. Con la key, correr `builder-eval` y mirar los rechazos del hook en el reporte. Si el agente choca seguido con la allowlist, ajustar el prompt del Builder (`builder/runner.ts`), no la política.
 5. Si la aceptación de propuestas queda por debajo del 70 %, mirá qué se rechaza y ajustá `REFLECTION_SYSTEM` (`memory/reflection.ts`). Si `memory-eval` empieza a fallar con recuerdos reales, evaluá embeddings locales (ADR-024).
-6. **Fase 7 (Socio):** falta el cliente móvil (Telegram por túnel seguro: necesita su propio ADR de seguridad). Inicio, proactividad, skills y skills desde la reflexión ya están (#47–#50). Con la key: revisar que la reflexión casi nunca proponga skills y que las que proponga se acepten.
+6. **Fase 7 (Socio):** falta el cliente móvil por **WhatsApp** (decisión del owner del 2026-11-22, en lugar de Telegram). Se va a basar en el proyecto que el owner ya tiene conectado a WhatsApp: pedírselo, revisarlo y escribir el ADR de seguridad antes de copiar código. El ADR tiene que cubrir: que solo responda al número del owner, dónde vive la sesión de WhatsApp (credenciales en `%APPDATA%/Jarvis`, nunca en el repo), que los mensajes entrantes sean datos no confiables, que las acciones sensibles sigan confirmándose en la PC y los términos de uso de WhatsApp para clientes no oficiales. Inicio, proactividad, skills y skills desde la reflexión ya están (#47–#50). Con la key: revisar que la reflexión casi nunca proponga skills y que las que proponga se acepten.
 
 ## Decisiones abiertas
 - **Costo:** el uso típico estimado (~US$2,2/día) supera el objetivo de US$1. Se decide con datos reales.
