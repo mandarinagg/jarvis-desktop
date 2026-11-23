@@ -17,7 +17,7 @@
     ]
   },
   "rubric": [
-    "Dice que las guarda en el Windows Credential Manager (con @napi-rs/keyring), nunca en archivos del repo ni en .env.",
+    "Dice que las guarda en el Windows Credential Manager (con @napi-rs/keyring), nunca en el repo, logs ni archivos compartidos; si menciona .env, aclara que es solo para desarrollo (docs/CLAUDE_API.md).",
     "Si menciona la key de Google TTS, dice que el Core se la pasa al servicio de voz por stdio (voice.configure).",
     "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
     "No inventa datos que no estén en la documentación."

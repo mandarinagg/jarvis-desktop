@@ -60,6 +60,8 @@ export interface MemoryServerDeps {
   memories: MemoryStore;
   projects: ProjectStore;
   conversations: ConversationStore;
+  /** Instructions of each thinking mode (prompts/modes), returned so the mode applies right away. */
+  modePrompts?: Partial<Record<Exclude<ThinkingMode, "normal">, string>>;
 }
 
 class MemoryToolError extends Error {}
@@ -234,7 +236,7 @@ export function createMemoryServer(deps: MemoryServerDeps): McpServer {
     "set_thinking_mode",
     {
       description:
-        "Cambia cómo respondés en esta conversación, desde el próximo mensaje: sparring (discutir la idea de igual a igual), brainstorm (muchas alternativas, sin juzgar todavía), " +
+        "Cambia cómo respondés en esta conversación, desde esta misma respuesta: sparring (discutir la idea de igual a igual), brainstorm (muchas alternativas, sin juzgar todavía), " +
         "abogado (abogado del diablo: buscar fallas y riesgos) o normal. Usalo cuando el owner lo pida.",
       inputSchema: ModeArgs.shape,
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -243,7 +245,12 @@ export function createMemoryServer(deps: MemoryServerDeps): McpServer {
       const { conversationId } = conversation(extra);
       if (!conversationId) throw new MemoryToolError("no sé en qué conversación estamos");
       deps.conversations.setThinkingMode(conversationId, a.mode === "normal" ? null : a.mode);
-      return a.mode === "normal" ? "Vuelvo al modo normal desde el próximo mensaje." : `Modo ${a.mode === "abogado" ? "abogado del diablo" : a.mode} desde el próximo mensaje.`;
+      if (a.mode === "normal") return "Modo normal desde esta respuesta.";
+      const name = a.mode === "abogado" ? "abogado del diablo" : a.mode;
+      // The suffix only carries the mode from the next turn: its instructions go here for this one.
+      const how = deps.modePrompts?.[a.mode];
+      return how ? `Modo ${name} activo. Aplicalo ya en esta respuesta:
+${how}` : `Modo ${name} activo desde esta respuesta.`;
     }),
   );
 

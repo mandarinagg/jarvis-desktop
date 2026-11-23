@@ -58,7 +58,9 @@ export async function runCase(
       // Same assembly as ChatService: clock, project card, memories for this message, then voice instructions.
       const suffix = [nowLine(new Date()), ws.card, ws.memory(turn), c.mode === "voice" ? prompts.voice : undefined, c.mode === "whatsapp" ? prompts.whatsapp : undefined].filter(Boolean).join("\n\n");
       transcript.push({ role: "user", content: turn });
+      const turnId = ws.beginTurn(turn);
       const r = await model.complete({
+        turnId,
         system: prompts.system,
         systemSuffix: suffix || undefined,
         messages: [...transcript],

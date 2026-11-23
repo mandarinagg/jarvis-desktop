@@ -91,7 +91,7 @@ function hubFor(w: ReturnType<typeof world>, answer: "approve" | "reject" = "app
   };
   const broker = new ConfirmationBroker({ sessions: () => [desktop] });
   const hub = new ToolHub(new PermissionEngine(), new AuditLog(w.db), undefined, broker);
-  const deps = { memories: w.memories, projects: w.projects, conversations: w.conversations };
+  const deps = { memories: w.memories, projects: w.projects, conversations: w.conversations, modePrompts: { abogado: "Numerá los problemas del más grave al menos grave." } };
   return { hub, requests, ready: hub.addInProcess(MEMORY_SERVER, createMemoryServer(deps), MEMORY_TOOLS, memoryPreviews(deps)) };
 }
 
@@ -132,6 +132,9 @@ describe("memory tools through the hub", () => {
     expect(e.content).toContain("Recetario usa SQLite");
     const mode = await hub.call("memory__set_thinking_mode", { mode: "abogado" }, { turnId: "t2" });
     expect(mode.content).toMatch(/abogado del diablo/);
+    // The suffix only has the mode from the next turn: the instructions apply in this answer too.
+    expect(mode.content).toContain("Aplicalo ya en esta respuesta");
+    expect(mode.content).toContain("Numerá los problemas");
     expect(w.conversations.thinkingMode(c.id)).toBe("abogado");
     expect(w.memories.get(m.id)?.useCount).toBe(1);
   });

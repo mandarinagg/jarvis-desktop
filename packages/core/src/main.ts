@@ -128,9 +128,9 @@ async function main(): Promise<number> {
   await tools.addInProcess(JARVIS_SERVER, createJarvisServer({ audit }), JARVIS_TOOLS);
   // Phase 6 (ADR-024): memory that learns. Saving needs the owner's OK; retrieval is per turn, as data.
   const memories = new MemoryStore(db);
-  const memoryDeps = { memories, projects, conversations: store };
-  await tools.addInProcess(MEMORY_SERVER, createMemoryServer(memoryDeps), MEMORY_TOOLS, memoryPreviews(memoryDeps));
   const modePrompts = loadModePrompts();
+  const memoryDeps = { memories, projects, conversations: store, modePrompts };
+  await tools.addInProcess(MEMORY_SERVER, createMemoryServer(memoryDeps), MEMORY_TOOLS, memoryPreviews(memoryDeps));
   // The server is created below; events only flow once it is listening.
   let broadcast: (m: CoreMessage) => void = () => {};
   const dailyBudgetUsd = Number.isFinite(budget) && budget > 0 ? budget : 3;

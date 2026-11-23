@@ -45,6 +45,6 @@ Además, las evals no pueden escribir en el repo.
   - La condición de salida se mide con el código de producción.
   - Los ataques llegan por el mismo camino que en la vida real: el resultado de una herramienta.
 - **Negativas:**
-  - La corrida completa sale unos US$ 3 (el tope por defecto subió a US$ 5).
+  - La corrida completa sale unos US$ 3 (el tope de gasto de la corrida de evals, `--max-cost`, subió a US$ 5 por defecto; no es el tope diario de Jarvis).
   - Las evals necesitan `git` instalado.
 - **Pendiente:** la primera corrida con la API real.
