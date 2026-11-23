@@ -1,11 +1,13 @@
 /** Pure chat state for the renderer: every Core message and UI action goes through `reduce`. */
-import type { ConversationSummary, CoreMessage, VoiceStateName } from "@jarvis/shared";
+import type { ConversationSummary, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
 
 export interface UiMessage {
   role: "user" | "assistant";
   content: string;
   interrupted: boolean;
   pending: boolean;
+  /** What Jarvis looked up while answering (Phase 3), in words. */
+  tools?: { summary: string; status: "started" | "done" | "error" | "denied" }[];
 }
 
 export interface State {
@@ -13,6 +15,9 @@ export interface State {
   connectionError?: string;
   conversations: ConversationSummary[];
   activeId?: string;
+  projects: ProjectInfo[];
+  /** Active project of the open conversation, or the one chosen for the next new conversation. */
+  projectId?: string;
   messages: UiMessage[];
   /** Request in flight: set on send (or on voice.transcript for voice turns), gets its turnId on chat.started. */
   streaming?: { requestId: string; turnId?: string; voice?: boolean };
@@ -28,11 +33,13 @@ export type Action =
   | { kind: "send"; requestId: string; text: string }
   | { kind: "select"; conversationId: string }
   | { kind: "new" }
+  | { kind: "setProject"; projectId?: string }
   | { kind: "dismissError" };
 
 export const initialState: State = {
   connected: false,
   conversations: [],
+  projects: [],
   messages: [],
   voice: { state: "unavailable", micOpen: false },
 };
@@ -88,13 +95,23 @@ export function reduce(state: State, action: Action): State {
     }
     case "select": {
       const next: State = { ...state, activeId: action.conversationId, messages: [] };
+      const projectId = state.conversations.find((c) => c.id === action.conversationId)?.projectId;
+      if (projectId) next.projectId = projectId;
+      else delete next.projectId;
       delete next.error;
       return next;
     }
     case "new": {
+      // The chosen project stays selected: a new conversation usually continues on the same project.
       const next: State = { ...state, messages: [] };
       delete next.activeId;
       delete next.error;
+      return next;
+    }
+    case "setProject": {
+      const next: State = { ...state };
+      if (action.projectId) next.projectId = action.projectId;
+      else delete next.projectId;
       return next;
     }
     case "dismissError": {
@@ -136,6 +153,19 @@ function reduceCore(state: State, m: CoreMessage): State {
       }
       if (state.streaming?.requestId !== m.id) return state;
       return { ...state, activeId: m.conversationId, streaming: { requestId: m.id, turnId: m.turnId } };
+    case "chat.tool": {
+      if (state.streaming?.turnId !== m.turnId) return state;
+      return {
+        ...state,
+        messages: updateLastAssistant(state.messages, (a) => {
+          const tools = [...(a.tools ?? [])];
+          const i = tools.findLastIndex((t) => t.summary === m.summary && t.status === "started");
+          if (m.status !== "started" && i !== -1) tools[i] = { summary: m.summary, status: m.status };
+          else tools.push({ summary: m.summary, status: m.status });
+          return { ...a, tools };
+        }),
+      };
+    }
     case "chat.delta":
       if (state.streaming?.turnId !== m.turnId) return state;
       return { ...state, messages: updateLastAssistant(state.messages, (a) => ({ ...a, content: a.content + m.text })) };
@@ -165,11 +195,27 @@ function reduceCore(state: State, m: CoreMessage): State {
       }
       return next;
     }
-    case "conversations.list.result":
-      return { ...state, conversations: m.conversations };
-    case "conversations.history":
+    case "conversations.list.result": {
+      const next: State = { ...state, conversations: m.conversations };
+      const active = state.activeId ? m.conversations.find((c) => c.id === state.activeId) : undefined;
+      if (active) {
+        if (active.projectId) next.projectId = active.projectId;
+        else delete next.projectId;
+      }
+      return next;
+    }
+    case "conversations.history": {
       if (m.conversationId !== state.activeId || state.streaming) return state;
-      return { ...state, messages: m.messages.map((x) => ({ ...x, pending: false })) };
+      const next: State = { ...state, messages: m.messages.map((x) => ({ ...x, pending: false })) };
+      if (m.projectId) next.projectId = m.projectId;
+      else delete next.projectId;
+      return next;
+    }
+    case "projects.list.result": {
+      const next: State = { ...state, projects: m.projects };
+      if (state.projectId && !m.projects.some((p) => p.id === state.projectId)) delete next.projectId;
+      return next;
+    }
     case "budget.status":
       return { ...state, budget: { spentTodayUsd: m.spentTodayUsd, dailyBudgetUsd: m.dailyBudgetUsd } };
     default:

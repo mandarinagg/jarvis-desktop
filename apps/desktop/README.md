@@ -30,6 +30,11 @@ Un panel de instrumentos sobrio:
 - **Transcripción:** lo que dice Jarvis va con una línea vertical de canal; tus mensajes van más chicos, indentados.
 - **Medidor de gasto:** pasa a ámbar al 80% del tope (ADR-005). Al 100% se bloquea el envío.
 
+## Proyectos (Fase 3)
+- Panel **Proyectos** en la barra lateral. «Agregar» pide nombre, descripción y objetivos, y abre el selector nativo de carpetas. La ruta la elige el proceso principal: el renderer nunca la manda (ADR-017).
+- El selector **Proyecto** de arriba fija el proyecto activo de la conversación. Si no hay una conversación abierta, queda para la próxima.
+- Mientras Jarvis responde se ve qué consultó («Buscando «…»», «Leyendo …»).
+
 ## Prueba de humo (desarrollo)
 ```powershell
 electron apps/desktop --smoke-screenshot=C:\ruta\captura.png --smoke-open-first

@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 import type { BudgetGet, ChatCancel, ChatSend, ConversationsGet, ConversationsList } from "@jarvis/shared";
 import { type ChatModel, TurnCancelledError, UpstreamError } from "./claude/model.js";
+import type { ProjectStore } from "./projects/store.js";
 import type { ToolRuntime } from "./tools/hub.js";
 import { costOf } from "./claude/pricing.js";
 import { localDay } from "./db.js";
@@ -23,6 +24,8 @@ export interface ChatServiceOptions {
   tools?: ToolRuntime;
   /** Active-project card for a conversation, appended to the system prompt (ADR-017). */
   projectContext?: (conversationId: string) => Promise<string | undefined>;
+  /** Links new conversations to the project chosen in the client (chat.send projectId). */
+  projects?: ProjectStore;
   dailyBudgetUsd: number;
   logger?: Logger;
   now?: () => Date;
@@ -70,6 +73,9 @@ export class ChatService {
 
     const conversation = msg.conversationId ? store.getConversation(msg.conversationId) : store.createConversation(msg.text);
     if (!conversation) return fail("invalid_message", "la conversación no existe");
+    if (!msg.conversationId && msg.projectId && this.opts.projects?.get(msg.projectId)) {
+      this.opts.projects.setConversationProject(conversation.id, msg.projectId);
+    }
     if ([...this.active.values()].some((t) => t.conversationId === conversation.id)) {
       return fail("invalid_message", "ya hay una respuesta en curso en esta conversación");
     }
@@ -134,7 +140,9 @@ export class ChatService {
   }
 
   conversationsList(session: Session, msg: ConversationsList): void {
-    const conversations = this.opts.store.listConversations(100).map(({ id, title, updatedAt }) => ({ id, title, updatedAt }));
+    const conversations = this.opts.store
+      .listConversations(100)
+      .map(({ id, title, updatedAt, projectId }) => ({ id, title, updatedAt, ...(projectId ? { projectId } : {}) }));
     session.send({ type: "conversations.list.result", id: msg.id, conversations });
   }
 
@@ -149,7 +157,14 @@ export class ChatService {
       .messages(conversation.id)
       .slice(-HISTORY_LIMIT)
       .map(({ role, content, interrupted, createdAt }) => ({ role, content, interrupted, createdAt }));
-    session.send({ type: "conversations.history", id: msg.id, conversationId: conversation.id, title: conversation.title, messages });
+    session.send({
+      type: "conversations.history",
+      id: msg.id,
+      conversationId: conversation.id,
+      title: conversation.title,
+      ...(conversation.projectId ? { projectId: conversation.projectId } : {}),
+      messages,
+    });
   }
 
   budgetGet(session: Session, msg: BudgetGet): void {

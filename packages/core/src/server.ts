@@ -11,6 +11,7 @@ import {
   type ConversationsGet,
   type ConversationsList,
   type ClientMessage,
+  type ProjectsMessage,
   type VoicePtt,
   type VoiceStatusGet,
   type CoreMessage,
@@ -46,6 +47,7 @@ export interface Handlers {
   budgetGet?(session: Session, message: BudgetGet): void;
   voicePtt?(session: Session, message: VoicePtt): void;
   voiceStatusGet?(session: Session, message: VoiceStatusGet): void;
+  projects?(session: Session, message: ProjectsMessage): void | Promise<void>;
   disconnected?(session: Session): void;
 }
 
@@ -234,6 +236,18 @@ export class CoreServer {
           return this.query(session, message, h.voicePtt);
         case "voice.status.get":
           return this.query(session, message, h.voiceStatusGet);
+        case "projects.list":
+        case "projects.create":
+        case "projects.update":
+        case "projects.delete":
+        case "projects.reindex":
+        case "conversations.setProject":
+          if (!h.projects) {
+            session.send({ type: "error", id: message.id, code: "upstream_error", message: `${message.type} is not available` });
+            return;
+          }
+          await h.projects(session, message);
+          return;
       }
     } catch (err) {
       this.logger.log("error", "ipc.handler_failed", {
