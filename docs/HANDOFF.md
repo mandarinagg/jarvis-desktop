@@ -5,7 +5,7 @@
 ## Dónde estamos
 - **Fase 0 (Diagnóstico):** completa, salvo la cuenta de la API de Anthropic, que la tiene que crear el owner.
 - **Fase 1 (L0: Core + chat):** implementada y en `main`. Falta validarla con la API real.
-- **Fase 7 (L5: Socio):** en curso. Panel **Inicio** en el PR #47 (ADR-025, protocolo 1.6): gasto de hoy y del mes con proyección, por uso y por conversación, caché, datos enviados a la nube, pendientes, actividad e ideas abiertas. Falta: proactividad (briefing, recordatorios, horarios silenciosos), skills propuestas con evals y clientes móviles.
+- **Fase 7 (L5: Socio):** en curso. Panel **Inicio** en el PR #47 (ADR-025, protocolo 1.6): gasto de hoy y del mes con proyección, por uso y por conversación, caché, datos enviados a la nube, pendientes, actividad e ideas abiertas. **Proactividad** en el PR #48 (ADR-026, protocolo 1.7): recordatorios con confirmación, briefing diario local, horario silencioso y notificaciones de Windows. Jarvis ahora sabe la hora. Falta: skills propuestas con evals y clientes móviles.
 - **Fase 6 (L4b: Memoria que aprende):** **implementada** en los PRs #45–#46 (apilados sobre #44, ADR-024):
   - memoria de datos, preferencias, procedimientos, ideas y episodios que se recupera en cada turno como datos;
   - guardar siempre pide confirmación nativa, con filtro de secretos;
@@ -34,7 +34,7 @@
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.6 (`dashboard.get`, `voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
+| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.7 (`dashboard.get`, `proactive.*`, `voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
 | Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
 | Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks`, 008 memoria (`memories` + FTS5, `memory_uses`, `memory_proposals`, `reflections`, `settings`) |
 | Secretos | Credential Manager | `anthropic-api-key` (falta) y `google-tts-api-key` (migrada el 2026-11-19) |
@@ -57,7 +57,7 @@
 ## Pendiente del owner (bloquea el cierre de las Fases 1 a 4)
 1. Crear la cuenta de la API de Anthropic con **tope mensual de US$60** en la consola.
 2. Guardar la clave: `pnpm build` y después `node packages/core/dist/set-secret.js anthropic-api-key`.
-3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$3, 50 casos). Tienen que dar ≥ 80%, los 10 de proyectos 10/10 y **0 acciones sensibles sin confirmación**.
+3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$3,5, 61 casos). Tienen que dar ≥ 80%, los 10 de proyectos 10/10 y **0 acciones sensibles sin confirmación**.
 4. Usar Jarvis por texto y por voz: `pnpm --filter @jarvis/desktop start`, con `Ctrl+Shift+Space` o el botón «Mantené para hablar».
 5. Después de unas 20 conversaciones por voz: `node packages/core/dist/voice-stats.js`. Tiene que decir `OK: p50 … < 2000 ms`.
 6. **Wake word:**
@@ -79,14 +79,14 @@
       - cuando llegue la notificación, pedile que la mergee y revisá el diff.
 
 ## Próximos pasos (para quien retome)
-1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → … → #42 → #43 → #44 → #45 → #46 → #47. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
+1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → … → #42 → #43 → #44 → #45 → #46 → #47 → #48. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
 2. Con la key guardada:
    - correr las evals completas y ajustar `packages/core/prompts/system.md` y `voice.md`;
    - en la Fase 4, revisar sobre todo que una injection nunca genere un pedido de permiso, que anuncie el cambio antes de pedir el OK y que no reintente un rechazo.
 3. Medir la voz real con `voice-stats` (p50 menor a 2.0 s) y calibrar la wake word.
 4. Con la key, correr `builder-eval` y mirar los rechazos del hook en el reporte. Si el agente choca seguido con la allowlist, ajustar el prompt del Builder (`builder/runner.ts`), no la política.
 5. Si la aceptación de propuestas queda por debajo del 70 %, mirá qué se rechaza y ajustá `REFLECTION_SYSTEM` (`memory/reflection.ts`). Si `memory-eval` empieza a fallar con recuerdos reales, evaluá embeddings locales (ADR-024).
-6. **Fase 7 (Socio):** proactividad con reglas, skills propuestas por Jarvis con evals, clientes móviles. Arrancar solo con pedido explícito del owner.
+6. **Fase 7 (Socio):** seguir con skills propuestas por Jarvis (gated por evals y aprobación, EVOLUTION.md) y después clientes móviles (Telegram por túnel seguro). Inicio y proactividad ya están (#47, #48).
 
 ## Decisiones abiertas
 - **Costo:** el uso típico estimado (~US$2,2/día) supera el objetivo de US$1. Se decide con datos reales.
@@ -121,7 +121,7 @@
 ## Cómo verificar el estado
 ```powershell
 pnpm install --frozen-lockfile
-pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 327 tests
+pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 341 tests
 pnpm --filter @jarvis/evals memory-eval               # recuperación de memoria, offline: 15/15
 cd services/voice; uv run python -m pytest -q         # 207 tests (en local incluye Parakeet, Silero y openWakeWord reales)
 ```

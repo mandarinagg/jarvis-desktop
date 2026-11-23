@@ -10,10 +10,11 @@ describe("conversation cases", () => {
   const cases = loadCases();
 
   it("has the 50 cases of the Phase 4 exit (10 of them injection attacks) plus Phase 6 memory cases, all valid, with unique ids", () => {
-    expect(cases).toHaveLength(57); // ROADMAP Phase 4 exit: 50 trials; 051-057: Phase 6 memory and modes
-    expect(new Set(cases.map((c) => c.id)).size).toBe(57);
-    expect(cases.filter((c) => c.category === "inyeccion")).toHaveLength(11);
+    expect(cases).toHaveLength(61); // ROADMAP Phase 4 exit: 50 trials; 051-057: Phase 6 memory and modes; 058-061: Phase 7 reminders and briefing
+    expect(new Set(cases.map((c) => c.id)).size).toBe(61);
+    expect(cases.filter((c) => c.category === "inyeccion")).toHaveLength(12);
     expect(cases.filter((c) => c.category === "memoria")).toHaveLength(5);
+    expect(cases.filter((c) => c.category === "proactividad")).toHaveLength(3);
     expect(cases.filter((c) => c.mode === "voice")).toHaveLength(6);
     const exit = cases.filter((c) => c.project === "jarvis-docs");
     expect(exit).toHaveLength(10); // ROADMAP Phase 3 exit: 10/10 questions about a real project's docs
@@ -184,6 +185,31 @@ describe("demo workspace (Phase 4)", () => {
       const r = await ws.tools.call("projects__git_commit", { project: "Recetario", message: "docs: idea de exportar a PDF", paths: ["docs"] }, {});
       expect(r.content).toMatch(/^Commit/);
       expect(ws.requests.map((q) => q.tool)).toEqual(["edit_file", "git_commit"]);
+      expect(ws.checkState(c)).toEqual([]);
+      expect(ws.unconfirmedSensitive()).toBe(0);
+    } finally {
+      await ws.close();
+    }
+  });
+});
+
+describe("reminders workspace (Phase 7)", () => {
+  it("an approved reminder at the asked local time passes the state check; nothing else does", async () => {
+    const { createWorkspace } = await import("./workspace.js");
+    const c = loadCases().find((x) => x.id === "058-recordatorio-con-hora");
+    if (!c) throw new Error("no reminder case");
+    const ws = await createWorkspace(c);
+    try {
+      expect(ws.checkState(c)).toEqual([expect.stringMatching(/no quedó un recordatorio/)]);
+      const wrong = new Date();
+      wrong.setDate(wrong.getDate() + 1);
+      wrong.setHours(21, 0, 0, 0);
+      await ws.tools.call("reminders__create_reminder", { text: "Llamar a Juan", when: wrong.toISOString() }, {});
+      expect(ws.checkState(c)).toHaveLength(1);
+      const right = new Date(wrong);
+      right.setHours(9, 0, 0, 0);
+      const r = await ws.tools.call("reminders__create_reminder", { text: "Llamar a Juan por el presupuesto", when: right.toISOString() }, {});
+      expect(r.content).toMatch(/^Listo/);
       expect(ws.checkState(c)).toEqual([]);
       expect(ws.unconfirmedSensitive()).toBe(0);
     } finally {

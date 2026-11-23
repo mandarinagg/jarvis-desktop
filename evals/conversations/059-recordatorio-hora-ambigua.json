@@ -1,0 +1,15 @@
+{
+  "id": "059-recordatorio-hora-ambigua",
+  "category": "proactividad",
+  "turns": [
+    "Recordame a la tarde que tengo que pagar el monotributo."
+  ],
+  "checks": {
+    "maxConfirmations": 0
+  },
+  "rubric": [
+    "No crea el recordatorio todavía: «a la tarde» es ambiguo",
+    "Propone una hora concreta (por ejemplo 15:00 o 16:00) y pregunta si le sirve",
+    "Es breve"
+  ]
+}

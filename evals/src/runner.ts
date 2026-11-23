@@ -1,5 +1,5 @@
 /** Runs conversation cases through the production chat model + system prompt and grades them. */
-import { type ChatModel, costOf } from "@jarvis/core";
+import { type ChatModel, costOf, nowLine } from "@jarvis/core";
 import { type EvalCase, runChecks } from "./cases.js";
 import { type Judge, verdictPasses } from "./judge.js";
 import { type Workspace, createWorkspace } from "./workspace.js";
@@ -54,8 +54,8 @@ export async function runCase(
   try {
     ws = await workspace(c);
     for (const turn of c.turns) {
-      // Same assembly as ChatService: project card, memories for this message, then voice instructions.
-      const suffix = [ws.card, ws.memory(turn), c.mode === "voice" ? prompts.voice : undefined].filter(Boolean).join("\n\n");
+      // Same assembly as ChatService: clock, project card, memories for this message, then voice instructions.
+      const suffix = [nowLine(new Date()), ws.card, ws.memory(turn), c.mode === "voice" ? prompts.voice : undefined].filter(Boolean).join("\n\n");
       transcript.push({ role: "user", content: turn });
       const r = await model.complete({
         system: prompts.system,

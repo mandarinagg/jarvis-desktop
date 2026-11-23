@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.6"; // 1.6: dashboard.* (Phase 7); 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
+export const PROTOCOL_VERSION = "1.7"; // 1.7: proactive.*, reminders.cancel (Phase 7); 1.6: dashboard.* (Phase 7); 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
 
 const Id = z.string().min(1).max(64);
 const SessionToken = z.string().regex(/^[0-9a-f]{64}$/, "token must be 256-bit lowercase hex");
@@ -209,7 +209,33 @@ export type ConversationsSetMode = z.infer<typeof ConversationsSetMode>;
 export const DashboardGet = z.strictObject({ type: z.literal("dashboard.get"), id: Id });
 export type DashboardGet = z.infer<typeof DashboardGet>;
 
+/** Phase 7 (ADR-026): proactivity rules, reminders and the daily briefing. Reminders are only
+ * created through Jarvis' tool (native confirmation); clients can list and cancel them. */
+const ClockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM, 24 h");
+export const QuietHoursInfo = z.strictObject({ start: ClockTime, end: ClockTime });
+export const ProactiveSettingsInfo = z.strictObject({ briefingTime: ClockTime.nullable(), quietHours: QuietHoursInfo.nullable() });
+export type ProactiveSettingsInfo = z.infer<typeof ProactiveSettingsInfo>;
+
+export const ProactiveGet = z.strictObject({ type: z.literal("proactive.get"), id: Id });
+export type ProactiveGet = z.infer<typeof ProactiveGet>;
+
+export const ProactiveSet = z.strictObject({
+  type: z.literal("proactive.set"),
+  id: Id,
+  briefingTime: ClockTime.nullable().optional(),
+  quietHours: QuietHoursInfo.nullable().optional(),
+});
+export type ProactiveSet = z.infer<typeof ProactiveSet>;
+
+export const RemindersCancel = z.strictObject({ type: z.literal("reminders.cancel"), id: Id, reminderId: z.number().int().positive() });
+export type RemindersCancel = z.infer<typeof RemindersCancel>;
+
+export type ProactiveMessage = ProactiveGet | ProactiveSet | RemindersCancel;
+
 export const ClientMessage = z.discriminatedUnion("type", [
+  ProactiveGet,
+  ProactiveSet,
+  RemindersCancel,
   DashboardGet,
   VoiceWake,
   PermissionRespond,
@@ -567,7 +593,37 @@ export const DashboardResult = z.strictObject({
 });
 export type DashboardResult = z.infer<typeof DashboardResult>;
 
+export const ReminderInfo = z.strictObject({
+  id: z.number().int().positive(),
+  /** Approved by the owner, written by the model: plain text. */
+  text: z.string().max(300),
+  dueAt: z.string(),
+});
+export type ReminderInfo = z.infer<typeof ReminderInfo>;
+
+/** Reply to proactive.* / reminders.cancel (with its id), and broadcast when reminders or the briefing change. */
+export const ProactiveState = z.strictObject({
+  type: z.literal("proactive.state"),
+  id: Id.optional(),
+  settings: ProactiveSettingsInfo,
+  reminders: z.array(ReminderInfo).max(50),
+  /** Today's briefing, once composed. */
+  briefing: z.strictObject({ day: z.string(), text: z.string().max(4_000), createdAt: z.string() }).optional(),
+});
+export type ProactiveState = z.infer<typeof ProactiveState>;
+
+/** Something Jarvis wants the owner to see now (never sent during quiet hours). Plain text. */
+export const ProactiveNotify = z.strictObject({
+  type: z.literal("proactive.notify"),
+  kind: z.enum(["reminder", "briefing"]),
+  title: z.string().max(100),
+  body: z.string().max(4_000),
+});
+export type ProactiveNotify = z.infer<typeof ProactiveNotify>;
+
 export const CoreMessage = z.discriminatedUnion("type", [
+  ProactiveState,
+  ProactiveNotify,
   DashboardResult,
   MemoryListResult,
   BuilderListResult,

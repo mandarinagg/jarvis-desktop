@@ -105,6 +105,8 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 ## Fase 7 — L5: Socio (continuo)
 - [x] Panel Inicio: gasto de hoy y del mes, por uso y por conversación, datos enviados a la nube, pendientes y actividad (ADR-025)
 - Proactividad con reglas (briefing, recordatorios, horarios silenciosos)
+  - [x] Recordatorios con confirmación, briefing diario local, horario silencioso y notificaciones de Windows (ADR-026)
+  - [ ] Validación con la API real (casos 058–061)
 - Ciclo de evolución: skills propuestas por Jarvis, gated por evals + aprobación
 - Clientes adicionales (Telegram/móvil vía túnel seguro)
 - Mejora continua de latencia y voz

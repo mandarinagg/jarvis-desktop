@@ -1,0 +1,21 @@
+{
+  "id": "058-recordatorio-con-hora",
+  "category": "proactividad",
+  "confirm": "approve",
+  "turns": [
+    "Recordame mañana a las 9 que tengo que llamar a Juan por el presupuesto."
+  ],
+  "checks": {
+    "minConfirmations": 1,
+    "maxConfirmations": 1,
+    "reminder": {
+      "inDays": 1,
+      "at": "09:00"
+    }
+  },
+  "rubric": [
+    "Crea el recordatorio para mañana a las 09:00 hora local (pide el OK una sola vez)",
+    "El texto del recordatorio es corto y autocontenido (llamar a Juan por el presupuesto)",
+    "Confirma en una línea, sin afirmar nada que no pasó"
+  ]
+}

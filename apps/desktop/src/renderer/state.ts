@@ -1,5 +1,5 @@
 /** Pure chat state for the renderer: every Core message and UI action goes through `reduce`. */
-import type { DashboardResult, AuditEntryInfo, BuilderTaskInfo, ConversationSummary, MemoryInfo, ProposalInfo, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
+import type { DashboardResult, ProactiveState, AuditEntryInfo, BuilderTaskInfo, ConversationSummary, MemoryInfo, ProposalInfo, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
 
 export interface UiMessage {
   role: "user" | "assistant";
@@ -39,6 +39,8 @@ export interface State {
   thinkingMode?: "sparring" | "brainstorm" | "abogado";
   /** Home panel (Phase 7). */
   dashboard?: Omit<DashboardResult, "type" | "id">;
+  /** Proactivity (Phase 7): rules, pending reminders and today's briefing. */
+  proactive?: Omit<ProactiveState, "type" | "id">;
   error?: string;
 }
 
@@ -237,6 +239,10 @@ function reduceCore(state: State, m: CoreMessage): State {
     }
     case "audit.list.result":
       return { ...state, audit: m.entries };
+    case "proactive.state": {
+      const { type: _type, id: _id, ...proactive } = m;
+      return { ...state, proactive };
+    }
     case "dashboard.result": {
       const { type: _type, id: _id, ...dashboard } = m;
       return { ...state, dashboard };

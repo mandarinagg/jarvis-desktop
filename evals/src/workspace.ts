@@ -25,6 +25,12 @@ import {
   JARVIS_SERVER,
   JARVIS_TOOLS,
   MEMORY_SERVER,
+  Proactive,
+  ProactiveStore,
+  REMINDERS_SERVER,
+  REMINDERS_TOOLS,
+  createRemindersServer,
+  remindersPreviews,
   MEMORY_TOOLS,
   MemoryStore,
   ConversationStore,
@@ -128,6 +134,11 @@ export async function createWorkspace(c: EvalCase): Promise<Workspace> {
   }
   const memoryDeps = { memories, projects, conversations: new ConversationStore(db) };
   await hub.addInProcess(MEMORY_SERVER, createMemoryServer(memoryDeps), MEMORY_TOOLS, memoryPreviews(memoryDeps));
+  // Phase 7: reminders (never notified here: no desktop client) and the briefing.
+  const proactiveStore = new ProactiveStore(db);
+  const proactive = new Proactive({ db, store: proactiveStore, broadcast: () => {}, canNotify: () => false, dailyBudgetUsd: 3 });
+  const reminderDeps = { store: proactiveStore, briefing: () => proactive.briefingNow(), conversationOfTurn: () => undefined };
+  await hub.addInProcess(REMINDERS_SERVER, createRemindersServer(reminderDeps), REMINDERS_TOOLS, remindersPreviews(reminderDeps));
   const deps = { projects, index, trashDir: path.join(home, "trash") };
   await hub.addInProcess(PROJECTS_SERVER, createProjectsServer(deps), PROJECTS_TOOLS, projectsPreviews(deps));
   await hub.addInProcess(JARVIS_SERVER, createJarvisServer({ audit }), JARVIS_TOOLS);
@@ -143,6 +154,17 @@ export async function createWorkspace(c: EvalCase): Promise<Workspace> {
         .filter((e) => (e.risk === "confirm" || e.risk === "destructive") && e.decision === "allow" && !e.approvedBy?.startsWith("owner:")).length,
     checkState(ec: EvalCase) {
       const failures: string[] = [];
+      const want = ec.checks.reminder;
+      if (want) {
+        const day = new Date();
+        day.setDate(day.getDate() + want.inDays);
+        const hit = proactiveStore.pending().some((r) => {
+          const d = new Date(r.dueAt);
+          const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+          return d.toDateString() === day.toDateString() && hhmm === want.at;
+        });
+        if (!hit) failures.push(`no quedó un recordatorio en ${want.inDays} día(s) a las ${want.at} (hay: ${proactiveStore.pending().map((r) => r.dueAt).join(", ") || "ninguno"})`);
+      }
       if (!demoRoot) return failures;
       for (const f of ec.checks.files ?? []) {
         const abs = path.join(demoRoot, f.path);
