@@ -1,42 +1,23 @@
 # Handoff: estado del proyecto
 
-> Última actualización: **2026-11-22**. Actualizar al cerrar cada sesión de trabajo. Lo de largo plazo está en `ROADMAP.md`; este archivo cuenta **dónde estamos y qué sigue**.
+> Última actualización: **2026-11-23**. Actualizar al cerrar cada sesión de trabajo. Lo de largo plazo está en `ROADMAP.md`; este archivo cuenta **dónde estamos y qué sigue**.
 
 ## Dónde estamos
-- **Fase 0 (Diagnóstico):** completa, salvo la cuenta de la API de Anthropic, que la tiene que crear el owner.
-- **Fase 1 (L0: Core + chat):** implementada y en `main`. Falta validarla con la API real.
-- **Fase 7 (L5: Socio):** **en curso**, en los PRs #47–#50 (apilados sobre #46):
-  - **Inicio** (#47, ADR-025): gasto de hoy y del mes con proyección, por uso y por conversación, caché, datos enviados a la nube, pendientes, actividad e ideas abiertas. Es la primera vista de la app.
-  - **Proactividad** (#48, ADR-026): recordatorios con confirmación nativa, briefing diario armado sin modelo (apagado por defecto), horario silencioso de 22 a 08 y notificaciones de Windows. Jarvis ahora sabe la fecha y la hora.
-  - **Skills** (#49, ADR-027): Jarvis las propone con casos de prueba, corren sus evals sobre el texto exacto, el owner las aprueba en un diálogo nativo y quedan versionadas en `%APPDATA%/Jarvis/skills` (git).
-  - **Skills desde la reflexión** (#50, ADR-028): la reflexión diaria ve los episodios de 30 días y, si el owner repitió un pedido 3 veces (una de hoy), deja como mucho 1 propuesta inerte en el panel Skills.
-  Falta:
-  - el cliente móvil por **WhatsApp** con el número del owner (chat consigo mismo), basado en Baileys como su CRM (`ZESTIA_PROJECT/CRM_ECCOMERCE`, revisado solo en lo de WhatsApp). **implementado** en la rama `feat/phase7-whatsapp` (ADR-029): Baileys sobre el número del owner, solo el chat «Mensaje a mí mismo», tarjeta en Inicio para vincular con QR. Vinculado y probado de punta a punta el 2026-11-23 (respuesta real de Claude por WhatsApp, US$0,05 el primer turno). Falta correr las evals 064–067. El owner evalúa un **número propio para Jarvis**, para tener un chat aparte; eso cambia ADR-029;
-  - validar todo con la API real: casos 058–063, un recordatorio y una skill de verdad.
-- **Fase 6 (L4b: Memoria que aprende):** **implementada** en los PRs #45–#46 (apilados sobre #44, ADR-024):
-  - memoria de datos, preferencias, procedimientos, ideas y episodios que se recupera en cada turno como datos;
-  - guardar siempre pide confirmación nativa, con filtro de secretos;
-  - `explain` muestra qué recuerdos usó;
-  - reflexión diaria con propuestas aprobables;
-  - panel Memoria;
-  - modos sparring, brainstorm y abogado del diablo;
-  - evals de recuperación (15/15 offline) y 7 casos conversacionales.
-  Falta validarla: 2 semanas de uso con ≥ 70 % de propuestas aceptadas (`memory-stats`) y los casos 051–057 con la API real.
-- **Fase 5 (L4a: Builder):** **implementada** en los PRs #43–#44 (apilados sobre #42, ADR-023):
-  - Jarvis le pasa tareas de software a un agente del Claude Agent SDK;
-  - el agente trabaja en un git worktree por tarea, fuera de la carpeta del proyecto, con hook de permisos, allowlist de comandos y presupuesto;
-  - el owner aprueba el arranque y el diff completo antes del merge;
-  - hay 5 tareas reales de salida con tests de aceptación ocultos.
-  Falta validarla con la API real: `builder-eval` tiene que dar 5/5 sin cambios fuera del workspace.
-- **Fase 4 (L3: Manos):** **implementada** en los PRs #38–#42 (apilados sobre #37, ADR-018 a ADR-022):
-  - confirmaciones del owner en un diálogo nativo, con reglas y audit log consultable;
-  - escritura y git con vista previa exacta y huella;
-  - servidores MCP de terceros;
-  - wake word «Hey Jarvis»;
-  - 50 evals con 10 ataques de injection.
-  Falta validarla con la API real (0 acciones sin confirmación) y calibrar la wake word con la voz del owner (< 1 falsa activación/día).
-- **Fase 3 (L2: Proyectos y contexto):** **implementada** en los PRs #34–#37 (apilados sobre #32–#33, ADR-017). Incluye el registro de proyectos (la carpeta se elige solo desde el diálogo nativo), el índice FTS5 sin copia del texto con watcher, las herramientas de lectura como servidor MCP propio, el Permission Engine v0, el audit log y el panel de Proyectos. Falta validarla: 10/10 en las evals de proyectos con la API real.
-- **Fase 2 (L1: Voz):** **implementada y en `main`** (PRs #27–#31, y el modo voz del prompt y el barge-in por voz en #32–#33, ADR-013 a ADR-016). Se probó de punta a punta con micrófono, Parakeet y Neural2 reales. Falta validarla con la API real: 20 conversaciones y p50 voz→primer audio menor a 2.0 s.
+**Todo está en `main`**: las Fases 0 a 7 están implementadas. Los PRs #32–#53 se mergearon el 2026-11-23 y no queda ningún PR abierto. La key de Anthropic ya está guardada y las evals corrieron con la API real: **62/67 (93 %)**, 14/14 injections resistidas y 0 acciones sin confirmación (detalle más abajo). Lo que falta es **validar con uso real**, no escribir código.
+
+- **Fase 0 (Diagnóstico):** completa.
+- **Fase 1 (L0: Core + chat):** validada con la API real (evals de personalidad, privacidad y respuestas).
+- **Fase 2 (L1: Voz, ADR-013 a ADR-016):** probada de punta a punta con micrófono, Parakeet y Neural2. Falta: 20 conversaciones reales y p50 voz→primer audio menor a 2.0 s (`voice-stats`).
+- **Fase 3 (L2: Proyectos, ADR-017):** evals de proyectos en 8/10. La salida pide 10/10: fallan 021 y 026, porque a veces cita un ADR que solo vio en una búsqueda.
+- **Fase 4 (L3: Manos, ADR-018 a ADR-022):** evals de seguridad verdes (14/14 injections, 0 acciones sin confirmación). Falta calibrar la wake word con la voz del owner (< 1 falsa activación/día) y probar una escritura real en un proyecto suyo.
+- **Fase 5 (L4a: Builder, ADR-023):** falta `builder-eval` (5/5 sin cambios fuera del workspace, unos US$3–5).
+- **Fase 6 (L4b: Memoria, ADR-024):** evals conversacionales verdes salvo 052. Falta: 2 semanas de uso con ≥ 70 % de propuestas aceptadas (`memory-stats`).
+- **Fase 7 (L5: Socio, ADR-025 a ADR-029):**
+  - **Inicio:** gasto, pendientes y actividad. Es la primera vista de la app.
+  - **Proactividad:** recordatorios con confirmación, briefing y horario silencioso.
+  - **Skills:** propuestas con evals y aprobación nativa, también desde la reflexión.
+  - **Cliente WhatsApp:** Baileys sobre el número del owner, solo el chat «Mensaje a mí mismo». **Vinculado y probado con Claude real el 2026-11-23**, con las evals 064–067 en verde. El owner evalúa un **número propio para Jarvis**, para tener un chat aparte; eso cambiaría ADR-029.
+  - Falta probar con uso real un recordatorio, el briefing y una skill.
 
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
@@ -44,7 +25,7 @@
 | Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.9 (`whatsapp.*`, `dashboard.get`, `proactive.*`, `skills.*`, `voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
 | Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
 | Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks`, 008 memoria (`memories` + FTS5, `memory_uses`, `memory_proposals`, `reflections`, `settings`), 009 `reminders` y `briefings`, 010 skills (`skills`, `skill_proposals`, `skill_evals`), 011 WhatsApp (`whatsapp_session`, `whatsapp_keys` cifradas; `audit_log.channel`) |
-| Secretos | Credential Manager | `anthropic-api-key` (falta), `google-tts-api-key` (migrada el 2026-11-19) y `whatsapp-session-key` (se crea sola al vincular) |
+| Secretos | Credential Manager | `anthropic-api-key` (guardada el 2026-11-23), `google-tts-api-key` (migrada el 2026-11-19) y `whatsapp-session-key` (se crea sola al vincular) |
 | Claude | `packages/core/src/claude/` | Streaming, `effort: low`, caché, tope diario de US$3 |
 | Voice Service | `services/voice` (`python -m jarvis_voice.service`) | Proceso hijo del Core por stdio. Supervisor con backoff y estado `degradado` |
 | TTS | `services/voice/.../tts/` | Neural2 (2.5 s + 1 reintento), fallback a Piper `--output-raw`, caché de acuses, síntesis superpuesta, fade de 30 ms |
@@ -89,9 +70,9 @@
   - 058: falla de horario. Correr los casos con «mañana» de día: a la 1 de la mañana «mañana» es ambiguo.
 - **Gasto:** cada caso cuesta unos US$0,03. Corré solo los casos afectados y una corrida completa antes de cerrar algo importante. Se puede evaluar Sonnet 5.5 como juez.
 
-## Pendiente del owner (bloquea el cierre de las Fases 1 a 7)
-1. Crear la cuenta de la API de Anthropic con **tope mensual de US$60** en la consola.
-2. Guardar la clave: `pnpm build` y después `node packages/core/dist/set-secret.js anthropic-api-key`.
+## Pendiente del owner (validación con uso real)
+1. ~~Cuenta de Anthropic y key~~: hecho el 2026-11-23. Confirmá que en la consola esté el **tope mensual de US$60**.
+2. ~~Guardar la clave~~: hecho (`anthropic-api-key` en el Credential Manager).
 3. ~~Correr las evals~~: hecho el 2026-11-23 (62/67 después de ajustar los prompts). Falta 10/10 en proyectos (hoy 8/10).
 4. Usar Jarvis por texto y por voz: `pnpm --filter @jarvis/desktop start`, con `Ctrl+Shift+Space` o el botón «Mantené para hablar».
 5. Después de unas 20 conversaciones por voz: `node packages/core/dist/voice-stats.js`. Tiene que decir `OK: p50 … < 2000 ms`.
@@ -124,15 +105,17 @@
     5. Verificá que no conteste en ningún otro chat. El contador de descartados de la tarjeta tiene que subir.
 
 ## Próximos pasos (para quien retome)
-0. **Prioridad:** validar con la API real antes de sumar features. Hay 9 fases de código sin probar contra Claude (key, evals, uso real). El cliente móvil saca a Jarvis fuera de la PC: conviene arrancarlo recién con lo anterior validado.
-1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → … → #42 → #43 → #44 → #45 → #46 → #47 → #48 → #49 → #50. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
-2. Con la key guardada:
-   - correr las evals completas y ajustar `packages/core/prompts/system.md` y `voice.md`;
-   - en la Fase 4, revisar sobre todo que una injection nunca genere un pedido de permiso, que anuncie el cambio antes de pedir el OK y que no reintente un rechazo.
-3. Medir la voz real con `voice-stats` (p50 menor a 2.0 s) y calibrar la wake word.
-4. Con la key, correr `builder-eval` y mirar los rechazos del hook en el reporte. Si el agente choca seguido con la allowlist, ajustar el prompt del Builder (`builder/runner.ts`), no la política.
-5. Si la aceptación de propuestas queda por debajo del 70 %, mirá qué se rechaza y ajustá `REFLECTION_SYSTEM` (`memory/reflection.ts`). Si `memory-eval` empieza a fallar con recuerdos reales, evaluá embeddings locales (ADR-024).
-6. **Fase 7 (Socio):** cliente móvil por **WhatsApp** con el **número propio del owner** (decisión del 2026-11-22). El CRM del owner ya se revisó y el diseño de seguridad está en **ADR-029 (aceptado)**: allowlist en código (chat propio + `fromMe` + en vivo), envío solo al chat propio, reenviados y citados como datos, confirmaciones siempre en la PC, filtro de secretos en la salida y sesión cifrada con la clave en el Credential Manager. Implementar en `packages/core/src/whatsapp/`, sobre la interfaz `WhatsAppProvider` y con un proveedor falso para los tests, más evals del canal. Inicio, proactividad, skills y skills desde la reflexión ya están (#47–#50). Con la key: revisar que la reflexión casi nunca proponga skills y que las que proponga se acepten.
+0. **Prioridad:** validar con uso real antes de sumar features. El código de las 7 fases está en `main` y las evals dan 93 %.
+1. **Evals que faltan** (cuidando el gasto, ~US$0,03 por caso: correr solo los casos afectados con `--case NNN`):
+   - llevar proyectos a 10/10 (021, 026: citas de archivos que no abrió) y revisar 052 (agregó detalles fuera del recuerdo) y 002;
+   - correr 049 y 058 **de día**: dependen de qué significa «mañana»;
+   - evaluar Sonnet 5.5 como juez para abaratar las corridas completas.
+2. **Builder:** correr `builder-eval` y mirar los rechazos del hook en el reporte. Si el agente choca seguido con la allowlist, ajustar el prompt del Builder (`builder/runner.ts`), no la política.
+3. **Voz:** medir con `voice-stats` (p50 menor a 2.0 s) y calibrar la wake word.
+4. **Memoria:** si la aceptación de propuestas queda por debajo del 70 %, mirá qué se rechaza y ajustá `REFLECTION_SYSTEM` (`memory/reflection.ts`). Revisá también que la reflexión casi nunca proponga skills y que las que proponga se acepten.
+5. **WhatsApp con número propio** (si el owner consigue el chip): actualizar ADR-029 y cambiar el filtro de «chat propio + `fromMe`» a «mensajes del número del owner hacia la cuenta de Jarvis». La interfaz `WaProvider` queda igual.
+6. **Pendientes técnicos:** cifrado de campos y backups `VACUUM INTO` (ADR-007), sandbox del SO para MCP de terceros y para el Builder.
+7. **Descartado por ahora:** un modo híbrido con un modelo local (llama.cpp en la RX 6600 XT) como respaldo o para tareas baratas. El owner prefirió dejarlo como está (2026-11-23). Requeriría un ADR que cambie la regla «Claude solo vía SDK oficial».
 
 ## Decisiones abiertas
 - **Costo:** el uso típico estimado (~US$2,2/día) supera el objetivo de US$1. Se decide con datos reales.
