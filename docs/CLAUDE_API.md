@@ -86,6 +86,11 @@ El TTS representa US$ 0,08–0,46 por día del total. El Builder (Claude Agent S
 - **Topes iniciales sugeridos:**
   - **tope duro diario en el Core: US$ 3**, con alerta al 80%;
   - **tope mensual en la consola de Anthropic: US$ 60**.
+- **Tope diario implementado:** US$ 3 por defecto (`JARVIS_DAILY_BUDGET_USD`). Suma todo lo que llama a Claude: chat, voz, WhatsApp, Builder, reflexión y evals de skills. Al alcanzarlo, Jarvis deja de llamar a Claude hasta el día siguiente:
+  - en el chat, el turno no arranca y aparece «Se alcanzó el tope diario de US$ 3.00 (gastado: …)»;
+  - por voz lo dice («Llegué al tope de gasto de hoy…») y por WhatsApp responde un aviso fijo;
+  - el Builder no arranca tareas nuevas, la reflexión diaria se saltea y las evals de skills quedan para mañana.
+- **Alerta al 80 %:** el indicador de gasto del panel Inicio cambia de color; con el 100 % se marca como superado.
   - El owner puede ajustarlos. Si se mantiene el objetivo de US$1, se revisa con datos reales en la Fase 1.
 
 ## 5. Builder

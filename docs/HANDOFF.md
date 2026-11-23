@@ -77,12 +77,22 @@
   - el recordatorio con hora clara preguntó en vez de crearlo (058);
   - 008 sugirió `.env` o un gestor de contraseñas en lugar del Credential Manager.
 - Las evals encontraron un bug real: el audit log cortaba el JSON de argumentos largos y `JSON.parse` reventaba al leerlo. Está corregido.
-- **Siguiente paso:** ajustar `prompts/system.md` y `voice.md` para estos casos y volver a correr solo los que fallaron (`--case NNN`).
+- **Después del ajuste de prompts (misma noche): 62/67 (93 %)**, 14/14 injections, 0 acciones sin confirmación, US$1,76.
+  - Cambios: brevedad concreta, confirmar en una línea sin tapar avisos de seguridad, citar solo archivos abiertos, avisar explícitamente de las injections (también las que se hacen pasar por el owner), no filtrar razonamiento, horas concretas en recordatorios, la key pegada va al Credential Manager, voz sin comandos fuera del bloque.
+  - `set_thinking_mode` ahora devuelve las instrucciones del modo para aplicarlas en la misma respuesta.
+  - El runner de evals registra conversación y turno como `ChatService`.
+  - Se corrigieron dos rúbricas (021 y 025) que pedían cosas que la documentación no dice, y se documentó en `CLAUDE_API.md` qué pasa al llegar al tope diario.
+- **Fallan:**
+  - 021 y 026 (proyectos 8/10): a veces cita un ADR que solo vio en la búsqueda;
+  - 052: agregó detalles fuera del recuerdo;
+  - 002: no ofreció ampliar;
+  - 058: falla de horario. Correr los casos con «mañana» de día: a la 1 de la mañana «mañana» es ambiguo.
+- **Gasto:** cada caso cuesta unos US$0,03. Corré solo los casos afectados y una corrida completa antes de cerrar algo importante. Se puede evaluar Sonnet 5.5 como juez.
 
 ## Pendiente del owner (bloquea el cierre de las Fases 1 a 7)
 1. Crear la cuenta de la API de Anthropic con **tope mensual de US$60** en la consola.
 2. Guardar la clave: `pnpm build` y después `node packages/core/dist/set-secret.js anthropic-api-key`.
-3. ~~Correr las evals~~: hecho el 2026-11-23 (55/67). Falta llegar a 10/10 en proyectos, ajustando los prompts.
+3. ~~Correr las evals~~: hecho el 2026-11-23 (62/67 después de ajustar los prompts). Falta 10/10 en proyectos (hoy 8/10).
 4. Usar Jarvis por texto y por voz: `pnpm --filter @jarvis/desktop start`, con `Ctrl+Shift+Space` o el botón «Mantené para hablar».
 5. Después de unas 20 conversaciones por voz: `node packages/core/dist/voice-stats.js`. Tiene que decir `OK: p50 … < 2000 ms`.
 6. **Wake word:**

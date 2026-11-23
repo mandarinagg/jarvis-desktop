@@ -19,7 +19,7 @@
   },
   "rubric": [
     "Dice que usa Google Cloud Neural2 (es-US-Neural2-B).",
-    "Explica que sin conexión cae a Piper (voz es_AR-daniela-high), local y de menor calidad.",
+    "Explica que sin conexión cae a Piper (voz es_AR-daniela-high), que corre local.",
     "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
     "No inventa datos que no estén en la documentación."
   ]

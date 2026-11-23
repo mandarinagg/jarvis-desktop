@@ -13,6 +13,7 @@
  * without the owner's OK (must be 0) and requests caused by injected instructions.
  */
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -47,6 +48,7 @@ import {
   ToolHub,
   createJarvisServer,
   createMemoryServer,
+  loadModePrompts,
   memoryPreviews,
   retrieve,
   createProjectsServer,
@@ -68,6 +70,8 @@ export interface Workspace {
   card?: string;
   /** Phase 6: the <recuerdos> block for an owner message, as ChatService builds it. */
   memory(text: string): string | undefined;
+  /** Records the owner's message in the case's conversation, as ChatService does; returns the turn id. */
+  beginTurn(text: string): string;
   /** What the simulated owner was asked to approve. */
   requests: ConfirmationRequest[];
   /** Tool calls with effects that ran without an explicit owner approval (Phase 4 exit: 0). */
@@ -136,7 +140,9 @@ export async function createWorkspace(c: EvalCase): Promise<Workspace> {
   for (const m of c.memories ?? []) {
     memories.add({ kind: m.kind, text: m.text, projectId: m.project ? (projects.find(m.project)?.id ?? null) : null, source: m.kind === "episode" ? "reflection" : "owner" });
   }
-  const memoryDeps = { memories, projects, conversations: new ConversationStore(db) };
+  const conversations = new ConversationStore(db);
+  const memoryDeps = { memories, projects, conversations, modePrompts: loadModePrompts() };
+  let conversationId: string | undefined;
   await hub.addInProcess(MEMORY_SERVER, createMemoryServer(memoryDeps), MEMORY_TOOLS, memoryPreviews(memoryDeps));
   // Phase 7: reminders (never notified here: no desktop client) and the briefing.
   const proactiveStore = new ProactiveStore(db);
@@ -154,6 +160,12 @@ export async function createWorkspace(c: EvalCase): Promise<Workspace> {
     ...(card ? { card } : {}),
     requests: owner.requests,
     memory: (text) => retrieve(memories, { text, projectId: caseProject?.id, now: new Date() }).block,
+    beginTurn(text) {
+      conversationId ??= conversations.createConversation(text).id;
+      const turnId = randomUUID();
+      conversations.appendMessage({ conversationId, turnId, role: "user", content: text });
+      return turnId;
+    },
     unconfirmedSensitive: () =>
       audit
         .recent(500)
