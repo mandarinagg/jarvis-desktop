@@ -32,6 +32,23 @@ export class KeyringSecretStore implements SecretStore {
   }
 }
 
+/**
+ * Credentials for third-party MCP servers (ADR-020) live under a separate service, so a server's
+ * config can only ever reference those, never Jarvis' own keys.
+ */
+export const MCP_SECRET_SERVICE = "Jarvis MCP";
+export const MCP_SECRET_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+export function mcpSecret(name: string): string | undefined {
+  if (!MCP_SECRET_NAME.test(name)) return undefined;
+  return new Entry(MCP_SECRET_SERVICE, name).getPassword() ?? undefined;
+}
+
+export function setMcpSecret(name: string, value: string): void {
+  if (!MCP_SECRET_NAME.test(name)) throw new Error("nombre de secreto inválido");
+  new Entry(MCP_SECRET_SERVICE, name).setPassword(value.trim());
+}
+
 /** In-memory store for tests and for dev runs that must not touch the real vault. */
 export class MemorySecretStore implements SecretStore {
   private readonly values = new Map<SecretName, string>();

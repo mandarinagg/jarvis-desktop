@@ -4,7 +4,7 @@
  *   node packages/core/dist/set-secret.js anthropic-api-key      (prompts with hidden input)
  *   Get-Clipboard | node packages/core/dist/set-secret.js anthropic-api-key
  */
-import { KeyringSecretStore, type SecretName } from "./secrets.js";
+import { KeyringSecretStore, MCP_SECRET_NAME, type SecretName, setMcpSecret } from "./secrets.js";
 
 const NAMES: readonly SecretName[] = ["anthropic-api-key", "google-tts-api-key"];
 
@@ -50,14 +50,21 @@ async function readPiped(): Promise<string> {
 
 async function main(): Promise<number> {
   const name = process.argv[2] as SecretName | undefined;
-  if (!name || !NAMES.includes(name)) {
-    process.stderr.write(`Uso: set-secret <${NAMES.join("|")}>\n`);
+  // mcp:<name>: a credential for a third-party MCP server (ADR-020), kept apart from Jarvis' keys.
+  const mcp = name?.startsWith("mcp:") ? name.slice(4) : undefined;
+  if (!name || (mcp === undefined && !NAMES.includes(name)) || (mcp !== undefined && !MCP_SECRET_NAME.test(mcp))) {
+    process.stderr.write(`Uso: set-secret <${NAMES.join("|")}|mcp:<nombre>>\n`);
     return 2;
   }
   const value = (process.stdin.isTTY ? await readHidden(`Pegá el valor de ${name} (no se muestra): `) : await readPiped()).trim();
   if (!value) {
     process.stderr.write("Valor vacío: no se guardó nada.\n");
     return 1;
+  }
+  if (mcp !== undefined) {
+    setMcpSecret(mcp, value);
+    process.stderr.write(`Guardado en Windows Credential Manager (servicio Jarvis MCP, cuenta ${mcp}).\n`);
+    return 0;
   }
   new KeyringSecretStore().set(name, value);
   process.stderr.write(`Guardado en Windows Credential Manager (servicio Jarvis, cuenta ${name}).\n`);

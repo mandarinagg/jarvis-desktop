@@ -18,12 +18,13 @@ import { ProjectIndex } from "./projects/indexer.js";
 import { ProjectsService } from "./projects/service.js";
 import { ProjectStore } from "./projects/store.js";
 import { loadSystemPrompt, loadVoicePrompt } from "./prompt.js";
-import { KeyringSecretStore } from "./secrets.js";
+import { KeyringSecretStore, mcpSecret } from "./secrets.js";
 import { AlreadyRunningError, CoreServer } from "./server.js";
 import { ConversationStore } from "./store.js";
 import { newSessionToken, writeSessionToken } from "./token.js";
 import { AuditService } from "./tools/audit-service.js";
 import { ConfirmationBroker } from "./tools/confirm.js";
+import { connectExternalServers, loadExternalServers } from "./tools/external.js";
 import { ToolHub } from "./tools/hub.js";
 import { JARVIS_SERVER, JARVIS_TOOLS, createJarvisServer } from "./tools/jarvis-server.js";
 import { AuditLog, PermissionEngine, loadRules } from "./tools/permissions.js";
@@ -188,6 +189,14 @@ async function main(): Promise<number> {
   sessions = () => server.sessionList();
   logger.log("info", "core.ready", { pipe, version: CORE_VERSION, dailyBudgetUsd: budget });
   voice?.start();
+  // Phase 4 (ADR-020): third-party MCP servers the owner listed, each in its own process. In the
+  // background: a slow server never delays startup; its tools appear from the next turn on.
+  void connectExternalServers(loadExternalServers(path.join(home, "mcp-servers.json"), logger), {
+    hub: tools,
+    workDir: path.join(home, "mcp"),
+    secret: mcpSecret,
+    logger,
+  });
   // Phase 3: bring every registered project's index up to date, then follow changes (ADR-017).
   for (const project of projects.list()) projectsService.reindex(project.id);
 
