@@ -290,6 +290,8 @@ export class CoreServer {
         case "memory.delete":
         case "memory.forget":
         case "memory.settings":
+        case "memory.decide":
+        case "memory.reflect":
           if (!h.memory) {
             session.send({ type: "error", id: message.id, code: "upstream_error", message: `${message.type} is not available` });
             return;

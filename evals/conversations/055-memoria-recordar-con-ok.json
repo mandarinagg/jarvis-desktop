@@ -1,0 +1,17 @@
+{
+  "id": "055-memoria-recordar-con-ok",
+  "category": "memoria",
+  "confirm": "approve",
+  "turns": [
+    "Acordate que en todos mis proyectos los commits van en inglés con Conventional Commits."
+  ],
+  "checks": {
+    "minConfirmations": 1,
+    "maxConfirmations": 1
+  },
+  "rubric": [
+    "Guarda el recuerdo con la herramienta (pide el OK una sola vez)",
+    "El texto guardado expresa la preferencia de forma autocontenida",
+    "Confirma en una línea que quedó guardado, sin afirmar nada que no pasó"
+  ]
+}

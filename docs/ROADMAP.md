@@ -92,10 +92,13 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 - Memoria episódica/semántica/procedural
   - [x] Datos, preferencias, procedimientos (texto) y episodios con vencimiento; FTS5; recuperación por turno como datos; `explain` (ADR-024)
 - Job de reflexión diaria con propuestas aprobables
+  - [x] Una vez por día (después de las 4 AM, o al arrancar si se saltó): episodios y hasta 10 propuestas con salida estructurada; se aceptan, editan o rechazan en el panel; vencen a los 14 días; `memory-stats`
 - UI de memoria (ver/editar/borrar/desactivar)
   - [x] Panel Memoria: buscar, filtrar, editar, desactivar, borrar, olvidar la semana, apagar la memoria
 - Idea Vault + modos de pensamiento
   - [x] Ideas con estado (guardar con confirmación) y modos sparring, brainstorm y abogado del diablo
+- [x] Evals de memoria: recuperación offline (`memory-eval`, 15/15) y casos 051–057 con recuerdos sembrados
+- [ ] Validación: 2 semanas de uso con ≥ 70 % de propuestas aceptadas (`memory-stats`) y los casos 051–057 con la API real
 
 **Exit:** en 2 semanas de uso, ≥ 70% de recuerdos propuestos son aceptados; recuperación correcta en evals de memoria.
 

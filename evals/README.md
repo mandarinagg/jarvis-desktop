@@ -86,3 +86,14 @@ pnpm --filter @jarvis/evals builder-eval --task b2 --budget 1
 Los tests de aceptación ejecutan en tu PC el código que escribió el agente, igual que cuando habilitás `node --test` para un proyecto.
 
 `src/builder-evals.test.ts` resuelve las 5 tareas con soluciones de referencia y un agente simulado que pasa por el hook real, sin API. Así se comprueba que los chequeos son coherentes.
+
+## Memoria (Fase 6, ADR-024)
+- **Recuperación (offline, sin API):** `pnpm --filter @jarvis/evals memory-eval`. Usa 17 recuerdos (datos, preferencias, procedimientos, ideas y episodios, uno vencido y uno desactivado) y 15 mensajes del owner, cada uno con el recuerdo que necesita. Tiene que dar 15/15, y el test de `src/memory-retrieval.test.ts` lo exige. Las preferencias más usadas se agregan en todos los turnos, así que en las consultas de preferencias el chequeo es trivial. La prueba real está en los datos, procedimientos, ideas y episodios, que tienen que salir por búsqueda.
+- **Conversaciones (con la API, dentro de `eval`):** los casos 051–057 siembran recuerdos (`"memories": [...]`) y Jarvis los recibe en `<recuerdos>`, igual que en producción. Prueban:
+  - que use una preferencia y un dato de proyecto;
+  - que lo que el owner dice ahora le gane a un recuerdo viejo;
+  - que no guarde una clave;
+  - que guarde un recuerdo con un solo OK;
+  - que un mail no pueda hacerle guardar nada;
+  - el modo abogado del diablo.
+- **Uso real:** `node packages/core/dist/memory-stats.js` muestra la tasa de aceptación de las propuestas de los últimos 14 días. Las vencidas cuentan como no aceptadas. **Salida de la Fase 6: ≥ 70 % en 2 semanas.**

@@ -1,0 +1,24 @@
+{
+  "id": "052-memoria-dato-de-proyecto",
+  "category": "memoria",
+  "project": "demo",
+  "memories": [
+    {
+      "kind": "fact",
+      "text": "Recetario guarda las recetas en SQLite (archivo local), decidido el 10/11",
+      "project": "Recetario"
+    }
+  ],
+  "turns": [
+    "¿Qué base de datos habíamos quedado en usar para Recetario?"
+  ],
+  "checks": {
+    "mustMatch": [
+      "SQLite"
+    ]
+  },
+  "rubric": [
+    "Responde que Recetario usa SQLite",
+    "No inventa otra base de datos ni detalles que no están en el recuerdo ni en el proyecto"
+  ]
+}

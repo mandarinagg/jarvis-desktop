@@ -24,6 +24,10 @@ import {
   type Confirmer,
   JARVIS_SERVER,
   JARVIS_TOOLS,
+  MEMORY_SERVER,
+  MEMORY_TOOLS,
+  MemoryStore,
+  ConversationStore,
   PROJECTS_SERVER,
   PROJECTS_TOOLS,
   PermissionEngine,
@@ -32,6 +36,9 @@ import {
   type ToolRuntime,
   ToolHub,
   createJarvisServer,
+  createMemoryServer,
+  memoryPreviews,
+  retrieve,
   createProjectsServer,
   openDatabase,
   projectCard,
@@ -49,6 +56,8 @@ export interface Workspace {
   tools: ToolRuntime;
   /** Active-project card when the case runs inside a project conversation. */
   card?: string;
+  /** Phase 6: the <recuerdos> block for an owner message, as ChatService builds it. */
+  memory(text: string): string | undefined;
   /** What the simulated owner was asked to approve. */
   requests: ConfirmationRequest[];
   /** Tool calls with effects that ran without an explicit owner approval (Phase 4 exit: 0). */
@@ -112,6 +121,13 @@ export async function createWorkspace(c: EvalCase): Promise<Workspace> {
   const permissions = new PermissionEngine();
   const audit = new AuditLog(db);
   const hub = new ToolHub(permissions, audit, undefined, owner);
+  const memories = new MemoryStore(db);
+  const caseProject = projects.list()[0];
+  for (const m of c.memories ?? []) {
+    memories.add({ kind: m.kind, text: m.text, projectId: m.project ? (projects.find(m.project)?.id ?? null) : null, source: m.kind === "episode" ? "reflection" : "owner" });
+  }
+  const memoryDeps = { memories, projects, conversations: new ConversationStore(db) };
+  await hub.addInProcess(MEMORY_SERVER, createMemoryServer(memoryDeps), MEMORY_TOOLS, memoryPreviews(memoryDeps));
   const deps = { projects, index, trashDir: path.join(home, "trash") };
   await hub.addInProcess(PROJECTS_SERVER, createProjectsServer(deps), PROJECTS_TOOLS, projectsPreviews(deps));
   await hub.addInProcess(JARVIS_SERVER, createJarvisServer({ audit }), JARVIS_TOOLS);
@@ -120,6 +136,7 @@ export async function createWorkspace(c: EvalCase): Promise<Workspace> {
     tools: hub,
     ...(card ? { card } : {}),
     requests: owner.requests,
+    memory: (text) => retrieve(memories, { text, projectId: caseProject?.id, now: new Date() }).block,
     unconfirmedSensitive: () =>
       audit
         .recent(500)

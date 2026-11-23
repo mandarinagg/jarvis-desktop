@@ -14,6 +14,7 @@ import { ChatService } from "./chat.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
 import { openDatabase } from "./db.js";
 import { localDay } from "./db.js";
+import { AnthropicReflectionModel, Reflector } from "./memory/reflection.js";
 import { retrieve } from "./memory/retrieve.js";
 import { MemoryService } from "./memory/service.js";
 import { MemoryStore } from "./memory/store.js";
@@ -104,11 +105,31 @@ async function main(): Promise<number> {
   const memories = new MemoryStore(db);
   const memoryDeps = { memories, projects, conversations: store };
   await tools.addInProcess(MEMORY_SERVER, createMemoryServer(memoryDeps), MEMORY_TOOLS, memoryPreviews(memoryDeps));
-  const memoryService = new MemoryService(memories, projects);
   const modePrompts = loadModePrompts();
   // The server is created below; events only flow once it is listening.
   let broadcast: (m: CoreMessage) => void = () => {};
   const dailyBudgetUsd = Number.isFinite(budget) && budget > 0 ? budget : 3;
+  // Daily reflection (ADR-024): episodes + proposals the owner decides. JARVIS_REFLECTION=0 turns it off.
+  const reflectionKey = anthropicKey(env);
+  let reflectionModel: { key: string; model: AnthropicReflectionModel } | undefined;
+  const reflector = new Reflector({
+    db,
+    memories,
+    projects,
+    model: () => {
+      const key = reflectionKey();
+      if (!key) return undefined;
+      if (reflectionModel?.key !== key) reflectionModel = { key, model: new AnthropicReflectionModel(key) };
+      return reflectionModel.model;
+    },
+    spentToday: () => store.spentOn(localDay(new Date())),
+    dailyBudgetUsd,
+    logger,
+  });
+  const memoryService = new MemoryService(memories, projects, reflector);
+  const reflectionTimer =
+    env.JARVIS_REFLECTION === "0" ? undefined : setInterval(() => void reflector.runIfDue(), 30 * 60_000);
+  reflectionTimer?.unref();
   // Phase 5 (ADR-023): the Builder, reached through the `builder` tools (owner confirms start and merge).
   const builder = new Builder({
     tasks: new BuilderTaskStore(db),
@@ -187,6 +208,7 @@ async function main(): Promise<number> {
     chat.cancelAll();
     confirmations.cancelAll();
     await builder.close();
+    if (reflectionTimer) clearInterval(reflectionTimer);
     unwatchFile(rulesFile);
     index.close();
     await tools.close();
@@ -246,6 +268,8 @@ async function main(): Promise<number> {
   sessions = () => server.sessionList();
   logger.log("info", "core.ready", { pipe, version: CORE_VERSION, dailyBudgetUsd: budget });
   voice?.start();
+  // A reflection missed while the Core was off runs shortly after startup.
+  if (reflectionTimer) setTimeout(() => void reflector.runIfDue(), 2 * 60_000).unref();
   // Phase 4 (ADR-020): third-party MCP servers the owner listed, each in its own process. In the
   // background: a slow server never delays startup; its tools appear from the next turn on.
   void connectExternalServers(loadExternalServers(path.join(home, "mcp-servers.json"), logger), {

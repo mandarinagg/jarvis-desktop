@@ -53,7 +53,7 @@ El riesgo nuevo es el **envenenamiento de memoria**: una injection que logre gua
 - **Filtro de secretos** antes de pedir el OK y también al editar desde la UI: se rechazan claves y tokens (los patrones de `redact`), «contraseña/clave/PIN… es X», números de tarjeta, y CBU/CVU/IBAN.
 - **Turno del pedido:** el hub ahora pasa el turno (`_meta["jarvis/turn"]`) a los servidores propios, nunca a los de terceros, para que `explain` y `set_thinking_mode` sepan en qué conversación están.
 
-### Reflexión diaria (PR siguiente)
+### Reflexión diaria (`memory/reflection.ts`)
 - Una vez por día, con el Core prendido (la primera vez después de las 4 AM, o al arrancar si se saltó), sobre las conversaciones nuevas desde la anterior. Tiene un tope de tamaño.
 - Usa `claude-opus-5-5` con salida estructurada y devuelve:
   - **episodios**, que se guardan directo y vencen solos;
@@ -64,6 +64,8 @@ El riesgo nuevo es el **envenenamiento de memoria**: una injection que logre gua
   - vencen a los 14 días;
   - `memory-stats` calcula la tasa de aceptación.
 - El costo suma al tope diario; si se alcanzó el tope, la reflexión no corre. Se apaga con la memoria o con `JARVIS_REFLECTION=0`.
+- Si falla, se reintenta, pero nunca antes de 2 horas. Una corrida fallida no consume las conversaciones: la próxima vuelve a leerlas.
+- El panel tiene «Reflexionar ahora» (`memory.reflect`).
 
 ### Control del owner
 - **Panel Memoria:**

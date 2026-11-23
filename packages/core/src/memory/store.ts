@@ -27,6 +27,28 @@ const COLUMNS = `id, kind, text, project_id AS projectId, source, source_convers
   last_used_at AS lastUsedAt, use_count AS useCount`;
 const M_COLUMNS = COLUMNS.split(",").map((c) => `m.${c.trim()}`).join(", ");
 
+export type ProposalKind = Exclude<MemoryKind, "episode">;
+
+export interface Proposal {
+  id: number;
+  kind: ProposalKind;
+  text: string;
+  reason: string;
+  projectId: string | null;
+  sourceConversationId: string | null;
+  status: "pending" | "accepted" | "rejected" | "expired";
+  edited: number;
+  memoryId: number | null;
+  createdAt: string;
+  decidedAt: string | null;
+}
+
+const P_COLUMNS = `id, kind, text, reason, project_id AS projectId, source_conversation_id AS sourceConversationId, status, edited,
+  memory_id AS memoryId, created_at AS createdAt, decided_at AS decidedAt`;
+
+/** Proposals expire if the owner does not decide within this many days. */
+export const PROPOSAL_TTL_DAYS = 14;
+
 export interface NewMemory {
   kind: MemoryKind;
   text: string;
@@ -138,6 +160,84 @@ export class MemoryStore {
   conversationOfTurn(turnId: string): string | undefined {
     const row = this.db.prepare("SELECT conversation_id AS c FROM messages WHERE turn_id = ? LIMIT 1").get(turnId) as { c: string } | undefined;
     return row?.c;
+  }
+
+  // ---------------------------------------------------------------- proposals (daily reflection)
+
+  addProposal(p: { kind: ProposalKind; text: string; reason: string; projectId?: string | null; sourceConversationId?: string | null }): Proposal {
+    const r = this.db
+      .prepare("INSERT INTO memory_proposals (kind, text, reason, project_id, source_conversation_id, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(p.kind, p.text.trim().slice(0, MAX_MEMORY_CHARS), p.reason.slice(0, 300), p.projectId ?? null, p.sourceConversationId ?? null, this.now().toISOString());
+    return this.proposal(Number(r.lastInsertRowid)) as Proposal;
+  }
+
+  proposal(id: number): Proposal | undefined {
+    return this.db.prepare(`SELECT ${P_COLUMNS} FROM memory_proposals WHERE id = ?`).get(id) as Proposal | undefined;
+  }
+
+  pendingProposals(): Proposal[] {
+    this.expireProposals();
+    return this.db.prepare(`SELECT ${P_COLUMNS} FROM memory_proposals WHERE status = 'pending' ORDER BY created_at, id`).all() as unknown as Proposal[];
+  }
+
+  /** Accepting (optionally with an edited text) creates the memory; rejecting only records the decision. */
+  decideProposal(id: number, accept: boolean, text?: string): { proposal: Proposal; memory?: Memory } | undefined {
+    const p = this.proposal(id);
+    if (!p || p.status !== "pending") return undefined;
+    const ts = this.now().toISOString();
+    if (!accept) {
+      this.db.prepare("UPDATE memory_proposals SET status = 'rejected', decided_at = ? WHERE id = ?").run(ts, id);
+      return { proposal: this.proposal(id) as Proposal };
+    }
+    const finalText = text?.trim() || p.text;
+    const memory = this.add({ kind: p.kind, text: finalText, projectId: p.projectId, source: "reflection", sourceConversationId: p.sourceConversationId });
+    this.db
+      .prepare("UPDATE memory_proposals SET status = 'accepted', decided_at = ?, memory_id = ?, edited = ? WHERE id = ?")
+      .run(ts, memory.id, finalText !== p.text ? 1 : 0, id);
+    return { proposal: this.proposal(id) as Proposal, memory };
+  }
+
+  expireProposals(): void {
+    const cutoff = new Date(this.now().getTime() - PROPOSAL_TTL_DAYS * 86_400_000).toISOString();
+    this.db.prepare("UPDATE memory_proposals SET status = 'expired', decided_at = ? WHERE status = 'pending' AND created_at < ?").run(this.now().toISOString(), cutoff);
+  }
+
+  /** Phase 6 exit: share of decided proposals the owner accepted in the last `days` days. */
+  proposalStats(days = 14): { proposed: number; accepted: number; edited: number; rejected: number; expired: number; pending: number; rate?: number } {
+    this.expireProposals();
+    const since = new Date(this.now().getTime() - days * 86_400_000).toISOString();
+    const rows = this.db
+      .prepare("SELECT status, COUNT(*) AS n, SUM(edited) AS e FROM memory_proposals WHERE created_at >= ? GROUP BY status")
+      .all(since) as { status: Proposal["status"]; n: number; e: number | null }[];
+    const n = (s: Proposal["status"]) => Number(rows.find((r) => r.status === s)?.n ?? 0);
+    const accepted = n("accepted");
+    const rejected = n("rejected");
+    const out = {
+      proposed: rows.reduce((a, r) => a + Number(r.n), 0),
+      accepted,
+      edited: Number(rows.find((r) => r.status === "accepted")?.e ?? 0),
+      rejected,
+      expired: n("expired"),
+      pending: n("pending"),
+    };
+    // Expired proposals count as not accepted: ignoring them would flatter the rate.
+    const decided = accepted + rejected + out.expired;
+    return decided ? { ...out, rate: accepted / decided } : out;
+  }
+
+  // ---------------------------------------------------------------- reflections
+
+  /** Latest reflection; `okOnly` skips failed runs (they did not consume the conversations). */
+  lastReflection(okOnly = false): { day: string; ranAt: string; error: string | null } | undefined {
+    return this.db.prepare(`SELECT day, ran_at AS ranAt, error FROM reflections ${okOnly ? "WHERE error IS NULL OR error = 'sin conversaciones nuevas'" : ""} ORDER BY ran_at DESC, id DESC LIMIT 1`).get() as
+      | { day: string; ranAt: string; error: string | null }
+      | undefined;
+  }
+
+  recordReflection(r: { day: string; conversations: number; episodes: number; proposals: number; costUsd: number; error?: string | undefined }): void {
+    this.db
+      .prepare("INSERT INTO reflections (day, ran_at, conversations, episodes, proposals, cost_usd, error) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(r.day, this.now().toISOString(), r.conversations, r.episodes, r.proposals, r.costUsd, r.error ?? null);
   }
 
   setting(key: string): string | undefined {

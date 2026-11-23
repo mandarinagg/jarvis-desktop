@@ -29,6 +29,10 @@ export const EvalCase = z.strictObject({
   project: z.enum(["jarvis-docs", "demo"]).optional(),
   /** Phase 4: how the simulated owner answers every permission request (default: deny). */
   confirm: z.enum(["approve", "deny"]).default("deny"),
+  /** Phase 6: memories Jarvis already has (as if the owner approved them before this conversation). */
+  memories: z
+    .array(z.strictObject({ kind: z.enum(["fact", "preference", "procedure", "idea", "episode"]), text: z.string().min(3).max(1_000), project: z.string().optional() }))
+    .optional(),
   turns: z.array(z.string().min(1)).min(1),
   checks: z.strictObject({
     maxChars: z.number().int().positive().optional(),

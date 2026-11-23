@@ -179,7 +179,21 @@ export type MemoryForget = z.infer<typeof MemoryForget>;
 export const MemorySettings = z.strictObject({ type: z.literal("memory.settings"), id: Id, enabled: z.boolean().optional() });
 export type MemorySettings = z.infer<typeof MemorySettings>;
 
-export type MemoryMessage = MemoryList | MemoryUpdate | MemoryDelete | MemoryForget | MemorySettings;
+/** Accept (optionally edited) or reject a proposal from the daily reflection. */
+export const MemoryDecide = z.strictObject({
+  type: z.literal("memory.decide"),
+  id: Id,
+  proposalId: z.number().int().positive(),
+  accept: z.boolean(),
+  text: z.string().min(1).max(1_000).optional(),
+});
+export type MemoryDecide = z.infer<typeof MemoryDecide>;
+
+/** Run the daily reflection now (it spends a few cents). */
+export const MemoryReflect = z.strictObject({ type: z.literal("memory.reflect"), id: Id });
+export type MemoryReflect = z.infer<typeof MemoryReflect>;
+
+export type MemoryMessage = MemoryList | MemoryUpdate | MemoryDelete | MemoryForget | MemorySettings | MemoryDecide | MemoryReflect;
 
 export const ThinkingModeName = z.enum(["sparring", "brainstorm", "abogado"]);
 /** Thinking mode of a conversation (Phase 6); null = normal. */
@@ -203,6 +217,8 @@ export const ClientMessage = z.discriminatedUnion("type", [
   MemoryDelete,
   MemoryForget,
   MemorySettings,
+  MemoryDecide,
+  MemoryReflect,
   ConversationsSetMode,
   VoicePtt,
   VoiceStatusGet,
@@ -481,6 +497,17 @@ export const MemoryInfo = z.strictObject({
 });
 export type MemoryInfo = z.infer<typeof MemoryInfo>;
 
+export const ProposalInfo = z.strictObject({
+  id: z.number().int().positive(),
+  kind: z.enum(["fact", "preference", "procedure", "idea"]),
+  /** Written by the reflection model: plain text, never rendered as markup. */
+  text: z.string().max(1_000),
+  reason: z.string().max(300),
+  project: z.string().optional(),
+  createdAt: z.string(),
+});
+export type ProposalInfo = z.infer<typeof ProposalInfo>;
+
 /** Reply to every memory.* request (with its id): the current list and whether memory is on. */
 export const MemoryListResult = z.strictObject({
   type: z.literal("memory.list.result"),
@@ -489,6 +516,12 @@ export const MemoryListResult = z.strictObject({
   memories: z.array(MemoryInfo).max(500),
   /** memory.delete / memory.forget: how many were removed. */
   removed: z.number().int().nonnegative().optional(),
+  /** Pending proposals from the daily reflection. */
+  proposals: z.array(ProposalInfo).max(200).default([]),
+  /** Acceptance over the last 14 days (Phase 6 exit: >= 70%). */
+  acceptance: z.strictObject({ accepted: z.number().int(), decided: z.number().int(), rate: z.number().optional() }).optional(),
+  /** memory.reflect: what happened. */
+  reflection: z.string().max(300).optional(),
 });
 export type MemoryListResult = z.infer<typeof MemoryListResult>;
 

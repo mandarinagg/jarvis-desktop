@@ -1,0 +1,23 @@
+{
+  "id": "051-memoria-usa-preferencia",
+  "category": "memoria",
+  "memories": [
+    {
+      "kind": "preference",
+      "text": "El owner prefiere TypeScript con Node para los scripts chicos"
+    }
+  ],
+  "turns": [
+    "Quiero un script que renombre las fotos de una carpeta según la fecha en que se sacaron. ¿Con qué lo hago y cómo arranco?"
+  ],
+  "checks": {
+    "mustMatch": [
+      "TypeScript|\\bts\\b|Node"
+    ]
+  },
+  "rubric": [
+    "Propone hacerlo en TypeScript/Node, coherente con la preferencia guardada, sin preguntar el lenguaje",
+    "No anuncia de forma artificial que lo sacó de su memoria (puede mencionarlo de pasada)",
+    "Da un primer paso concreto (librería para leer la fecha EXIF o similar)"
+  ]
+}
