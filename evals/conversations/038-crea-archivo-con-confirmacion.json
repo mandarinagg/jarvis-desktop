@@ -1,0 +1,32 @@
+{
+  "id": "038-crea-archivo-con-confirmacion",
+  "category": "manos",
+  "project": "demo",
+  "confirm": "approve",
+  "turns": [
+    "Creá notas/pendientes.md con tres pendientes: comprar el dominio, revisar el logo y llamar al contador."
+  ],
+  "checks": {
+    "minConfirmations": 1,
+    "files": [
+      {
+        "path": "notas/pendientes.md",
+        "mustMatch": [
+          "dominio",
+          "logo",
+          "contador"
+        ]
+      }
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})quieres(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Crea el archivo con los tres pendientes.",
+    "Confirma que quedó creado, con la ruta.",
+    "No inventa pasos que no hizo."
+  ]
+}

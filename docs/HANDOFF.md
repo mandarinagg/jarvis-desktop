@@ -1,19 +1,26 @@
 # Handoff: estado del proyecto
 
-> Última actualización: **2026-11-19**. Actualizar al cerrar cada sesión de trabajo. Lo de largo plazo está en `ROADMAP.md`; este archivo cuenta **dónde estamos y qué sigue**.
+> Última actualización: **2026-11-20**. Actualizar al cerrar cada sesión de trabajo. Lo de largo plazo está en `ROADMAP.md`; este archivo cuenta **dónde estamos y qué sigue**.
 
 ## Dónde estamos
 - **Fase 0 (Diagnóstico):** completa, salvo la cuenta de la API de Anthropic, que la tiene que crear el owner.
 - **Fase 1 (L0: Core + chat):** implementada y en `main`. Falta validarla con la API real.
+- **Fase 4 (L3: Manos):** **implementada** en los PRs #38–#42 (apilados sobre #37, ADR-018 a ADR-022):
+  - confirmaciones del owner en un diálogo nativo, con reglas y audit log consultable;
+  - escritura y git con vista previa exacta y huella;
+  - servidores MCP de terceros;
+  - wake word «Hey Jarvis»;
+  - 50 evals con 10 ataques de injection.
+  Falta validarla con la API real (0 acciones sin confirmación) y calibrar la wake word con la voz del owner (< 1 falsa activación/día).
 - **Fase 3 (L2: Proyectos y contexto):** **implementada** en los PRs #34–#37 (apilados sobre #32–#33, ADR-017). Incluye el registro de proyectos (la carpeta se elige solo desde el diálogo nativo), el índice FTS5 sin copia del texto con watcher, las herramientas de lectura como servidor MCP propio, el Permission Engine v0, el audit log y el panel de Proyectos. Falta validarla: 10/10 en las evals de proyectos con la API real.
 - **Fase 2 (L1: Voz):** **implementada y en `main`** (PRs #27–#31, y el modo voz del prompt y el barge-in por voz en #32–#33, ADR-013 a ADR-016). Se probó de punta a punta con micrófono, Parakeet y Neural2 reales. Falta validarla con la API real: 20 conversaciones y p50 voz→primer audio menor a 2.0 s.
 
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.2 (`voice.*`, `projects.*`, `chat.tool`). Voz: protocolo propio 1.1 (`vad.*`), con fixtures compartidos con Python |
+| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.3 (`voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
 | Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
-| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only) |
+| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events` |
 | Secretos | Credential Manager | `anthropic-api-key` (falta) y `google-tts-api-key` (migrada el 2026-11-19) |
 | Claude | `packages/core/src/claude/` | Streaming, `effort: low`, caché, tope diario de US$3 |
 | Voice Service | `services/voice` (`python -m jarvis_voice.service`) | Proceso hijo del Core por stdio. Supervisor con backoff y estado `degradado` |
@@ -24,24 +31,31 @@
 | App de escritorio | `apps/desktop` | Chat + chip de voz + «Mantené para hablar» + atajo `Ctrl+Shift+Space` (interruptor) + overlay |
 | Modo voz del prompt | `packages/core/prompts/voice.md` | Se agrega en los turnos hablados como segundo bloque de `system` (ADR-015) |
 | Proyectos | `packages/core/src/projects/` | Registro (solo el owner), guardia de rutas con `realpath` y denylist de secretos, índice FTS5 sin contenido con watcher, tarjeta del proyecto activo |
-| Herramientas | `packages/core/src/tools/` | Servidor MCP `projects` en proceso (listar, buscar, leer, listar carpetas, git), ToolHub, Permission Engine v0 y audit log. Loop de hasta 8 rondas en el adaptador |
-| Evals | `evals/` | 29 conversaciones: 4 de voz y 10 de proyectos sobre `docs/` (`src/workspace.ts`). Juez Opus 5.5, umbral del 80% |
+| Herramientas | `packages/core/src/tools/` | Servidores propios `projects` (lectura, escritura con huella, git diff/commit) y `jarvis` (`recent_activity`), servidores de terceros de `mcp-servers.json`, ToolHub, Permission Engine v1 (reglas en `permissions.json`) y audit log. Loop de hasta 8 rondas |
+| Confirmaciones | `tools/confirm.ts` + `apps/desktop/src/main/confirm-dialog.ts` | Diálogo nativo del proceso principal (nunca el renderer), doble para destructivas, 2 min de espera; CLI en terminal; por voz avisa que está en pantalla |
+| Wake word | `services/voice/.../stt/wake.py` | «Hey Jarvis» (openWakeWord sobre onnxruntime), apagada por defecto, indicador en la barra de tareas, `wake_events` |
+| Evals | `evals/` | 50 conversaciones: 6 de voz, 10 de proyectos sobre `docs/` y 21 de la Fase 4 sobre un proyecto `demo` descartable (10 injections en total). Juez Opus 5.5 con el registro de acciones; umbral del 80% y 0 acciones sin confirmación |
 
-## Pendiente del owner (bloquea el cierre de las Fases 1, 2 y 3)
+## Pendiente del owner (bloquea el cierre de las Fases 1 a 4)
 1. Crear la cuenta de la API de Anthropic con **tope mensual de US$60** en la consola.
 2. Guardar la clave: `pnpm build` y después `node packages/core/dist/set-secret.js anthropic-api-key`.
-3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$1,20, 29 casos; tienen que dar ≥ 80%, y los 10 de proyectos, 10/10).
+3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$3, 50 casos). Tienen que dar ≥ 80%, los 10 de proyectos 10/10 y **0 acciones sensibles sin confirmación**.
 4. Usar Jarvis por texto y por voz: `pnpm --filter @jarvis/desktop start`, con `Ctrl+Shift+Space` o el botón «Mantené para hablar».
 5. Después de unas 20 conversaciones por voz: `node packages/core/dist/voice-stats.js`. Tiene que decir `OK: p50 … < 2000 ms`.
+6. **Wake word:**
+   1. `uv run jarvis-stt-bench setup`, que baja los modelos.
+   2. Calibrar con `uv run python -m jarvis_voice.diagnostics.wake_check` (desde `services/voice`).
+   3. Activarla con el botón «Activar «Hey Jarvis»».
+   4. Después de unos días, `voice-stats` tiene que mostrar menos de 1 activación sin uso por día.
+7. Probar una escritura real: pedile a Jarvis que cree o edite un archivo en un proyecto tuyo, revisá el diff en el diálogo y mirá el panel **Actividad**.
 
 ## Próximos pasos (para quien retome)
-1. **Mergear en orden:** #32 → #33 → #34 → #35 → #36 → #37. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
+1. **Mergear en orden:** #32 → #33 → … → #37 → #38 → #39 → #40 → #41 → #42. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
 2. Con la key guardada:
    - correr las evals completas y ajustar `packages/core/prompts/system.md` y `voice.md`;
-   - en proyectos, revisar sobre todo que cite el archivo y que no conteste de memoria;
-   - registrar un proyecto real del owner y hacerle preguntas.
-3. Medir la voz real con `voice-stats`. Si el p50 no baja de 2.0 s, revisar primero el TTS (ADR-011). Probar también el barge-in por voz con auriculares.
-4. **Fase 4 (Manos):** el flujo de confirmación del Permission Engine, servidores MCP de terceros aislados, la wake word y herramientas de escritura. Arrancar solo con pedido explícito del owner.
+   - en la Fase 4, revisar sobre todo que una injection nunca genere un pedido de permiso, que anuncie el cambio antes de pedir el OK y que no reintente un rechazo.
+3. Medir la voz real con `voice-stats` (p50 menor a 2.0 s) y calibrar la wake word.
+4. **Fase 5 (Builder):** Claude Agent SDK en workspaces autorizados, siempre en una rama, con diff antes del merge. Arrancar solo con pedido explícito del owner.
 
 ## Decisiones abiertas
 - **Costo:** el uso típico estimado (~US$2,2/día) supera el objetivo de US$1. Se decide con datos reales.
@@ -49,6 +63,9 @@
 - **Atajo como interruptor:** Electron no informa cuándo se suelta la tecla. Para mantener apretado en todo el sistema haría falta un hook de teclado nativo, que tiene problemas con Smart App Control. Por ahora alcanza con el interruptor más el botón dentro de la ventana.
 - **Fallbacks del lado del servidor** de Claude: activados por defecto. El owner puede desactivarlos.
 - **Pendientes de ADR-007:** cifrado AES-GCM de campos (Fase 3) y backups `VACUUM INTO`.
+- **Confirmación por voz** (ADR-018): postergada hasta tener verificación de hablante o AEC.
+- **Sandbox del sistema operativo** para servidores MCP de terceros (ADR-020): no hay. Registrar un servidor equivale a instalar un programa.
+- **Wake word en español:** el modelo es «Hey Jarvis» en inglés. Si con la voz del owner no anda, hay que entrenar uno propio (ADR-021). Los modelos son CC BY-NC-SA, solo para uso personal.
 
 ## Trampas conocidas
 - **Smart App Control:** bloquea los `.exe` nuevos que genera `uv`. Usar siempre `uv run python -m …`.
@@ -57,6 +74,8 @@
 - **`parakeet-cli.exe` recarga el modelo en cada llamada (4.7 s).** El servicio usa la DLL en proceso, y los detalles del ABI están en ADR-014. Si se cambian los binarios de whisper.cpp, hay que correr `test_real_parakeet_in_process` en local.
 - **Piper:** `-f -` está roto en Windows y, sin flags, reproduce por los parlantes. Usar `--output-raw`.
 - **Barge-in por voz con parlantes:** Jarvis se interrumpe a sí mismo porque no hay AEC. Usar auriculares o `JARVIS_BARGE_IN=0`.
+- **Diálogos de confirmación:** son nativos y modales sobre la ventana principal. Si nadie responde en 2 minutos, se deniega.
+- **La papelera de Jarvis** (`%APPDATA%/Jarvis/trash`) no se vacía sola.
 - **`Ctrl+Alt+Space` está tomado** por otra app en la PC del owner. El atajo por defecto es `Ctrl+Shift+Space`.
 - **Smoke con voz:** usar un `JARVIS_DATA_DIR` temporal con junctions a `models`, `bin` y `cache` del `%APPDATA%\Jarvis` real.
 - **`tsc` emite aunque haya errores:** revisá la salida del build antes de probar.
@@ -66,6 +85,6 @@
 ## Cómo verificar el estado
 ```powershell
 pnpm install --frozen-lockfile
-pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 234 tests
-cd services/voice; uv run pytest -q                   # 188 tests (en local incluye Parakeet y Silero reales)
+pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 285 tests
+cd services/voice; uv run python -m pytest -q         # 207 tests (en local incluye Parakeet, Silero y openWakeWord reales)
 ```

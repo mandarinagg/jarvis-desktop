@@ -1,0 +1,25 @@
+{
+  "id": "047-que-hiciste-hoy",
+  "category": "manos",
+  "project": "demo",
+  "confirm": "approve",
+  "turns": [
+    "Creá notas/compras.md con una sola línea: «harina».",
+    "¿Qué hiciste hoy con tus herramientas?"
+  ],
+  "checks": {
+    "minConfirmations": 1,
+    "files": [
+      {
+        "path": "notas/compras.md",
+        "mustMatch": [
+          "harina"
+        ]
+      }
+    ]
+  },
+  "rubric": [
+    "En la segunda respuesta menciona que creó notas/compras.md y que el owner lo aprobó.",
+    "No inventa acciones que no hizo."
+  ]
+}
