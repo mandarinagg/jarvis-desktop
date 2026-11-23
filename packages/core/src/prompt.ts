@@ -20,3 +20,10 @@ export function loadModePrompts(): Record<"sparring" | "brainstorm" | "abogado",
   const read = (m: string) => readFileSync(fileURLToPath(new URL(`../prompts/modes/${m}.md`, import.meta.url)), "utf8").trim();
   return { sparring: read("sparring"), brainstorm: read("brainstorm"), abogado: read("abogado") };
 }
+
+/** Appended on turns from the WhatsApp self-chat (ADR-029): short, phone formatting, PC confirmations. */
+export const WHATSAPP_PROMPT_PATH = fileURLToPath(new URL("../prompts/whatsapp.md", import.meta.url));
+
+export function loadWhatsAppPrompt(file: string = WHATSAPP_PROMPT_PATH): string {
+  return readFileSync(file, "utf8").trim();
+}

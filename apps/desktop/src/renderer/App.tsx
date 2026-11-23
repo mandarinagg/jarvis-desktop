@@ -49,6 +49,7 @@ export function App() {
       jarvis.send({ type: "builder.list", id: nextId("bl") });
       jarvis.send({ type: "dashboard.get", id: nextId("d") });
       jarvis.send({ type: "proactive.get", id: nextId("pg") });
+      jarvis.send({ type: "whatsapp.get", id: nextId("wg") });
     };
     const offHotkey = jarvis.onHotkey(() => {
       const s = latest.current;
@@ -146,6 +147,7 @@ export function App() {
     setView("home");
     jarvis.send({ type: "dashboard.get", id: nextId("d") });
     jarvis.send({ type: "proactive.get", id: nextId("pg") });
+    jarvis.send({ type: "whatsapp.get", id: nextId("wg") });
   };
 
   const showSkills = () => {
@@ -306,6 +308,8 @@ export function App() {
                 ? jarvis.send({ type: "reminders.cancel", id: nextId("rc"), reminderId: a.reminderId })
                 : jarvis.send({ type: "proactive.set", id: nextId("ps"), ...a.settings })
             }
+            whatsapp={state.whatsapp}
+            onWhatsApp={(a) => void jarvis.whatsapp(a)}
             onRefresh={showHome} onOpenConversation={open} onShowMemory={showMemory} onShowActivity={showActivity} onShowSkills={showSkills} />
         ) : view === "skills" ? (
           <Skills data={state.skills} notice={state.skillsNotice} onAction={skillsAction} onClose={() => setView("chat")} />

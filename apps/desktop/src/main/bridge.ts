@@ -53,6 +53,9 @@ export const RENDERER_ALLOWED = [
   "skills.reject",
   "skills.setEnabled",
   "skills.delete",
+  // WhatsApp (ADR-029): the status only, without the QR. Linking and unlinking go through
+  // jarvis:whatsapp, which asks in a native dialog and shows the QR in its own window.
+  "whatsapp.get",
 ] as const;
 
 export type RendererMessage = Extract<ClientMessage, { type: (typeof RENDERER_ALLOWED)[number] }>;
@@ -63,6 +66,9 @@ export function parseRendererMessage(raw: unknown): RendererMessage | undefined 
   const msg = parsed.data;
   return (RENDERER_ALLOWED as readonly string[]).includes(msg.type) ? (msg as RendererMessage) : undefined;
 }
+
+/** Linking or unlinking WhatsApp: the renderer only asks; the main process confirms natively. */
+export const WhatsAppRequest = z.enum(["link", "unlink"]);
 
 /** What the renderer may say about a new project: everything except its folder. */
 export const CreateProjectRequest = z.strictObject({

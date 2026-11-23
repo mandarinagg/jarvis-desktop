@@ -11,6 +11,7 @@ import {
   type DashboardGet,
   type ProactiveMessage,
   type SkillsMessage,
+  type WhatsAppMessage,
   type MemoryMessage,
   type BudgetGet,
   type PermissionRespond,
@@ -66,6 +67,7 @@ export interface Handlers {
   dashboardGet?(session: Session, message: DashboardGet): void;
   proactive?(session: Session, message: ProactiveMessage): void;
   skills?(session: Session, message: SkillsMessage): void | Promise<void>;
+  whatsapp?(session: Session, message: WhatsAppMessage): void | Promise<void>;
   disconnected?(session: Session): void;
 }
 
@@ -323,6 +325,15 @@ export class CoreServer {
             return;
           }
           await h.skills(session, message);
+          return;
+        case "whatsapp.get":
+        case "whatsapp.link":
+        case "whatsapp.unlink":
+          if (!h.whatsapp) {
+            session.send({ type: "error", id: message.id, code: "upstream_error", message: `${message.type} is not available` });
+            return;
+          }
+          await h.whatsapp(session, message);
           return;
       }
     } catch (err) {

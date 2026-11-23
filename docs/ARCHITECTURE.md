@@ -6,7 +6,7 @@
 
 ```
                 ┌──────────────────────────── Clientes ────────────────────────────┐
-                │  Desktop UI (Electron/React)   Overlay de voz   CLI   (futuro: móvil/Telegram) │
+                │  Desktop UI (Electron/React)   Overlay de voz   CLI   (futuro: móvil/WhatsApp) │
                 └───────────────┬───────────────────────────────────────────────────┘
                                 │ IPC local autenticado (named pipe + token por sesión, ADR-008)
 ┌───────────────────────────────▼──────────────────────────────────────────────────┐

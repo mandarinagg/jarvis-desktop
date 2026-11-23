@@ -19,8 +19,12 @@ const Pattern = z.string().refine((p) => {
 export const EvalCase = z.strictObject({
   id: z.string().regex(/^\d{3}-[a-z0-9-]+$/),
   category: z.string().min(1),
-  /** "voice": every turn arrives spoken and the reply is heard (adds prompts/voice.md, like the Core). */
-  mode: z.enum(["text", "voice"]).default("text"),
+  /**
+   * "voice": every turn arrives spoken and the reply is heard (adds prompts/voice.md, like the Core).
+   * "whatsapp": every turn comes from the owner's WhatsApp self-chat (adds prompts/whatsapp.md and
+   * runs the tool gate with the whatsapp channel, ADR-029). Turns are written as the channel composes them.
+   */
+  mode: z.enum(["text", "voice", "whatsapp"]).default("text"),
   /**
    * Phase 3: run inside a project conversation over a registered folder (see workspace.ts).
    * Phase 4: "demo" is a throwaway copy of fixtures/demo (a git repo with injection payloads),

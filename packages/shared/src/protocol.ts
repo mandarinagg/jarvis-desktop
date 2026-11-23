@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.8"; // 1.8: skills.* (Phase 7); 1.7: proactive.*, reminders.cancel (Phase 7); 1.6: dashboard.* (Phase 7); 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
+export const PROTOCOL_VERSION = "1.9"; // 1.9: whatsapp.* (Phase 7); 1.8: skills.* (Phase 7); 1.7: proactive.*, reminders.cancel (Phase 7); 1.6: dashboard.* (Phase 7); 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
 
 const Id = z.string().min(1).max(64);
 const SessionToken = z.string().regex(/^[0-9a-f]{64}$/, "token must be 256-bit lowercase hex");
@@ -250,7 +250,17 @@ export type SkillsMessage =
   | z.infer<typeof SkillsSetEnabled>
   | z.infer<typeof SkillsDelete>;
 
+/** Phase 7 (ADR-029): the WhatsApp self-chat channel. whatsapp.link is sent only by the desktop
+ * main process after a native confirmation (never by the renderer); the QR never reaches it. */
+export const WhatsAppGet = z.strictObject({ type: z.literal("whatsapp.get"), id: Id });
+export const WhatsAppLink = z.strictObject({ type: z.literal("whatsapp.link"), id: Id });
+export const WhatsAppUnlink = z.strictObject({ type: z.literal("whatsapp.unlink"), id: Id });
+export type WhatsAppMessage = z.infer<typeof WhatsAppGet> | z.infer<typeof WhatsAppLink> | z.infer<typeof WhatsAppUnlink>;
+
 export const ClientMessage = z.discriminatedUnion("type", [
+  WhatsAppGet,
+  WhatsAppLink,
+  WhatsAppUnlink,
   SkillsList,
   SkillsEvaluate,
   SkillsApprove,
@@ -477,6 +487,8 @@ export const AuditEntryInfo = z.strictObject({
   id: z.number().int().positive(),
   ts: z.string(),
   turnId: z.string().optional(),
+  /** Where the request came from (ADR-029); absent for older entries. */
+  channel: z.enum(["text", "voice", "whatsapp"]).optional(),
   server: z.string(),
   tool: z.string(),
   /** Redacted JSON of the arguments, at most 2000 characters. */
@@ -695,7 +707,21 @@ export const SkillsListResult = z.strictObject({
 });
 export type SkillsListResult = z.infer<typeof SkillsListResult>;
 
+/** Reply to whatsapp.* (with its id), and broadcast on every change. `qr` only while linking. */
+export const WhatsAppState = z.strictObject({
+  type: z.literal("whatsapp.state"),
+  id: Id.optional(),
+  state: z.enum(["off", "connecting", "waiting_qr", "connected", "degraded"]),
+  qr: z.string().max(2_000).optional(),
+  phone: z.string().max(20).optional(),
+  detail: z.string().max(300).optional(),
+  /** Messages from other chats dropped since the Core started: a count, never their content. */
+  discarded: z.number().int().nonnegative(),
+});
+export type WhatsAppState = z.infer<typeof WhatsAppState>;
+
 export const CoreMessage = z.discriminatedUnion("type", [
+  WhatsAppState,
   SkillsListResult,
   ProactiveState,
   ProactiveNotify,

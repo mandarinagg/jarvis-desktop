@@ -11,10 +11,11 @@ import { jarvisHome } from "@jarvis/core/paths";
 import type { CoreMessage, PermissionRequest } from "@jarvis/shared";
 import { randomUUID } from "node:crypto";
 import { BrowserWindow, Notification, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from "electron";
-import { CreateProjectRequest, parseRendererMessage } from "./bridge.js";
+import { CreateProjectRequest, parseRendererMessage, WhatsAppRequest } from "./bridge.js";
 import { dialogSteps } from "./confirm-dialog.js";
 import { ensureCore } from "./core-connection.js";
 import { overlayVisible, wakeBadgeBitmap } from "./overlay.js";
+import { qrPage, whatsappDialog } from "./whatsapp-qr.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const smokeShot = process.argv.find((a) => a.startsWith("--smoke-screenshot="))?.split("=")[1];
@@ -166,7 +167,41 @@ function notifyOwner(m: Extract<CoreMessage, { type: "proactive.notify" }>): voi
   n.show();
 }
 
+let qrWindow: BrowserWindow | undefined;
+
+/** The WhatsApp QR (ADR-029), in its own window: no preload, no JavaScript, only the SVG. */
+function showWhatsAppQr(qr: string | undefined): void {
+  if (!qr) {
+    qrWindow?.close();
+    return;
+  }
+  if (!qrWindow || qrWindow.isDestroyed()) {
+    qrWindow = new BrowserWindow({
+      width: 360,
+      height: 440,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      autoHideMenuBar: true,
+      title: "Vincular WhatsApp",
+      backgroundColor: "#1a2230",
+      ...(win ? { parent: win } : {}),
+      webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, javascript: false, webSecurity: true },
+    });
+    qrWindow.webContents.on("will-navigate", (e) => e.preventDefault());
+    qrWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    qrWindow.on("closed", () => (qrWindow = undefined));
+  }
+  void qrWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(qrPage(qr))}`);
+}
+
 function forward(m: CoreMessage): void {
+  if (m.type === "whatsapp.state") {
+    showWhatsAppQr(m.qr);
+    const { qr: _qr, ...rest } = m;
+    win?.webContents.send("jarvis:message", rest); // the renderer never sees the QR
+    return;
+  }
   if (m.type === "voice.state") showWakeBadge(m.wake === true);
   if (m.type === "permission.request") void askOwner(m);
   if (m.type === "permission.resolved") asking.get(m.requestId)?.abort();
@@ -218,6 +253,27 @@ ipcMain.on("jarvis:send", (event, raw: unknown) => {
   const msg = parseRendererMessage(raw);
   if (!msg) return; // dropped: the renderer only ever sends well-formed allowlisted messages
   core?.send(msg);
+});
+
+/** Linking or unlinking WhatsApp (ADR-029): the renderer asks, the owner confirms here. */
+ipcMain.handle("jarvis:whatsapp", async (event, raw: unknown) => {
+  if (event.senderFrame?.url && !event.senderFrame.url.startsWith("file://")) return { sent: false };
+  const action = WhatsAppRequest.safeParse(raw);
+  if (!action.success || !core || !win) return { sent: false };
+  const step = whatsappDialog(action.data);
+  const { response } = await dialog.showMessageBox(win, {
+    type: "warning",
+    title: step.title,
+    message: step.message,
+    detail: step.detail,
+    buttons: step.buttons,
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+  });
+  if (response !== 0 || !core) return { sent: false };
+  core.send({ type: action.data === "link" ? "whatsapp.link" : "whatsapp.unlink", id: randomUUID() });
+  return { sent: true };
 });
 
 ipcMain.handle("jarvis:status", () => ({ connected: core !== undefined, hotkey }));

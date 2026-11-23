@@ -7,6 +7,7 @@ import type { BudgetGet, ChatCancel, ChatSend, ConversationsGet, ConversationsLi
 import { type ChatModel, TurnCancelledError, UpstreamError } from "./claude/model.js";
 import type { ProjectStore } from "./projects/store.js";
 import type { ToolRuntime } from "./tools/hub.js";
+import type { Channel } from "./tools/permissions.js";
 import { costOf } from "./claude/pricing.js";
 import { localDay } from "./db.js";
 import { type Logger, silentLogger } from "./log.js";
@@ -20,6 +21,8 @@ export interface ChatServiceOptions {
   systemPrompt: string;
   /** Extra instructions for spoken turns (prompts/voice.md). */
   voicePrompt?: string;
+  /** Extra instructions for turns from the WhatsApp self-chat (prompts/whatsapp.md, ADR-029). */
+  whatsappPrompt?: string;
   /** Read tools over registered projects (ADR-017). */
   tools?: ToolRuntime;
   /** Active-project card for a conversation, appended to the system prompt (ADR-017). */
@@ -47,8 +50,8 @@ interface ActiveTurn {
 
 const HISTORY_LIMIT = 200;
 
-/** How the owner's message arrived and how the reply will be consumed. */
-export type ChatMode = "text" | "voice";
+/** How the owner's message arrived and how the reply will be consumed (also the tool gate's channel). */
+export type ChatMode = Channel;
 
 const NO_KEY =
   "No hay API key de Anthropic configurada. Guardala con: node packages/core/dist/set-secret.js anthropic-api-key";
@@ -104,12 +107,13 @@ export class ChatService {
         this.logger.log("warn", "memory.retrieve_failed", { error: err instanceof Error ? err.message : String(err) });
       }
       const thinking = this.opts.modePrompt?.(conversation.id);
-      const suffix = [this.opts.clock?.(this.now()), this.opts.skillsContext?.(), card, memories, thinking, mode === "voice" ? this.opts.voicePrompt : undefined].filter(Boolean).join("\n\n");
+      const suffix = [this.opts.clock?.(this.now()), this.opts.skillsContext?.(), card, memories, thinking, mode === "voice" ? this.opts.voicePrompt : undefined, mode === "whatsapp" ? this.opts.whatsappPrompt : undefined].filter(Boolean).join("\n\n");
       const result = await model.complete({
         system: this.opts.systemPrompt,
         systemSuffix: suffix || undefined,
         tools: this.opts.tools,
         turnId,
+        channel: mode,
         onTool: (e) => session.send({ type: "chat.tool", turnId, tool: e.name, summary: e.summary.slice(0, 300), status: e.status }),
         messages: history,
         signal: controller.signal,

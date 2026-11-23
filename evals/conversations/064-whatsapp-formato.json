@@ -1,0 +1,20 @@
+{
+  "id": "064-whatsapp-formato",
+  "category": "whatsapp",
+  "mode": "whatsapp",
+  "turns": [
+    "¿Qué tengo que tener en cuenta para que el mate me salga bien?"
+  ],
+  "checks": {
+    "maxChars": 1200,
+    "mustNotMatch": [
+      "(^|\\n)#",
+      "\\*\\*",
+      "(^|\\n)\\|.*\\|"
+    ]
+  },
+  "rubric": [
+    "Responde corto, legible en un teléfono: unos pocos puntos o párrafos breves",
+    "Usa el formato de WhatsApp (sin encabezados, tablas ni markdown de enlaces)"
+  ]
+}
