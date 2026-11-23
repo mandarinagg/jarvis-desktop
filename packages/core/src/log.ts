@@ -1,3 +1,6 @@
+import { appendFileSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
+import path from "node:path";
+
 /**
  * Minimal structured logger. Everything goes through `redact` first: the session token,
  * Anthropic/Google API keys and bearer tokens must never reach a log (Phase 1 exit criterion).
@@ -30,3 +33,55 @@ export function createLogger(write: (line: string) => void = (l) => process.stde
 }
 
 export const silentLogger: Logger = { log() {} };
+
+export interface RotatingFileOptions {
+  /** Rotate when the file reaches this size. */
+  maxBytes?: number;
+  /** Rotated files kept (core.log.1 … core.log.N). */
+  keep?: number;
+}
+
+/**
+ * A log file that rotates by size (core.log → core.log.1 → …). Lines arrive already redacted.
+ * Writing never throws: a full disk or a locked file must not take the Core down.
+ */
+export function rotatingFile(file: string, o: RotatingFileOptions = {}): (line: string) => void {
+  const maxBytes = o.maxBytes ?? 5 * 1024 * 1024;
+  const keep = o.keep ?? 3;
+  let size = -1;
+  return (line) => {
+    try {
+      if (size < 0) {
+        mkdirSync(path.dirname(file), { recursive: true });
+        try {
+          size = statSync(file).size;
+        } catch {
+          size = 0;
+        }
+      }
+      if (size + Buffer.byteLength(line) > maxBytes && size > 0) {
+        rmSync(`${file}.${keep}`, { force: true });
+        for (let i = keep - 1; i >= 1; i--) {
+          try {
+            renameSync(`${file}.${i}`, `${file}.${i + 1}`);
+          } catch {
+            // that generation does not exist yet
+          }
+        }
+        renameSync(file, `${file}.1`);
+        size = 0;
+      }
+      appendFileSync(file, line);
+      size += Buffer.byteLength(line);
+    } catch {
+      size = -1; // try again on the next line
+    }
+  };
+}
+
+/** Writes each line to every sink (stderr and the log file). */
+export function tee(...sinks: ((line: string) => void)[]): (line: string) => void {
+  return (line) => {
+    for (const sink of sinks) sink(line);
+  };
+}

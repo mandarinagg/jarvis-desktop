@@ -151,3 +151,26 @@ describe("gitStatus", () => {
     expect(s.repo).toBe(false);
   });
 });
+
+describe("audit log with long arguments", () => {
+  it("stores valid JSON when it truncates, and still reads rows cut by older versions", () => {
+    const db = openDatabase(":memory:");
+    const audit = new AuditLog(db);
+    audit.record({ server: "projects", tool: "write_file", args: { content: "x".repeat(5_000) }, risk: "confirm", decision: "allow" });
+    audit.record({ server: "projects", tool: "write_file", args: { content: '"'.repeat(5_000) }, risk: "confirm", decision: "allow" });
+    const quoted = db.prepare("SELECT args FROM audit_log ORDER BY id DESC LIMIT 1").get() as { args: string };
+    expect(quoted.args.length).toBeLessThanOrEqual(2_000);
+    expect(() => JSON.parse(quoted.args) as unknown).not.toThrow();
+    // A row written by the old code: the JSON cut in the middle.
+    db.prepare("INSERT INTO audit_log (ts, server, tool, args, risk, decision) VALUES (?, ?, ?, ?, ?, ?)").run(
+      new Date().toISOString(), "projects", "write_file", '{"content":"yyyy…', "confirm", "allow",
+    );
+    const rows = audit.recent(10);
+    expect(rows).toHaveLength(3);
+    const truncated = JSON.stringify(rows[2]?.args);
+    expect(truncated.length).toBeLessThanOrEqual(2_100);
+    expect(truncated).toContain("recortado");
+    expect(rows[0]?.args).toBe('{"content":"yyyy…');
+    expect([...audit.jsonl()]).toHaveLength(3);
+  });
+});

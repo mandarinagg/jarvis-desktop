@@ -27,7 +27,7 @@ import { AnthropicReflectionModel, Reflector, SKILL_WINDOW_DAYS } from "./memory
 import { retrieve } from "./memory/retrieve.js";
 import { MemoryService } from "./memory/service.js";
 import { MemoryStore } from "./memory/store.js";
-import { createLogger } from "./log.js";
+import { createLogger, rotatingFile, tee } from "./log.js";
 import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
 import { projectCard } from "./projects/context.js";
 import { ProjectIndex } from "./projects/indexer.js";
@@ -91,8 +91,21 @@ function ttsResolver(env: NodeJS.ProcessEnv): () => TtsConfig {
 
 async function main(): Promise<number> {
   const env = process.env;
-  const logger = createLogger();
   const home = jarvisHome(env);
+  // The app starts the Core detached with its output discarded: the log file is the record.
+  // Same redaction as stderr; message text never reaches a log.
+  const logger = createLogger(tee((l) => process.stderr.write(l), rotatingFile(path.join(home, "logs", "core.log"))));
+  // A crash must leave its reason behind (the Core used to die silently when started by the app).
+  const stackOf = (err: Error) => err.stack?.split(/\r?\n/).slice(0, 8).join(" | ");
+  process.on("uncaughtException", (err) => {
+    logger.log("error", "core.crashed", { error: err.message, stack: stackOf(err) });
+    process.exit(1);
+  });
+  process.on("unhandledRejection", (reason) => {
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    logger.log("error", "core.unhandled_rejection", { error: err.message, stack: stackOf(err) });
+    process.exit(1);
+  });
   const pipe = env.JARVIS_PIPE ?? defaultPipeName();
   const token = newSessionToken();
   const budget = Number(env.JARVIS_DAILY_BUDGET_USD || 3);
