@@ -2,6 +2,7 @@
 import { type ChatModel, costOf } from "@jarvis/core";
 import { type EvalCase, runChecks } from "./cases.js";
 import { type Judge, verdictPasses } from "./judge.js";
+import { type Workspace, createWorkspace } from "./workspace.js";
 
 export interface CaseResult {
   id: string;
@@ -11,6 +12,7 @@ export interface CaseResult {
   checkFailures: string[];
   criteria: { criterion: string; met: boolean; reason: string }[];
   costUsd: number;
+  toolCalls: string[];
   error?: string;
 }
 
@@ -30,24 +32,39 @@ export interface Prompts {
   voice?: string;
 }
 
-export async function runCase(c: EvalCase, model: ChatModel, judge: Judge, prompts: Prompts): Promise<CaseResult> {
+export async function runCase(
+  c: EvalCase,
+  model: ChatModel,
+  judge: Judge,
+  prompts: Prompts,
+  workspace: (c: EvalCase) => Promise<Workspace> = createWorkspace,
+): Promise<CaseResult> {
   const transcript: { role: "user" | "assistant"; content: string }[] = [];
+  const toolCalls: string[] = [];
   let costUsd = 0;
+  let ws: Workspace | undefined;
   try {
+    ws = await workspace(c);
+    // Same assembly as ChatService: project card, then voice instructions.
+    const suffix = [ws.card, c.mode === "voice" ? prompts.voice : undefined].filter(Boolean).join("\n\n");
     for (const turn of c.turns) {
       transcript.push({ role: "user", content: turn });
       const r = await model.complete({
         system: prompts.system,
-        systemSuffix: c.mode === "voice" ? prompts.voice : undefined,
+        systemSuffix: suffix || undefined,
         messages: [...transcript],
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(180_000),
         onText: () => {},
+        tools: ws.tools,
+        onTool: (e) => {
+          if (e.status === "started") toolCalls.push(e.summary);
+        },
       });
       costUsd += costOf(r.model, r.usage);
       transcript.push({ role: "assistant", content: r.text });
     }
     const answer = transcript.at(-1)?.content ?? "";
-    const checkFailures = runChecks(c, answer);
+    const checkFailures = runChecks(c, answer, toolCalls.length);
     const { verdict, usage } = await judge.grade(c, transcript);
     costUsd += costOf(judge.model, usage);
     return {
@@ -58,6 +75,7 @@ export async function runCase(c: EvalCase, model: ChatModel, judge: Judge, promp
       checkFailures,
       criteria: verdict.criteria,
       costUsd,
+      toolCalls,
     };
   } catch (err) {
     return {
@@ -68,8 +86,11 @@ export async function runCase(c: EvalCase, model: ChatModel, judge: Judge, promp
       checkFailures: [],
       criteria: [],
       costUsd,
+      toolCalls,
       error: err instanceof Error ? err.message : String(err),
     };
+  } finally {
+    await ws?.close();
   }
 }
 
@@ -84,7 +105,7 @@ export async function runAll(
   let spent = 0;
   for (const c of cases) {
     if (spent >= opts.maxCostUsd) {
-      results.push({ id: c.id, category: c.category, passed: false, answer: "", checkFailures: [], criteria: [], costUsd: 0, error: "omitido: se alcanzó el tope de costo de la corrida" });
+      results.push({ id: c.id, category: c.category, passed: false, answer: "", checkFailures: [], criteria: [], costUsd: 0, toolCalls: [], error: "omitido: se alcanzó el tope de costo de la corrida" });
       continue;
     }
     const r = await runCase(c, model, judge, prompts);

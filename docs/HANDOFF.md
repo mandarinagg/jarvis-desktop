@@ -5,14 +5,15 @@
 ## Dónde estamos
 - **Fase 0 (Diagnóstico):** completa, salvo la cuenta de la API de Anthropic, que la tiene que crear el owner.
 - **Fase 1 (L0: Core + chat):** implementada y en `main`. Falta validarla con la API real.
+- **Fase 3 (L2: Proyectos y contexto):** **implementada** en los PRs #34–#37 (apilados sobre #32–#33, ADR-017). Incluye el registro de proyectos (la carpeta se elige solo desde el diálogo nativo), el índice FTS5 sin copia del texto con watcher, las herramientas de lectura como servidor MCP propio, el Permission Engine v0, el audit log y el panel de Proyectos. Falta validarla: 10/10 en las evals de proyectos con la API real.
 - **Fase 2 (L1: Voz):** **implementada y en `main`** (PRs #27–#31, y el modo voz del prompt y el barge-in por voz en #32–#33, ADR-013 a ADR-016). Se probó de punta a punta con micrófono, Parakeet y Neural2 reales. Falta validarla con la API real: 20 conversaciones y p50 voz→primer audio menor a 2.0 s.
 
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.1 (`voice.*`). Voz: protocolo propio 1.0, con fixtures compartidos con Python |
+| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.2 (`voice.*`, `projects.*`, `chat.tool`). Voz: protocolo propio 1.1 (`vad.*`), con fixtures compartidos con Python |
 | Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
-| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migración 002: `voice_turns` (solo tiempos) |
+| Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only) |
 | Secretos | Credential Manager | `anthropic-api-key` (falta) y `google-tts-api-key` (migrada el 2026-11-19) |
 | Claude | `packages/core/src/claude/` | Streaming, `effort: low`, caché, tope diario de US$3 |
 | Voice Service | `services/voice` (`python -m jarvis_voice.service`) | Proceso hijo del Core por stdio. Supervisor con backoff y estado `degradado` |
@@ -22,21 +23,25 @@
 | Barge-in por voz | `services/voice/.../stt/vad.py` + `controller.py` | Silero VAD mientras Jarvis habla: ≥ 250 ms de voz lo interrumpe y la frase termina sola con 700 ms de silencio (ADR-016). `JARVIS_BARGE_IN=0` lo apaga |
 | App de escritorio | `apps/desktop` | Chat + chip de voz + «Mantené para hablar» + atajo `Ctrl+Shift+Space` (interruptor) + overlay |
 | Modo voz del prompt | `packages/core/prompts/voice.md` | Se agrega en los turnos hablados como segundo bloque de `system` (ADR-015) |
-| Evals | `evals/` | 19 conversaciones (4 de voz con `mode: voice`), juez Opus 5.5, umbral del 80% |
+| Proyectos | `packages/core/src/projects/` | Registro (solo el owner), guardia de rutas con `realpath` y denylist de secretos, índice FTS5 sin contenido con watcher, tarjeta del proyecto activo |
+| Herramientas | `packages/core/src/tools/` | Servidor MCP `projects` en proceso (listar, buscar, leer, listar carpetas, git), ToolHub, Permission Engine v0 y audit log. Loop de hasta 8 rondas en el adaptador |
+| Evals | `evals/` | 29 conversaciones: 4 de voz y 10 de proyectos sobre `docs/` (`src/workspace.ts`). Juez Opus 5.5, umbral del 80% |
 
-## Pendiente del owner (bloquea el cierre de las Fases 1 y 2)
+## Pendiente del owner (bloquea el cierre de las Fases 1, 2 y 3)
 1. Crear la cuenta de la API de Anthropic con **tope mensual de US$60** en la consola.
 2. Guardar la clave: `pnpm build` y después `node packages/core/dist/set-secret.js anthropic-api-key`.
-3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$0,40, 19 casos; tienen que dar ≥ 80%).
+3. Correr las evals: `pnpm --filter @jarvis/evals eval` (~US$1,20, 29 casos; tienen que dar ≥ 80%, y los 10 de proyectos, 10/10).
 4. Usar Jarvis por texto y por voz: `pnpm --filter @jarvis/desktop start`, con `Ctrl+Shift+Space` o el botón «Mantené para hablar».
 5. Después de unas 20 conversaciones por voz: `node packages/core/dist/voice-stats.js`. Tiene que decir `OK: p50 … < 2000 ms`.
 
 ## Próximos pasos (para quien retome)
-1. Con la clave guardada: correr las evals, ajustar `packages/core/prompts/system.md` y volver a medir.
-2. Medir la voz real con `voice-stats`. Si el p50 no baja de 2.0 s, revisar primero el TTS (ADR-011): proveedor más cercano o streaming real. Después, adelantar el primer corte del segmentador.
-3. **Modo voz:** ya está implementado (ADR-015), pero las 4 evals de voz (016–019) nunca corrieron con la API real. Ajustar `prompts/voice.md` según esos resultados.
-4. **Barge-in por voz:** ya está implementado (ADR-016). Probarlo en uso real y ajustar los umbrales si una tos o un ruido lo interrumpen. Para descargar el modelo de Silero, volver a correr `jarvis-stt-bench setup`.
-5. Después, la **Fase 3** (proyectos y contexto), según `ROADMAP.md`.
+1. **Mergear en orden:** #32 → #33 → #34 → #35 → #36 → #37. Están apilados: GitHub reubica cada base cuando se mergea la anterior.
+2. Con la key guardada:
+   - correr las evals completas y ajustar `packages/core/prompts/system.md` y `voice.md`;
+   - en proyectos, revisar sobre todo que cite el archivo y que no conteste de memoria;
+   - registrar un proyecto real del owner y hacerle preguntas.
+3. Medir la voz real con `voice-stats`. Si el p50 no baja de 2.0 s, revisar primero el TTS (ADR-011). Probar también el barge-in por voz con auriculares.
+4. **Fase 4 (Manos):** el flujo de confirmación del Permission Engine, servidores MCP de terceros aislados, la wake word y herramientas de escritura. Arrancar solo con pedido explícito del owner.
 
 ## Decisiones abiertas
 - **Costo:** el uso típico estimado (~US$2,2/día) supera el objetivo de US$1. Se decide con datos reales.
@@ -61,6 +66,6 @@
 ## Cómo verificar el estado
 ```powershell
 pnpm install --frozen-lockfile
-pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 201 tests
+pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 234 tests
 cd services/voice; uv run pytest -q                   # 188 tests (en local incluye Parakeet y Silero reales)
 ```

@@ -1,0 +1,25 @@
+{
+  "id": "022-docs-tope-gasto",
+  "category": "proyectos",
+  "project": "jarvis-docs",
+  "turns": [
+    "¿Cuál es el tope de gasto diario por defecto y qué pasa cuando se alcanza?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "mustMatch": [
+      "(?<!\\d)3(?![\\d.,]*\\s*%)"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Dice que el tope diario por defecto es US$ 3.",
+    "Explica que al alcanzarlo Jarvis deja de llamar a Claude y avisa (y/o que hay alerta al 80%), sin inventar comportamientos.",
+    "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
+    "No inventa datos que no estén en la documentación."
+  ]
+}

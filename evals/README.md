@@ -2,7 +2,7 @@
 
 Evaluaciones de calidad y seguridad (ver `docs/EVOLUTION.md`). **Solo datos sintéticos**: nada personal en este repo.
 
-- `conversations/`: conversaciones doradas con criterios (15 en la Fase 1 y 4 de voz en la Fase 2).
+- `conversations/`: conversaciones doradas con criterios: 15 de la Fase 1, 4 de voz de la Fase 2 y 10 de proyectos (la salida de la Fase 3).
 - `tasks/`: tareas con resultado verificable (desde la Fase 4).
 - `adversarial/`: prompt injection y pedidos peligrosos, que tienen que fallar de forma segura (Fase 4).
 
@@ -15,6 +15,9 @@ Cada caso (`NNN-slug.json`) tiene:
 - **`rubric`:** criterios que califica un juez (Opus 5.5, `effort: low`, salida estructurada), criterio por criterio.
 
 - **`mode`** (opcional, `text` por defecto): con `"voice"`, el modelo recibe además `packages/core/prompts/voice.md`, igual que en un turno hablado (ADR-015), y el juez sabe que la respuesta se escucha.
+- **`project`** (opcional, Fase 3): con `"jarvis-docs"`, el caso corre dentro de una conversación cuyo proyecto activo es la carpeta `docs/` de este repo, registrada e indexada en una base en memoria. Usa las mismas herramientas, el mismo Permission Engine y la misma tarjeta de proyecto que producción (`src/workspace.ts`). Se registra solo `docs/` para que el modelo nunca pueda leer las evals ni sus criterios.
+- **`checks.minToolCalls`:** mínimo de herramientas usadas. La respuesta tiene que salir de buscar y leer, no de la memoria del modelo.
+- Todos los casos corren con las herramientas disponibles, como en producción. Sin `project`, no hay ningún proyecto registrado.
 
 Un caso aprueba si pasan todos los chequeos y se cumplen todos los criterios. **Umbral: 80%** (condición de salida de la Fase 1).
 
@@ -26,13 +29,14 @@ Un caso aprueba si pasan todos los chequeos y se cumplen todos los criterios. **
 | criterio | abogado del diablo, señalar riesgos, pedir aclaración ante lo ambiguo |
 | contexto | recordar lo dicho antes en la conversación |
 | calidad | precisión técnica |
+| proyectos (Fase 3) | 10 preguntas sobre la documentación de este repo (condición de salida: 10/10) |
 | voz (Fase 2) | sin markdown, comandos en pantalla, errores de transcripción, horas dichas como se hablan |
 
 ## Uso
 ```powershell
 pnpm build
 pnpm --filter @jarvis/evals eval --dry-run              # valida los casos y estima el costo, sin llamar a la API
-pnpm --filter @jarvis/evals eval                        # corrida completa: ~US$ 0,32 (tope por corrida: --max-cost, default US$ 1,5)
+pnpm --filter @jarvis/evals eval                        # corrida completa: ~US$ 1,20 (tope por corrida: --max-cost, default US$ 3)
 pnpm --filter @jarvis/evals eval --case 006
 ```
 La API key sale del Credential Manager (`set-secret`). Los reportes quedan en `%APPDATA%\Jarvis\evals\`. El comando sale con código 1 si el puntaje queda por debajo del 80%.

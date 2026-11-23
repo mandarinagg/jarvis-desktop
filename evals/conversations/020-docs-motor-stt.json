@@ -1,0 +1,25 @@
+{
+  "id": "020-docs-motor-stt",
+  "category": "proyectos",
+  "project": "jarvis-docs",
+  "turns": [
+    "¿Qué motor de STT usa Jarvis y cuánto tarda en transcribir una frase?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "mustMatch": [
+      "parakeet"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Dice que usa Parakeet (TDT 0.6B v3), corriendo dentro del servicio de voz (vía parakeet.dll / whisper.cpp con Vulkan).",
+    "Da una latencia del orden de 100 ms por frase (no los 4.7 s de la CLI, que se descartó).",
+    "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
+    "No inventa datos que no estén en la documentación."
+  ]
+}

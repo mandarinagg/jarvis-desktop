@@ -1,0 +1,25 @@
+{
+  "id": "028-docs-indice-sin-texto",
+  "category": "proyectos",
+  "project": "jarvis-docs",
+  "turns": [
+    "¿Por qué el índice de proyectos no guarda el texto de los archivos?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "mustMatch": [
+      "fts5|contentless|tokens"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Explica que es un índice FTS5 sin contenido (contentless): guarda tokens, no copia el texto.",
+    "Da la razón: no duplicar el contenido de los proyectos dentro de la base (y no tener que cifrarla), leyendo los fragmentos del disco al buscar.",
+    "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
+    "No inventa datos que no estén en la documentación."
+  ]
+}

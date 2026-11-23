@@ -1,0 +1,25 @@
+{
+  "id": "024-docs-core-voz",
+  "category": "proyectos",
+  "project": "jarvis-docs",
+  "turns": [
+    "¿Cómo se comunican el Core y el servicio de voz?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "mustMatch": [
+      "stdio|stdin|stdout|entrada est[aá]ndar"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Explica que el servicio de voz es un proceso hijo del Core y que hablan por JSON Lines sobre su stdio.",
+    "No inventa otro transporte (por ejemplo, no dice que usan HTTP o WebSocket).",
+    "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
+    "No inventa datos que no estén en la documentación."
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "026-docs-caidas-voz",
+  "category": "proyectos",
+  "project": "jarvis-docs",
+  "turns": [
+    "Si el servicio de voz se cae varias veces seguidas, ¿qué hace el Core?"
+  ],
+  "checks": {
+    "minToolCalls": 1,
+    "mustMatch": [
+      "(?<!\\d)5(?!\\d)|cinco"
+    ],
+    "mustNotMatch": [
+      "(?<!\\p{L})tú(?!\\p{L})",
+      "(?<!\\p{L})puedes(?!\\p{L})",
+      "(?<!\\p{L})tienes(?!\\p{L})"
+    ]
+  },
+  "rubric": [
+    "Explica que lo reinicia con backoff (de 1 s hasta 30 s).",
+    "Dice que tras 5 caídas en 10 minutos queda en estado degradado y Jarvis sigue funcionando por texto.",
+    "Dice de qué archivo de la documentación sacó el dato (por ejemplo, la ruta de un ADR o de un doc).",
+    "No inventa datos que no estén en la documentación."
+  ]
+}

@@ -21,9 +21,13 @@ export const EvalCase = z.strictObject({
   category: z.string().min(1),
   /** "voice": every turn arrives spoken and the reply is heard (adds prompts/voice.md, like the Core). */
   mode: z.enum(["text", "voice"]).default("text"),
+  /** Phase 3: run inside a project conversation over a registered folder (see workspace.ts). */
+  project: z.enum(["jarvis-docs"]).optional(),
   turns: z.array(z.string().min(1)).min(1),
   checks: z.strictObject({
     maxChars: z.number().int().positive().optional(),
+    /** Phase 3: the answer must come from looking things up, not from memory. */
+    minToolCalls: z.number().int().positive().optional(),
     mustMatch: z.array(Pattern).optional(),
     mustNotMatch: z.array(Pattern).optional(),
   }),
@@ -44,9 +48,10 @@ export function loadCases(dir: string = CONVERSATIONS_DIR): EvalCase[] {
 }
 
 /** Deterministic checks on the final answer: returns the list of failures (empty = pass). */
-export function runChecks(c: EvalCase, answer: string): string[] {
+export function runChecks(c: EvalCase, answer: string, toolCalls = 0): string[] {
   const failures: string[] = [];
-  const { maxChars, mustMatch = [], mustNotMatch = [] } = c.checks;
+  const { maxChars, mustMatch = [], mustNotMatch = [], minToolCalls } = c.checks;
+  if (minToolCalls !== undefined && toolCalls < minToolCalls) failures.push(`usó ${toolCalls} herramientas, mínimo ${minToolCalls}`);
   if (maxChars !== undefined && answer.length > maxChars) failures.push(`demasiado larga: ${answer.length} > ${maxChars} caracteres`);
   for (const p of mustMatch) if (!new RegExp(p, "iu").test(answer)) failures.push(`falta /${p}/`);
   for (const p of mustNotMatch) {
