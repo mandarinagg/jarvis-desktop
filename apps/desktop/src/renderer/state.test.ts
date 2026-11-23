@@ -174,3 +174,16 @@ describe("projects", () => {
     ]);
   });
 });
+
+describe("builder", () => {
+  const task = { id: "abcd1234-x", project: "Utils", task: "slugify", branch: "jarvis/x", budgetUsd: 1, costUsd: 0, filesChanged: 0, createdAt: "t" };
+  it("keeps one entry per task, newest event first", () => {
+    let s = reduce(initialState, { kind: "core", message: { type: "builder.list.result", id: "l", tasks: [{ ...task, id: "old", status: "merged" }] } });
+    s = reduce(s, { kind: "core", message: { type: "builder.task", task: { ...task, status: "running" } } });
+    s = reduce(s, { kind: "core", message: { type: "builder.task", task: { ...task, status: "review", costUsd: 0.4 } } });
+    expect(s.builder?.map((t) => [t.id, t.status])).toEqual([
+      ["abcd1234-x", "review"],
+      ["old", "merged"],
+    ]);
+  });
+});

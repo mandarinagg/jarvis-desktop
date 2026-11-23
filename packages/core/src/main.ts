@@ -8,9 +8,12 @@ import { rm } from "node:fs/promises";
 import type { CoreMessage, TtsConfig } from "@jarvis/shared";
 import type { Session } from "./server.js";
 import path from "node:path";
+import { Builder } from "./builder/service.js";
+import { BuilderTaskStore } from "./builder/store.js";
 import { ChatService } from "./chat.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
 import { openDatabase } from "./db.js";
+import { localDay } from "./db.js";
 import { createLogger } from "./log.js";
 import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
 import { projectCard } from "./projects/context.js";
@@ -23,6 +26,7 @@ import { AlreadyRunningError, CoreServer } from "./server.js";
 import { ConversationStore } from "./store.js";
 import { newSessionToken, writeSessionToken } from "./token.js";
 import { AuditService } from "./tools/audit-service.js";
+import { BUILDER_SERVER, BUILDER_SERVER_TOOLS, builderPreviews, createBuilderServer } from "./tools/builder-server.js";
 import { ConfirmationBroker } from "./tools/confirm.js";
 import { connectExternalServers, loadExternalServers } from "./tools/external.js";
 import { ToolHub } from "./tools/hub.js";
@@ -38,12 +42,17 @@ export const CORE_VERSION = "0.1.0";
 const EFFORTS: readonly Effort[] = ["low", "medium", "high", "xhigh", "max"];
 
 /** Key from Credential Manager; ANTHROPIC_API_KEY only as a dev fallback (.env is never committed). */
-function modelResolver(env: NodeJS.ProcessEnv): () => ChatModel | undefined {
+function anthropicKey(env: NodeJS.ProcessEnv): () => string | undefined {
   const secrets = new KeyringSecretStore();
+  return () => secrets.get("anthropic-api-key") ?? env.ANTHROPIC_API_KEY;
+}
+
+function modelResolver(env: NodeJS.ProcessEnv): () => ChatModel | undefined {
+  const apiKey = anthropicKey(env);
   const effort = EFFORTS.find((e) => e === env.JARVIS_EFFORT) ?? "low";
   let cached: { key: string; model: ChatModel } | undefined;
   return () => {
-    const key = secrets.get("anthropic-api-key") ?? env.ANTHROPIC_API_KEY;
+    const key = apiKey();
     if (!key) return undefined;
     if (cached?.key !== key) {
       cached = { key, model: new AnthropicChatModel({ apiKey: key, model: env.JARVIS_DEFAULT_MODEL || "claude-opus-5-5", effort }) };
@@ -87,6 +96,24 @@ async function main(): Promise<number> {
   const projectsDeps = { projects, index, trashDir: path.join(home, "trash") };
   await tools.addInProcess(PROJECTS_SERVER, createProjectsServer(projectsDeps), PROJECTS_TOOLS, projectsPreviews(projectsDeps));
   await tools.addInProcess(JARVIS_SERVER, createJarvisServer({ audit }), JARVIS_TOOLS);
+  // The server is created below; events only flow once it is listening.
+  let broadcast: (m: CoreMessage) => void = () => {};
+  const dailyBudgetUsd = Number.isFinite(budget) && budget > 0 ? budget : 3;
+  // Phase 5 (ADR-023): the Builder, reached through the `builder` tools (owner confirms start and merge).
+  const builder = new Builder({
+    tasks: new BuilderTaskStore(db),
+    projects,
+    audit,
+    home,
+    apiKey: anthropicKey(env),
+    model: env.JARVIS_BUILDER_MODEL || "claude-opus-5-5",
+    spentToday: () => store.spentOn(localDay(new Date())),
+    dailyBudgetUsd,
+    broadcast: (m) => broadcast(m),
+    logger,
+  });
+  builder.recoverInterrupted();
+  await tools.addInProcess(BUILDER_SERVER, createBuilderServer(builder), BUILDER_SERVER_TOOLS, builderPreviews(builder));
   const auditService = new AuditService(audit, path.join(home, "exports"));
   const chat = new ChatService({
     store,
@@ -99,12 +126,10 @@ async function main(): Promise<number> {
       const p = projects.conversationProject(conversationId);
       return p ? projectCard(p) : undefined;
     },
-    dailyBudgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 3,
+    dailyBudgetUsd,
     logger,
   });
 
-  // The server is created below; voice events only flow once it is listening.
-  let broadcast: (m: CoreMessage) => void = () => {};
   const projectsService = new ProjectsService({
     projects,
     index,
@@ -142,6 +167,7 @@ async function main(): Promise<number> {
     logger.log("info", "core.stopping", { reason });
     chat.cancelAll();
     confirmations.cancelAll();
+    await builder.close();
     unwatchFile(rulesFile);
     index.close();
     await tools.close();
@@ -166,6 +192,13 @@ async function main(): Promise<number> {
       },
       permissionRespond: (s, m) => confirmations.respond(s, m),
       audit: (s, m) => auditService.handle(s, m),
+      builder: (s, m) => {
+        if (m.type === "builder.list") s.send({ type: "builder.list.result", id: m.id, tasks: builder.list() });
+        else {
+          builder.cancel(m.taskId);
+          s.send({ type: "builder.list.result", id: m.id, tasks: builder.list() });
+        }
+      },
       conversationsList: (s, m) => chat.conversationsList(s, m),
       conversationsGet: (s, m) => chat.conversationsGet(s, m),
       budgetGet: (s, m) => chat.budgetGet(s, m),

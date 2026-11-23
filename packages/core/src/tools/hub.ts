@@ -149,6 +149,16 @@ export class ToolHub implements ToolRuntime {
         return `Commit en ${s("project") ?? ""}`;
       case "recent_activity":
         return "Revisando lo que hice";
+      case "start_task":
+        return `Preparando una tarea del Builder en ${s("project") ?? ""}`;
+      case "task_status":
+        return "Mirando las tareas del Builder";
+      case "cancel_task":
+        return "Cancelando la tarea del Builder";
+      case "merge_task":
+        return "Mergeando la tarea del Builder";
+      case "discard_task":
+        return "Descartando la tarea del Builder";
       default:
         return tool;
     }

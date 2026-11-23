@@ -78,8 +78,12 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
 
 ## Fase 5 — L4a: Builder
 - Integración Claude Agent SDK en workspaces autorizados
+  - [x] Un git worktree por tarea fuera del proyecto, agente sin settings del repo ni del owner, sin web, subagentes ni MCP (ADR-023)
 - Siempre en rama git; diff y resumen antes de merge
+  - [x] Rama `jarvis/…`, commit del Core al terminar, merge `--no-ff` solo con el diff completo aprobado en el diálogo nativo; descarte y cancelación
 - Hooks: bloqueo de comandos fuera de allowlist, límite de presupuesto por tarea
+  - [x] Hook `PreToolUse` que bloquea al fallar: rutas dentro del worktree y Bash con allowlist (git de lectura + lo que el owner habilite en `builder.json`); `maxBudgetUsd` por tarea dentro del tope diario
+- [ ] Validación: 5 tareas reales con la API real, sin tocar nada fuera del workspace
 
 **Exit:** construye 5 tareas reales pequeñas (scripts/utilidades) con aprobación de diff, sin tocar nada fuera del workspace.
 

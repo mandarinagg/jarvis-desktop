@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.3"; // 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4)
+export const PROTOCOL_VERSION = "1.4"; // 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5)
 
 const Id = z.string().min(1).max(64);
 const SessionToken = z.string().regex(/^[0-9a-f]{64}$/, "token must be 256-bit lowercase hex");
@@ -134,11 +134,23 @@ export type AuditExport = z.infer<typeof AuditExport>;
 
 export type AuditMessage = AuditList | AuditExport;
 
+/** Builder tasks (Phase 5, ADR-023). Starting, merging and discarding go through Jarvis' tools
+ * (with the owner's confirmation); clients can list tasks and stop a running one. */
+export const BuilderList = z.strictObject({ type: z.literal("builder.list"), id: Id });
+export type BuilderList = z.infer<typeof BuilderList>;
+
+export const BuilderCancel = z.strictObject({ type: z.literal("builder.cancel"), id: Id, taskId: Id });
+export type BuilderCancel = z.infer<typeof BuilderCancel>;
+
+export type BuilderMessage = BuilderList | BuilderCancel;
+
 export const ClientMessage = z.discriminatedUnion("type", [
   VoiceWake,
   PermissionRespond,
   AuditList,
   AuditExport,
+  BuilderList,
+  BuilderCancel,
   VoicePtt,
   VoiceStatusGet,
   AuthHello,
@@ -368,7 +380,39 @@ export const AuditExported = z.strictObject({
 });
 export type AuditExported = z.infer<typeof AuditExported>;
 
+export const BuilderTaskInfo = z.strictObject({
+  id: z.string(),
+  project: z.string(),
+  task: z.string().max(4_000),
+  branch: z.string(),
+  status: z.enum(["running", "review", "merged", "discarded", "failed", "cancelled"]),
+  budgetUsd: z.number().nonnegative(),
+  costUsd: z.number().nonnegative(),
+  filesChanged: z.number().int().nonnegative(),
+  /** What the agent is doing now (running) or its final summary (data written by the model). */
+  lastAction: z.string().max(200).optional(),
+  summary: z.string().max(4_000).optional(),
+  error: z.string().max(500).optional(),
+  createdAt: z.string(),
+  finishedAt: z.string().optional(),
+});
+export type BuilderTaskInfo = z.infer<typeof BuilderTaskInfo>;
+
+/** Reply to builder.list (with its id). */
+export const BuilderListResult = z.strictObject({
+  type: z.literal("builder.list.result"),
+  id: Id,
+  tasks: z.array(BuilderTaskInfo).max(50),
+});
+export type BuilderListResult = z.infer<typeof BuilderListResult>;
+
+/** Broadcast whenever a task changes (progress, review, merged...). */
+export const BuilderTaskEvent = z.strictObject({ type: z.literal("builder.task"), task: BuilderTaskInfo });
+export type BuilderTaskEvent = z.infer<typeof BuilderTaskEvent>;
+
 export const CoreMessage = z.discriminatedUnion("type", [
+  BuilderListResult,
+  BuilderTaskEvent,
   PermissionRequest,
   PermissionResolved,
   AuditListResult,

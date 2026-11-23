@@ -725,3 +725,26 @@ html.is-overlay body {
   background: #4ade80;
   box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.25);
 }
+
+/* ------------------------------------------------------------ Builder (Phase 5) */
+.activity h3 {
+  margin: 16px 0 4px;
+  font-size: 14px;
+}
+.audit.builder-task.running {
+  border-left-color: #2563eb;
+}
+.audit.builder-task.review {
+  border-left-color: #16a34a;
+}
+.audit.builder-task.failed {
+  border-left-color: #c2410c;
+}
+.builder-summary {
+  margin: 4px 0 0;
+  font: inherit;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  opacity: 0.9;
+}
