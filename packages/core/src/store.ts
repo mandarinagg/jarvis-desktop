@@ -134,14 +134,15 @@ export class ConversationStore {
   }
 
   spentOn(day: string): number {
-    // Chat turns plus Builder tasks (Phase 5): one daily cap for everything Jarvis spends.
+    // Chat turns, Builder tasks, reflections and skill evals: one daily cap for everything Jarvis spends.
     const row = this.db
       .prepare(
         `SELECT (SELECT COALESCE(SUM(cost_usd), 0) FROM usage WHERE day = ?)
               + (SELECT COALESCE(SUM(cost_usd), 0) FROM builder_tasks WHERE day = ?)
-              + (SELECT COALESCE(SUM(cost_usd), 0) FROM reflections WHERE day = ?) AS total`,
+              + (SELECT COALESCE(SUM(cost_usd), 0) FROM reflections WHERE day = ?)
+              + (SELECT COALESCE(SUM(cost_usd), 0) FROM skill_evals WHERE day = ?) AS total`,
       )
-      .get(day, day, day);
+      .get(day, day, day, day);
     return Number(row?.total ?? 0);
   }
 

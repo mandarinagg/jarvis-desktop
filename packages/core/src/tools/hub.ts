@@ -170,6 +170,12 @@ export class ToolHub implements ToolRuntime {
         return "Programando un recordatorio";
       case "cancel_reminder":
         return "Cancelando un recordatorio";
+      case "list_skills":
+        return "Mirando tus skills";
+      case "use_skill":
+        return `Siguiendo la skill «${s("name") ?? ""}»`;
+      case "propose_skill":
+        return `Proponiendo la skill «${s("name") ?? ""}»`;
       default:
         return tool;
     }

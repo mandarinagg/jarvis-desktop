@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.7"; // 1.7: proactive.*, reminders.cancel (Phase 7); 1.6: dashboard.* (Phase 7); 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
+export const PROTOCOL_VERSION = "1.8"; // 1.8: skills.* (Phase 7); 1.7: proactive.*, reminders.cancel (Phase 7); 1.6: dashboard.* (Phase 7); 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
 
 const Id = z.string().min(1).max(64);
 const SessionToken = z.string().regex(/^[0-9a-f]{64}$/, "token must be 256-bit lowercase hex");
@@ -232,7 +232,31 @@ export type RemindersCancel = z.infer<typeof RemindersCancel>;
 
 export type ProactiveMessage = ProactiveGet | ProactiveSet | RemindersCancel;
 
+/** Phase 7 (ADR-027): skills Jarvis proposes. Approving opens a native confirmation in the Core
+ * (the renderer only asks for it), and only after the skill's own evals passed on its exact text. */
+const SkillName = z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/);
+const ProposalId = z.number().int().positive();
+export const SkillsList = z.strictObject({ type: z.literal("skills.list"), id: Id });
+export const SkillsEvaluate = z.strictObject({ type: z.literal("skills.evaluate"), id: Id, proposalId: ProposalId });
+export const SkillsApprove = z.strictObject({ type: z.literal("skills.approve"), id: Id, proposalId: ProposalId });
+export const SkillsReject = z.strictObject({ type: z.literal("skills.reject"), id: Id, proposalId: ProposalId });
+export const SkillsSetEnabled = z.strictObject({ type: z.literal("skills.setEnabled"), id: Id, name: SkillName, enabled: z.boolean() });
+export const SkillsDelete = z.strictObject({ type: z.literal("skills.delete"), id: Id, name: SkillName });
+export type SkillsMessage =
+  | z.infer<typeof SkillsList>
+  | z.infer<typeof SkillsEvaluate>
+  | z.infer<typeof SkillsApprove>
+  | z.infer<typeof SkillsReject>
+  | z.infer<typeof SkillsSetEnabled>
+  | z.infer<typeof SkillsDelete>;
+
 export const ClientMessage = z.discriminatedUnion("type", [
+  SkillsList,
+  SkillsEvaluate,
+  SkillsApprove,
+  SkillsReject,
+  SkillsSetEnabled,
+  SkillsDelete,
   ProactiveGet,
   ProactiveSet,
   RemindersCancel,
@@ -584,6 +608,7 @@ export const DashboardResult = z.strictObject({
     .max(10),
   activity: z.strictObject({ actionsToday: z.number().int().nonnegative(), confirmedToday: z.number().int().nonnegative(), deniedToday: z.number().int().nonnegative() }),
   builder: z.strictObject({ running: z.number().int().nonnegative(), review: z.number().int().nonnegative() }),
+  skills: z.strictObject({ active: z.number().int().nonnegative(), pendingProposals: z.number().int().nonnegative() }),
   memory: z.strictObject({
     enabled: z.boolean(),
     active: z.number().int().nonnegative(),
@@ -621,7 +646,57 @@ export const ProactiveNotify = z.strictObject({
 });
 export type ProactiveNotify = z.infer<typeof ProactiveNotify>;
 
+export const SkillInfo = z.strictObject({
+  name: z.string(),
+  /** Model-written, owner-approved: plain text, never markup. */
+  description: z.string().max(300),
+  body: z.string().max(4_000),
+  version: z.number().int().positive(),
+  status: z.enum(["active", "disabled"]),
+  approvedAt: z.string(),
+  useCount: z.number().int().nonnegative(),
+  lastUsedAt: z.string().optional(),
+});
+export type SkillInfo = z.infer<typeof SkillInfo>;
+
+export const SkillProposalInfo = z.strictObject({
+  id: z.number().int().positive(),
+  name: z.string(),
+  description: z.string().max(300),
+  body: z.string().max(4_000),
+  cases: z.array(z.strictObject({ prompt: z.string().max(1_000), rubric: z.array(z.string().max(300)).max(4) })).max(5),
+  reason: z.string().max(500),
+  createdAt: z.string(),
+  /** A new version of an existing skill. */
+  updates: z.boolean(),
+  eval: z
+    .strictObject({
+      ranAt: z.string(),
+      passed: z.number().int().nonnegative(),
+      total: z.number().int().nonnegative(),
+      costUsd: z.number().nonnegative(),
+      results: z.array(z.strictObject({ prompt: z.string().max(1_000), pass: z.boolean(), reason: z.string().max(300) })).max(5),
+      error: z.string().max(300).optional(),
+      /** It ran on the current text. */
+      current: z.boolean(),
+    })
+    .optional(),
+  canApprove: z.boolean(),
+});
+export type SkillProposalInfo = z.infer<typeof SkillProposalInfo>;
+
+/** Reply to skills.* (with its id), and broadcast with id "skills" when something changes. */
+export const SkillsListResult = z.strictObject({
+  type: z.literal("skills.list.result"),
+  id: Id,
+  skills: z.array(SkillInfo).max(200),
+  proposals: z.array(SkillProposalInfo).max(50),
+  notice: z.string().max(500).optional(),
+});
+export type SkillsListResult = z.infer<typeof SkillsListResult>;
+
 export const CoreMessage = z.discriminatedUnion("type", [
+  SkillsListResult,
   ProactiveState,
   ProactiveNotify,
   DashboardResult,

@@ -34,3 +34,8 @@ export * from "./proactive/schedule.js";
 export * from "./proactive/service.js";
 export * from "./proactive/store.js";
 export * from "./tools/reminders-server.js";
+export * from "./skills/evaluate.js";
+export * from "./skills/lint.js";
+export * from "./skills/service.js";
+export * from "./skills/store.js";
+export * from "./tools/skills-server.js";
