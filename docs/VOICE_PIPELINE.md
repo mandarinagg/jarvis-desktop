@@ -66,7 +66,7 @@ Los logs registran la duración y la latencia de cada frase, pero **nunca el tex
 
 - El stream de Claude también llega a la UI como texto, por broadcast.
 - Sin conversación indicada, un turno nuevo sigue la última conversación de voz si pasaron menos de 10 minutos.
-- **Barge-in:** apretar el atajo mientras Jarvis piensa o habla cancela el stream de Claude y manda `tts.cancel`. Si el texto ya se había guardado entero, la respuesta queda marcada como interrumpida.
+- **Barge-in:** hablarle encima mientras habla (VAD, §4) o apretar el atajo mientras piensa o habla cancela el stream de Claude y manda `tts.cancel`. Si el texto ya se había guardado entero, la respuesta queda marcada como interrumpida.
 - **Modo voz (ADR-015):** los turnos hablados agregan `prompts/voice.md` después del system prompt: respuestas de una a tres oraciones, sin markdown, con números y horas como se dicen, y el código en un bloque que queda en pantalla.
 - **Errores hablados:** frases cortas y presintetizadas (tope de gasto, falla de Claude). El detalle queda en pantalla.
 - **Métricas:** tabla `voice_turns` (migración 002), solo con tiempos y nunca con texto. Reporte: `node packages/core/dist/voice-stats.js`.
@@ -84,11 +84,16 @@ El indicador de micrófono abierto es **obligatorio y no se puede ocultar**.
 
 ## 4. Barge-in
 
-1. Mientras `hablando`, VAD sigue activo sobre audio con AEC.
-2. Si detecta voz del usuario > 250 ms → `voice.barge_in`.
-3. Core cancela el stream de Claude (AbortController) y envía `tts.cancel`.
-4. El reproductor corta en < 100 ms con fade de 30 ms.
-5. Se vuelve a `escuchando`. Lo dicho por Jarvis hasta el corte queda en el historial marcado como interrumpido.
+Implementado en la Fase 2 (ADR-016), sin AEC porque el owner usa auriculares:
+1. Cuando un turno empieza a sonar, el Core manda `vad.arm`. El servicio abre el micrófono (el indicador lo muestra: «Hablando · te escucho») y corre Silero VAD sobre frames de 32 ms.
+2. Si detecta voz del owner durante ≥ 250 ms, manda `vad.speech` (~250 ms desde que empieza la voz, medido con una grabación real).
+3. El Core cancela el stream de Claude (AbortController) y manda `tts.cancel`.
+4. El reproductor corta en < 100 ms, con fade de 30 ms.
+5. El servicio sigue grabando esa frase, con 0,5 s de pre-roll, hasta 700 ms de silencio. Después cierra el micrófono y transcribe. Se pasa a `escuchando` → `transcribiendo`, y lo que Jarvis dijo hasta el corte queda en el historial marcado como interrumpido.
+
+- Si termina el turno sin que el owner hable, `vad.disarm` cierra el micrófono.
+- El atajo siempre gana: desarma el VAD o termina antes la frase que se está grabando.
+- `JARVIS_BARGE_IN=0` deja solo el barge-in por atajo, que es lo que conviene con parlantes hasta que haya AEC.
 
 ## 5. Privacidad
 

@@ -78,6 +78,8 @@ async function main(): Promise<number> {
     metrics: new VoiceMetricsStore(db),
     markInterrupted: (turnId) => store.markInterrupted(turnId),
     logger,
+    // Barge-in by voice (ADR-016) assumes headphones: with speakers Jarvis would interrupt himself.
+    vadBargeIn: env.JARVIS_BARGE_IN !== "0",
   });
   // Voice is on by default (Phase 2); JARVIS_VOICE=0 keeps the Core text-only.
   const voice: VoiceSupervisor | undefined =

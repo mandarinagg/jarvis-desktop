@@ -19,7 +19,7 @@ def line(msg: dict) -> bytes:
 def test_configure_replies_ready():
     code, out = run(line({"type": "voice.configure", "id": "c1", "protocolVersion": "1.0"}))
     assert code == 0
-    assert out == [{"type": "voice.ready", "id": "c1", "protocolVersion": "1.0", "serviceVersion": __version__}]
+    assert out == [{"type": "voice.ready", "id": "c1", "protocolVersion": "1.1", "serviceVersion": __version__}]
 
 
 def test_incompatible_version_errors_and_stops():
@@ -28,7 +28,7 @@ def test_incompatible_version_errors_and_stops():
         line({"type": "voice.ping", "id": "p1"}),
     )
     assert code == 0
-    assert out == [{"type": "voice.error", "id": "c1", "code": "incompatible_version", "message": "voice protocol 1.0 required"}]
+    assert out == [{"type": "voice.error", "id": "c1", "code": "incompatible_version", "message": "voice protocol 1.1 required"}]
 
 
 def test_ping_pong_and_shutdown_stops_reading():

@@ -307,6 +307,7 @@ default-groups = ["dev", "tts-offline"]
 dependencies = [
     { name = "google-cloud-texttospeech" },
     { name = "numpy" },
+    { name = "onnxruntime" },
     { name = "sounddevice" },
 ]
 
@@ -327,6 +328,7 @@ tts-offline = [
 requires-dist = [
     { name = "google-cloud-texttospeech", specifier = ">=2.38.0" },
     { name = "numpy", specifier = ">=2.1" },
+    { name = "onnxruntime", specifier = ">=1.20" },
     { name = "sounddevice", specifier = ">=0.5" },
 ]
 

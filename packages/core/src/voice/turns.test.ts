@@ -20,7 +20,7 @@ class FakeChat {
   }
 }
 
-function setup() {
+function setup(extra: { vadBargeIn?: boolean } = {}) {
   let clock = 1_000;
   const toVoice: ToVoiceMessage[] = [];
   const broadcast: CoreMessage[] = [];
@@ -34,6 +34,7 @@ function setup() {
     metrics,
     markInterrupted: (id) => interrupted.push(id),
     now: () => clock,
+    ...extra,
   });
   const client: Session = { id: "ui", client: "desktop", send: (m) => broadcast.push(m), close() {} };
   turns.supervisorState("ready");
@@ -133,6 +134,73 @@ describe("VoiceTurns", () => {
     expect(t.turns.state).toBe("listening");
     expect(t.metrics.stats().bargeIn).toMatchObject({ turns: 1, p50: 80 });
     expect(t.metrics.stats().outcomes.interrupted).toBe(1);
+  });
+
+  it("without VAD barge-in the mic stays closed while Jarvis speaks", () => {
+    const t = setup();
+    talk(t);
+    t.chat.emit({ type: "chat.delta", turnId: "chat-1", text: "Una frase. " });
+    t.turns.onVoiceMessage({ type: "tts.started", turnId: t.of("tts.speak")[0]?.turnId ?? "", seq: 0, engine: "cache", latencyMs: 0 });
+    expect(t.of("vad.arm")).toHaveLength(0);
+  });
+
+  it("VAD barge-in: talking over Jarvis interrupts him and the VAD utterance becomes the next turn", () => {
+    const t = setup({ vadBargeIn: true });
+    talk(t);
+    t.chat.emit({ type: "chat.delta", turnId: "chat-1", text: "Una frase larga. " });
+    const turnId = t.of("tts.speak")[0]?.turnId ?? "";
+    t.turns.onVoiceMessage({ type: "tts.started", turnId, seq: 0, engine: "cache", latencyMs: 0 });
+    t.turns.onVoiceMessage({ type: "tts.started", turnId, seq: 1, engine: "google", latencyMs: 0 });
+    expect(t.of("vad.arm")).toHaveLength(1); // once per turn
+    const watchId = t.of("vad.arm")[0]?.id ?? "";
+
+    t.turns.onVoiceMessage({ type: "vad.speech", id: watchId });
+    expect(t.chat.cancelled).toEqual([expect.objectContaining({ turnId: "chat-1" })]);
+    expect(t.of("tts.cancel")[0]?.turnId).toBe(turnId);
+    expect(t.turns.state).toBe("listening");
+    expect(t.of("stt.start")).toHaveLength(1); // the VAD records on its own: no new stt.start
+
+    t.tick(50);
+    t.turns.onVoiceMessage({ type: "tts.finished", turnId, interrupted: true });
+    expect(t.of("vad.disarm")).toHaveLength(0);
+    t.tick(1_500);
+    t.turns.onVoiceMessage({ type: "stt.listening", id: watchId, open: false });
+    expect(t.turns.state).toBe("transcribing");
+    t.tick(100);
+    t.turns.onVoiceMessage({ type: "stt.final", id: watchId, text: "pará, mejor decime otra cosa", audioMs: 1_500, sttMs: 90 });
+    expect(t.chat.sent).toHaveLength(2);
+    expect(t.chat.sent[1]?.msg).toMatchObject({ text: "pará, mejor decime otra cosa", conversationId: "conv-1" });
+    expect(t.metrics.stats().bargeIn).toMatchObject({ turns: 1, p50: 50 });
+  });
+
+  it("VAD watch is disarmed when the turn finishes or push-to-talk takes over", () => {
+    const t = setup({ vadBargeIn: true });
+    talk(t);
+    t.chat.emit({ type: "chat.delta", turnId: "chat-1", text: "Hola. " });
+    const turnId = t.of("tts.speak")[0]?.turnId ?? "";
+    t.turns.onVoiceMessage({ type: "tts.started", turnId, seq: 0, engine: "cache", latencyMs: 0 });
+    const first = t.of("vad.arm")[0]?.id;
+    t.ptt(true);
+    expect(t.of("vad.disarm").map((m) => m.id)).toEqual([first]);
+    expect(t.of("stt.start")).toHaveLength(2);
+
+    // a late vad.speech from the old watch is dropped, not treated as a new utterance
+    t.turns.onVoiceMessage({ type: "vad.speech", id: first ?? "" });
+    expect(t.of("stt.cancel").map((m) => m.id)).toEqual([first]);
+    expect(t.turns.state).toBe("listening");
+  });
+
+  it("VAD watch ends with the turn", () => {
+    const t = setup({ vadBargeIn: true });
+    talk(t);
+    const usage = { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 };
+    t.chat.emit({ type: "chat.delta", turnId: "chat-1", text: "Listo." });
+    t.chat.emit({ type: "chat.done", turnId: "chat-1", stopReason: "end_turn", usage, costUsd: 0 });
+    const turnId = t.of("tts.speak")[0]?.turnId ?? "";
+    t.turns.onVoiceMessage({ type: "tts.started", turnId, seq: 0, engine: "cache", latencyMs: 0 });
+    t.turns.onVoiceMessage({ type: "tts.finished", turnId, interrupted: false });
+    expect(t.of("vad.disarm").map((m) => m.id)).toEqual([t.of("vad.arm")[0]?.id]);
+    expect(t.turns.state).toBe("idle");
   });
 
   it("barge-in after the text is complete marks the stored reply as interrupted", () => {

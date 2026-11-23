@@ -5,7 +5,7 @@
 ## Dónde estamos
 - **Fase 0 (Diagnóstico):** completa, salvo la cuenta de la API de Anthropic, que la tiene que crear el owner.
 - **Fase 1 (L0: Core + chat):** implementada y en `main`. Falta validarla con la API real.
-- **Fase 2 (L1: Voz):** **implementada y en `main`** (PRs #27–#31 y el modo voz del prompt, ADR-013 a ADR-015). Se probó de punta a punta con micrófono, Parakeet y Neural2 reales. Falta validarla con la API real: 20 conversaciones y p50 voz→primer audio menor a 2.0 s.
+- **Fase 2 (L1: Voz):** **implementada y en `main`** (PRs #27–#31, y el modo voz del prompt y el barge-in por voz en #32–#33, ADR-013 a ADR-016). Se probó de punta a punta con micrófono, Parakeet y Neural2 reales. Falta validarla con la API real: 20 conversaciones y p50 voz→primer audio menor a 2.0 s.
 
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
@@ -18,7 +18,8 @@
 | Voice Service | `services/voice` (`python -m jarvis_voice.service`) | Proceso hijo del Core por stdio. Supervisor con backoff y estado `degradado` |
 | TTS | `services/voice/.../tts/` | Neural2 (2.5 s + 1 reintento), fallback a Piper `--output-raw`, caché de acuses, síntesis superpuesta, fade de 30 ms |
 | STT | `services/voice/.../stt/` | Parakeet en proceso vía `parakeet.dll` (~100 ms), micrófono abierto solo durante el push-to-talk, corrección post-STT |
-| Turnos de voz | `packages/core/src/voice/turns.ts` | Push-to-talk → STT → Claude → segmentador → TTS, barge-in, errores dichos por voz, métricas |
+| Turnos de voz | `packages/core/src/voice/turns.ts` | Push-to-talk → STT → Claude → segmentador → TTS, barge-in (atajo o voz), errores dichos por voz, métricas |
+| Barge-in por voz | `services/voice/.../stt/vad.py` + `controller.py` | Silero VAD mientras Jarvis habla: ≥ 250 ms de voz lo interrumpe y la frase termina sola con 700 ms de silencio (ADR-016). `JARVIS_BARGE_IN=0` lo apaga |
 | App de escritorio | `apps/desktop` | Chat + chip de voz + «Mantené para hablar» + atajo `Ctrl+Shift+Space` (interruptor) + overlay |
 | Modo voz del prompt | `packages/core/prompts/voice.md` | Se agrega en los turnos hablados como segundo bloque de `system` (ADR-015) |
 | Evals | `evals/` | 19 conversaciones (4 de voz con `mode: voice`), juez Opus 5.5, umbral del 80% |
@@ -34,7 +35,7 @@
 1. Con la clave guardada: correr las evals, ajustar `packages/core/prompts/system.md` y volver a medir.
 2. Medir la voz real con `voice-stats`. Si el p50 no baja de 2.0 s, revisar primero el TTS (ADR-011): proveedor más cercano o streaming real. Después, adelantar el primer corte del segmentador.
 3. **Modo voz:** ya está implementado (ADR-015), pero las 4 evals de voz (016–019) nunca corrieron con la API real. Ajustar `prompts/voice.md` según esos resultados.
-4. Pendiente de la Fase 2 que no bloquea: barge-in por VAD (Silero) para hablar sin apretar el atajo. Hoy el barge-in es volver a apretar el atajo.
+4. **Barge-in por voz:** ya está implementado (ADR-016). Probarlo en uso real y ajustar los umbrales si una tos o un ruido lo interrumpen. Para descargar el modelo de Silero, volver a correr `jarvis-stt-bench setup`.
 5. Después, la **Fase 3** (proyectos y contexto), según `ROADMAP.md`.
 
 ## Decisiones abiertas
@@ -50,6 +51,7 @@
 - **`Start-Process -Wait` no vuelve** cuando la app arranca el Core, porque espera también a los descendientes y el Core queda desacoplado. Usar `-PassThru` y `WaitForExit()`.
 - **`parakeet-cli.exe` recarga el modelo en cada llamada (4.7 s).** El servicio usa la DLL en proceso, y los detalles del ABI están en ADR-014. Si se cambian los binarios de whisper.cpp, hay que correr `test_real_parakeet_in_process` en local.
 - **Piper:** `-f -` está roto en Windows y, sin flags, reproduce por los parlantes. Usar `--output-raw`.
+- **Barge-in por voz con parlantes:** Jarvis se interrumpe a sí mismo porque no hay AEC. Usar auriculares o `JARVIS_BARGE_IN=0`.
 - **`Ctrl+Alt+Space` está tomado** por otra app en la PC del owner. El atajo por defecto es `Ctrl+Shift+Space`.
 - **Smoke con voz:** usar un `JARVIS_DATA_DIR` temporal con junctions a `models`, `bin` y `cache` del `%APPDATA%\Jarvis` real.
 - **`tsc` emite aunque haya errores:** revisá la salida del build antes de probar.
@@ -59,6 +61,6 @@
 ## Cómo verificar el estado
 ```powershell
 pnpm install --frozen-lockfile
-pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 190 tests
-cd services/voice; uv run pytest -q                   # 170 tests (en local incluye Parakeet real)
+pnpm lint; pnpm build; pnpm typecheck; pnpm test     # 201 tests
+cd services/voice; uv run pytest -q                   # 188 tests (en local incluye Parakeet y Silero reales)
 ```
