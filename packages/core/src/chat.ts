@@ -3,7 +3,7 @@
  * persist reply + usage. One turn at a time per conversation; cancellable (chat.cancel, disconnect).
  */
 import { randomUUID } from "node:crypto";
-import type { BudgetGet, ChatCancel, ChatSend, ConversationsGet, ConversationsList } from "@jarvis/shared";
+import type { BudgetGet, ChatCancel, ChatSend, ConversationsGet, ConversationsList, ConversationsSetMode } from "@jarvis/shared";
 import { type ChatModel, TurnCancelledError, UpstreamError } from "./claude/model.js";
 import type { ProjectStore } from "./projects/store.js";
 import type { ToolRuntime } from "./tools/hub.js";
@@ -24,6 +24,10 @@ export interface ChatServiceOptions {
   tools?: ToolRuntime;
   /** Active-project card for a conversation, appended to the system prompt (ADR-017). */
   projectContext?: (conversationId: string) => Promise<string | undefined>;
+  /** Relevant memories for this turn as a data block (Phase 6, ADR-024); records which ones were used. */
+  memoryContext?: (o: { conversationId: string; turnId: string; text: string }) => string | undefined;
+  /** Thinking-mode instructions of the conversation (sparring, brainstorm, abogado del diablo). */
+  modePrompt?: (conversationId: string) => string | undefined;
   /** Links new conversations to the project chosen in the client (chat.send projectId). */
   projects?: ProjectStore;
   dailyBudgetUsd: number;
@@ -89,7 +93,14 @@ export class ChatService {
 
       const history = store.messages(conversation.id).map((m) => ({ role: m.role, content: m.content }));
       const card = await this.opts.projectContext?.(conversation.id);
-      const suffix = [card, mode === "voice" ? this.opts.voicePrompt : undefined].filter(Boolean).join("\n\n");
+      let memories: string | undefined;
+      try {
+        memories = this.opts.memoryContext?.({ conversationId: conversation.id, turnId, text: msg.text });
+      } catch (err) {
+        this.logger.log("warn", "memory.retrieve_failed", { error: err instanceof Error ? err.message : String(err) });
+      }
+      const thinking = this.opts.modePrompt?.(conversation.id);
+      const suffix = [card, memories, thinking, mode === "voice" ? this.opts.voicePrompt : undefined].filter(Boolean).join("\n\n");
       const result = await model.complete({
         system: this.opts.systemPrompt,
         systemSuffix: suffix || undefined,
@@ -163,8 +174,19 @@ export class ChatService {
       conversationId: conversation.id,
       title: conversation.title,
       ...(conversation.projectId ? { projectId: conversation.projectId } : {}),
+      ...(this.opts.store.thinkingMode(conversation.id) ? { thinkingMode: this.opts.store.thinkingMode(conversation.id) } : {}),
       messages,
     });
+  }
+
+  /** Thinking mode of a conversation (Phase 6); replies with the updated history header. */
+  conversationsSetMode(session: Session, msg: ConversationsSetMode): void {
+    if (!this.opts.store.getConversation(msg.conversationId)) {
+      session.send({ type: "error", id: msg.id, code: "invalid_message", message: "la conversación no existe" });
+      return;
+    }
+    this.opts.store.setThinkingMode(msg.conversationId, msg.mode);
+    this.conversationsGet(session, { type: "conversations.get", id: msg.id, conversationId: msg.conversationId });
   }
 
   budgetGet(session: Session, msg: BudgetGet): void {

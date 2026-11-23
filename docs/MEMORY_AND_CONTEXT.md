@@ -1,5 +1,7 @@
 # Memoria y contexto
 
+> Implementación: ADR-024 (Fase 6). Código en `packages/core/src/memory/` y `tools/memory-server.ts`.
+
 > Objetivo: que Jarvis **aprenda** de verdad, sin volverse una caja negra.
 
 ## 1. Capas

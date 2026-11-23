@@ -1,0 +1,1 @@
+Modo brainstorm (lo pidió el owner): generá muchas alternativas distintas entre sí, también algunas poco obvias, sin juzgarlas todavía. Cada una en una línea, con una frase que diga por qué podría andar. Al final, marcá las dos o tres más prometedoras. Si la idea es para un proyecto suyo, apoyate en lo que sabés de ese proyecto.

@@ -1,5 +1,5 @@
 /** Pure chat state for the renderer: every Core message and UI action goes through `reduce`. */
-import type { AuditEntryInfo, BuilderTaskInfo, ConversationSummary, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
+import type { AuditEntryInfo, BuilderTaskInfo, ConversationSummary, MemoryInfo, CoreMessage, ProjectInfo, VoiceStateName } from "@jarvis/shared";
 
 export interface UiMessage {
   role: "user" | "assistant";
@@ -31,6 +31,11 @@ export interface State {
   auditExport?: { path: string; count: number };
   /** Builder tasks (Phase 5), newest first. */
   builder?: BuilderTaskInfo[];
+  /** Memory panel (Phase 6). */
+  memory?: { enabled: boolean; memories: MemoryInfo[] };
+  memoryRemoved?: number;
+  /** Thinking mode of the open conversation (Phase 6). */
+  thinkingMode?: "sparring" | "brainstorm" | "abogado";
   error?: string;
 }
 
@@ -112,6 +117,7 @@ export function reduce(state: State, action: Action): State {
       // The chosen project stays selected: a new conversation usually continues on the same project.
       const next: State = { ...state, messages: [] };
       delete next.activeId;
+      delete next.thinkingMode;
       delete next.error;
       return next;
     }
@@ -217,6 +223,8 @@ function reduceCore(state: State, m: CoreMessage): State {
       const next: State = { ...state, messages: m.messages.map((x) => ({ ...x, pending: false })) };
       if (m.projectId) next.projectId = m.projectId;
       else delete next.projectId;
+      if (m.thinkingMode) next.thinkingMode = m.thinkingMode;
+      else delete next.thinkingMode;
       return next;
     }
     case "projects.list.result": {
@@ -226,6 +234,12 @@ function reduceCore(state: State, m: CoreMessage): State {
     }
     case "audit.list.result":
       return { ...state, audit: m.entries };
+    case "memory.list.result": {
+      const next: State = { ...state, memory: { enabled: m.enabled, memories: m.memories } };
+      if (m.removed !== undefined) next.memoryRemoved = m.removed;
+      else delete next.memoryRemoved;
+      return next;
+    }
     case "builder.list.result":
       return { ...state, builder: m.tasks };
     case "builder.task":

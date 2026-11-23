@@ -29,6 +29,14 @@ export const RENDERER_ALLOWED = [
   // Jarvis' tools, confirmed in native dialogs.
   "builder.list",
   "builder.cancel",
+  // Phase 6. The Memory panel: list, edit, disable, delete, forget a range, turn memory off. It
+  // cannot create memories (those need a native confirmation or an accepted proposal).
+  "memory.list",
+  "memory.update",
+  "memory.delete",
+  "memory.forget",
+  "memory.settings",
+  "conversations.setMode",
 ] as const;
 
 export type RendererMessage = Extract<ClientMessage, { type: (typeof RENDERER_ALLOWED)[number] }>;

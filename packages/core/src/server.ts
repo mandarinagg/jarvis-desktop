@@ -7,6 +7,8 @@ import net from "node:net";
 import {
   type AuditMessage,
   type BuilderMessage,
+  type ConversationsSetMode,
+  type MemoryMessage,
   type BudgetGet,
   type PermissionRespond,
   type ChatCancel,
@@ -56,6 +58,8 @@ export interface Handlers {
   permissionRespond?(session: Session, message: PermissionRespond): void;
   audit?(session: Session, message: AuditMessage): void | Promise<void>;
   builder?(session: Session, message: BuilderMessage): void | Promise<void>;
+  memory?(session: Session, message: MemoryMessage): void | Promise<void>;
+  conversationsSetMode?(session: Session, message: ConversationsSetMode): void;
   disconnected?(session: Session): void;
 }
 
@@ -281,6 +285,19 @@ export class CoreServer {
           }
           await h.builder(session, message);
           return;
+        case "memory.list":
+        case "memory.update":
+        case "memory.delete":
+        case "memory.forget":
+        case "memory.settings":
+          if (!h.memory) {
+            session.send({ type: "error", id: message.id, code: "upstream_error", message: `${message.type} is not available` });
+            return;
+          }
+          await h.memory(session, message);
+          return;
+        case "conversations.setMode":
+          return this.query(session, message, h.conversationsSetMode);
       }
     } catch (err) {
       this.logger.log("error", "ipc.handler_failed", {
