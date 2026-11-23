@@ -11,7 +11,7 @@
   - **Skills** (#49, ADR-027): Jarvis las propone con casos de prueba, corren sus evals sobre el texto exacto, el owner las aprueba en un diálogo nativo y quedan versionadas en `%APPDATA%/Jarvis/skills` (git).
   - **Skills desde la reflexión** (#50, ADR-028): la reflexión diaria ve los episodios de 30 días y, si el owner repitió un pedido 3 veces (una de hoy), deja como mucho 1 propuesta inerte en el panel Skills.
   Falta:
-  - el cliente móvil por **WhatsApp** con el número del owner (chat consigo mismo), basado en Baileys como su CRM (`ZESTIA_PROJECT/CRM_ECCOMERCE`, revisado solo en lo de WhatsApp). **implementado** en la rama `feat/phase7-whatsapp` (ADR-029): Baileys sobre el número del owner, solo el chat «Mensaje a mí mismo», tarjeta en Inicio para vincular con QR. Falta vincularlo de verdad y correr las evals 064–067;
+  - el cliente móvil por **WhatsApp** con el número del owner (chat consigo mismo), basado en Baileys como su CRM (`ZESTIA_PROJECT/CRM_ECCOMERCE`, revisado solo en lo de WhatsApp). **implementado** en la rama `feat/phase7-whatsapp` (ADR-029): Baileys sobre el número del owner, solo el chat «Mensaje a mí mismo», tarjeta en Inicio para vincular con QR. Vinculado y probado de punta a punta el 2026-11-23 (respuesta real de Claude por WhatsApp, US$0,05 el primer turno). Falta correr las evals 064–067. El owner evalúa un **número propio para Jarvis**, para tener un chat aparte; eso cambia ADR-029;
   - validar todo con la API real: casos 058–063, un recordatorio y una skill de verdad.
 - **Fase 6 (L4b: Memoria que aprende):** **implementada** en los PRs #45–#46 (apilados sobre #44, ADR-024):
   - memoria de datos, preferencias, procedimientos, ideas y episodios que se recupera en cada turno como datos;
@@ -141,6 +141,8 @@
 - **Notificaciones de Jarvis:** solo salen con la app de escritorio abierta. Con la app cerrada, los recordatorios esperan y salen al abrirla, marcados «(era para …)».
 - **Espejo de skills:** necesita `git` en el PATH. Si falla, queda un aviso en el log y la skill igual queda activa en la DB.
 - **WhatsApp:** el canal vive en el Core; con la PC apagada no responde y, al volver, no ejecuta pedidos de hace más de 10 minutos. Si WhatsApp desvincula a Jarvis desde el teléfono, se borra la sesión y hay que escanear de nuevo. Cualquier otra sesión de WhatsApp Web del owner también le puede escribir al chat propio.
+- **Una sola conexión por sesión de WhatsApp:** nunca abras la sesión de Jarvis desde otro proceso (sondas, scripts) mientras el Core corre. Dos sockets desincronizan las claves de Signal (`Key used already or never filled`, `Bad MAC`) y los mensajes quedan «en espera». Se arregla desvinculando y volviendo a vincular.
+- **Logs del Core lanzado por la app:** se descartan (`stdio: "ignore"` en `core-connection.ts`). Para diagnosticar, arrancá el Core a mano con `node packages/core/dist/main.js 2> core.log` antes de abrir la app.
 - **Worktrees del Builder:** si el Core muere a mitad de una tarea, la tarea queda «falló» y su worktree sigue ahí hasta que se descarte.
 
 ## Cómo verificar el estado
