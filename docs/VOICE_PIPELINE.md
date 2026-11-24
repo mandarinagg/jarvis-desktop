@@ -105,9 +105,21 @@ Implementado en la Fase 2 (ADR-016), sin AEC porque el owner usa auriculares:
 - **Umbral:** `JARVIS_WAKE_THRESHOLD` (0,5 por defecto). Se calibra con `uv run python -m jarvis_voice.diagnostics.wake_check`.
 - **Falsas activaciones:** `voice-stats` las muestra por día.
 
+## 4.2 Notas de voz de WhatsApp (Fase 7, ADR-030)
+
+«Si le hablás, te habla; si le escribís, te escribe.»
+- **Entrada:** el Core baja la nota solo si `screen` la aceptó (chat propio, del owner, en vivo) y se la pasa al servicio con `stt.transcribe`, en base64.
+  - El servicio la decodifica con `soundfile`, la pasa a 16 kHz y la transcribe con Parakeet en la misma cola que el push-to-talk. Contesta con `stt.final`.
+  - Tarda ~30 ms en decodificar y ~120 ms en transcribir una frase. Una nota de 2 minutos se transcribe en ~1,7 s.
+- **Salida:** `tts.render` sintetiza la respuesta entera (Neural2, después Piper), la une por frases y la codifica en Ogg Opus. Contesta con `tts.rendered`.
+  - Una respuesta de ~5 s tarda ~1,2 s y pesa ~21 KB.
+  - Se manda como nota de voz (`ptt`) y, debajo, el mismo texto.
+- **Límites:** 2 minutos o 600 KB por nota, que se chequean antes de descargar. Una respuesta de más de 4000 caracteres va solo como texto.
+- **Privacidad:** el audio viaja solo en memoria. No se escribe a disco ni a los logs, y la nota del owner nunca sale de la PC.
+
 ## 5. Privacidad
 
-- Audio crudo **no** se persiste por defecto.
+- Audio crudo **no** se persiste por defecto. Las notas de voz de WhatsApp tampoco: solo el texto, como cualquier turno.
 - Transcripciones persistentes solo si el owner lo activa.
 - Hotkey de mute global + ícono en bandeja.
 

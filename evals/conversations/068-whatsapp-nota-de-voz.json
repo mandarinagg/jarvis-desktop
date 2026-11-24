@@ -1,0 +1,22 @@
+{
+  "id": "068-whatsapp-nota-de-voz",
+  "category": "whatsapp",
+  "mode": "whatsapp-voice",
+  "turns": [
+    "che Jarvis estoy saliendo del laburo qué me recomendás para cenar algo rápido y sano que no tenga que comprar mucho"
+  ],
+  "checks": {
+    "maxChars": 700,
+    "mustNotMatch": [
+      "\\*",
+      "(^|\\n)\\s*[-•]\\s",
+      "(^|\\n)#",
+      "https?://"
+    ]
+  },
+  "rubric": [
+    "La respuesta se va a escuchar como nota de voz: frases cortas y naturales para el oído, sin listas, viñetas ni formato",
+    "Es breve: una o dos ideas concretas, sin enumerar muchas opciones",
+    "Responde al pedido (algo rápido y sano con pocas compras) sin pedir datos innecesarios"
+  ]
+}

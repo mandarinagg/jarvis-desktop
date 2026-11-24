@@ -12,6 +12,9 @@ Privacy (VOICE_PIPELINE §5): without the wake word the microphone is open only 
 and stt.stop (or vad.arm and the end of that capture); every open/close is reported
 (stt.listening, wake.listening) so the UI can show the mandatory indicator, and audio is kept in
 memory only until it is transcribed. Nothing is written to disk.
+
+WhatsApp voice notes (ADR-030): stt.transcribe hands over a whole note as bytes. It is decoded and
+transcribed in the same worker as push-to-talk, so the two never compete for the GPU.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ from typing import Any, Protocol
 
 import numpy as np
 
+from ..notes import NoteError, decode_note
 from .corrections import Corrector
 from .vad import FRAME, SpeechGate
 
@@ -113,7 +117,7 @@ class SttController:
         self._active: str | None = None
         self._chunks: list[np.ndarray] = []
         self._samples = 0
-        self._jobs: queue.Queue[tuple[str, np.ndarray] | None] = queue.Queue()
+        self._jobs: queue.Queue[tuple[str, np.ndarray | bytes] | None] = queue.Queue()
         # Barge-in by voice: _vad_on while the capture is VAD-driven; _watching until speech starts.
         self._load_vad, self._new_gate = load_vad, gate
         self._gate = gate()
@@ -228,6 +232,10 @@ class SttController:
 
     def cancel(self, utterance_id: str) -> None:
         self._close(utterance_id)
+
+    def transcribe_note(self, request_id: str, data: bytes) -> None:
+        """A WhatsApp voice note (Ogg Opus bytes): answered with stt.final, like push-to-talk."""
+        self._jobs.put((request_id, data))
 
     def close(self) -> None:
         if self._active is not None:
@@ -420,7 +428,15 @@ class SttController:
             try:
                 if job is None:
                     return
-                self._transcribe(*job)
+                request_id, audio = job
+                if isinstance(audio, bytes):
+                    try:
+                        audio = decode_note(audio)
+                    except NoteError as exc:
+                        self._log("warn", "stt.note_rejected", error=str(exc))
+                        self._send({"type": "voice.error", "id": request_id, "code": "stt_failed", "message": str(exc)[:200]})
+                        continue
+                self._transcribe(request_id, audio)
             except Exception as exc:
                 self._log("error", "stt.worker_failed", error=repr(exc))
             finally:

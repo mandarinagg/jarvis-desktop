@@ -66,7 +66,11 @@ export class ChatService {
     this.now = opts.now ?? (() => new Date());
   }
 
-  async chatSend(session: Session, msg: ChatSend, mode: ChatMode = "text"): Promise<void> {
+  /**
+   * `spoken`: the owner talked (a WhatsApp voice note, ADR-030) and the reply will be heard, so the
+   * voice prompt applies on top of the channel's. Voice turns on the PC are always spoken.
+   */
+  async chatSend(session: Session, msg: ChatSend, mode: ChatMode = "text", opts: { spoken?: boolean } = {}): Promise<void> {
     const { store } = this.opts;
     const fail = (code: "budget_exceeded" | "upstream_error" | "invalid_message", message: string) =>
       session.send({ type: "error", id: msg.id, code, message });
@@ -107,7 +111,7 @@ export class ChatService {
         this.logger.log("warn", "memory.retrieve_failed", { error: err instanceof Error ? err.message : String(err) });
       }
       const thinking = this.opts.modePrompt?.(conversation.id);
-      const suffix = [this.opts.clock?.(this.now()), this.opts.skillsContext?.(), card, memories, thinking, mode === "voice" ? this.opts.voicePrompt : undefined, mode === "whatsapp" ? this.opts.whatsappPrompt : undefined].filter(Boolean).join("\n\n");
+      const suffix = [this.opts.clock?.(this.now()), this.opts.skillsContext?.(), card, memories, thinking, mode === "whatsapp" ? this.opts.whatsappPrompt : undefined, mode === "voice" || opts.spoken ? this.opts.voicePrompt : undefined].filter(Boolean).join("\n\n");
       const result = await model.complete({
         system: this.opts.systemPrompt,
         systemSuffix: suffix || undefined,

@@ -1,8 +1,9 @@
 /**
  * WhatsApp through Baileys (ADR-029), adapted from the owner's CRM (`apps/api/src/whatsapp/`).
  * Unofficial client: WhatsApp may restrict the number; the owner accepted that risk. Differences
- * with the CRM: one account (the owner's), text only (no media download), a logger that never
- * writes message data, and a send guard that only reaches the self-chat.
+ * with the CRM: one account (the owner's), text plus voice notes (ADR-030: an accepted note's audio
+ * is the only media ever downloaded), a logger that never writes message data, and a send guard
+ * that only reaches the self-chat.
  */
 import makeWASocket, {
   type AuthenticationCreds,
@@ -10,6 +11,7 @@ import makeWASocket, {
   BufferJSON,
   type CacheStore,
   DisconnectReason,
+  downloadMediaMessage,
   initAuthCreds,
   makeCacheableSignalKeyStore,
   type MessageUpsertType,
@@ -66,8 +68,14 @@ function contextOf(inner: proto.IMessage): proto.IContextInfo | null | undefined
   );
 }
 
-/** Baileys message → channel message; null for groups, broadcasts, statuses and protocol messages. */
-export function toIncoming(m: WAMessage, type: MessageUpsertType): WaIncoming | null {
+/** Downloads a message's media; only ever called for a voice note the channel accepted. */
+export type MediaDownloader = (m: WAMessage) => Promise<Buffer>;
+
+/**
+ * Baileys message → channel message; null for groups, broadcasts, statuses and protocol messages.
+ * An audio message carries its metadata and a lazy `download`: nothing is fetched here.
+ */
+export function toIncoming(m: WAMessage, type: MessageUpsertType, download?: MediaDownloader): WaIncoming | null {
   const remoteJid = m.key.remoteJid;
   const id = m.key.id;
   if (!remoteJid || !id || !m.message) return null;
@@ -78,6 +86,17 @@ export function toIncoming(m: WAMessage, type: MessageUpsertType): WaIncoming | 
   const ctx = contextOf(inner);
   const seconds = Number(m.messageTimestamp ?? 0);
   const quoted = textOf(ctx?.quotedMessage);
+  const a = inner.audioMessage;
+  const audio =
+    a && download
+      ? {
+          ptt: a.ptt === true,
+          seconds: Number(a.seconds ?? 0) || 0,
+          bytes: Number(a.fileLength ?? 0) || 0,
+          ...(a.mimetype ? { mimetype: a.mimetype } : {}),
+          download: () => download(m),
+        }
+      : undefined;
   return {
     id,
     remoteJid,
@@ -88,6 +107,7 @@ export function toIncoming(m: WAMessage, type: MessageUpsertType): WaIncoming | 
     media: mediaOf(inner),
     forwarded: ctx?.isForwarded === true,
     ...(quoted ? { quoted } : {}),
+    ...(audio ? { audio } : {}),
   };
 }
 
@@ -289,10 +309,12 @@ export class BaileysProvider implements WaProvider {
         guard("close", () => events.closed(reason, detail));
       }
     });
+    const download: MediaDownloader = (m) =>
+      downloadMediaMessage(m, "buffer", {}, { logger, reuploadRequest: (msg) => sock.updateMediaMessage(msg) });
     sock.ev.on("messages.upsert", ({ messages, type }) => {
       refreshSelf();
       for (const m of messages) {
-        const incoming = toIncoming(m, type);
+        const incoming = toIncoming(m, type, download);
         if (incoming) guard("message", () => events.message(incoming));
       }
     });
@@ -304,6 +326,13 @@ export class BaileysProvider implements WaProvider {
         const id = sent?.key.id ?? "";
         if (id) this.sent.set(id, text);
         return { id };
+      },
+      sendVoiceNote: async (jid, audio, seconds) => {
+        if (!self || !isSelfChat(jid, self)) throw new Error("WhatsApp: solo se envía al chat propio del owner");
+        // `seconds` given: Baileys skips probing the file. Without `audio-decode` installed the
+        // waveform stays flat; the note plays the same (ADR-030).
+        const sent = await sock.sendMessage(self.jid, { audio, mimetype: "audio/ogg; codecs=opus", ptt: true, seconds: Math.max(1, Math.round(seconds)) });
+        return { id: sent?.key.id ?? "" };
       },
       stop: () => {
         sock.end(undefined);

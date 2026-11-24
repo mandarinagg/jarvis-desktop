@@ -48,6 +48,7 @@ import { MEMORY_SERVER, MEMORY_TOOLS, createMemoryServer, memoryPreviews } from 
 import { AuditLog, PermissionEngine, loadRules } from "./tools/permissions.js";
 import { PROJECTS_SERVER, PROJECTS_TOOLS, createProjectsServer, projectsPreviews } from "./tools/projects-server.js";
 import { VoiceMetricsStore } from "./voice/metrics.js";
+import { VoiceNotes } from "./voice/notes.js";
 import { createVoiceSpawner } from "./voice/spawn.js";
 import { VoiceSupervisor } from "./voice/supervisor.js";
 import { VoiceTurns } from "./voice/turns.js";
@@ -264,10 +265,16 @@ async function main(): Promise<number> {
     ...(s.detail ? { detail: s.detail.slice(0, 300) } : {}),
     discarded: s.discarded,
   });
+  // Voice notes (ADR-030): the voice service hears and speaks them; `voice` is defined below.
+  const voiceNotes = new VoiceNotes({
+    send: (m) => voice?.send(m) ?? false,
+    available: () => voice?.status === "ready",
+  });
   const whatsapp = new WhatsAppChannel({
     provider: new BaileysProvider(logger),
     auth: new WhatsAppAuthStore(db, () => sessionKey(whatsappSecrets)),
     chat,
+    voice: voiceNotes,
     enabled: setting("whatsapp.enabled"),
     onStatus: (s) => broadcast(whatsappState(s)),
     broadcast: (m) => broadcast(m),
@@ -304,8 +311,13 @@ async function main(): Promise<number> {
           tts,
           stt: env.JARVIS_STT !== "0",
           logger,
-          onState: (state, detail) => turns.supervisorState(state, detail),
-          onMessage: (m) => turns.onVoiceMessage(m),
+          onState: (state, detail) => {
+            if (state !== "ready") voiceNotes.failAll(`voice service ${state}`);
+            turns.supervisorState(state, detail);
+          },
+          onMessage: (m) => {
+            if (!voiceNotes.handle(m)) turns.onVoiceMessage(m);
+          },
         });
 
   const stop = async (reason: string) => {

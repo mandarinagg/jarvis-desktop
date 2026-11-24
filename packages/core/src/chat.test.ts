@@ -80,6 +80,17 @@ describe("ChatService.chatSend", () => {
     expect(model.requests[1]?.systemSuffix).toBeUndefined();
   });
 
+  it("a WhatsApp voice note gets the channel's instructions and then the voice ones (ADR-030)", async () => {
+    const model = new FakeModel();
+    const store = new ConversationStore(openDatabase(":memory:"));
+    const service = new ChatService({ store, model: () => model, systemPrompt: "SYS", voicePrompt: "VOZ", whatsappPrompt: "WA", dailyBudgetUsd: 3 });
+    const { session } = fakeSession();
+    await service.chatSend(session, { type: "chat.send", id: "m1", text: "nota" }, "whatsapp", { spoken: true });
+    await service.chatSend(session, { type: "chat.send", id: "m2", text: "texto" }, "whatsapp");
+    expect(model.requests[0]?.systemSuffix).toBe("WA\n\nVOZ");
+    expect(model.requests[1]?.systemSuffix).toBe("WA");
+  });
+
   it("passes tools, the active-project card and reports tool use to the client", async () => {
     const model = new FakeModel(async (req) => {
       req.onTool?.({ name: "projects__search", summary: "Buscando «pagos»", status: "started" });

@@ -56,7 +56,7 @@ export async function runCase(
     ws = await workspace(c);
     for (const turn of c.turns) {
       // Same assembly as ChatService: clock, project card, memories for this message, then voice instructions.
-      const suffix = [nowLine(new Date()), ws.card, ws.memory(turn), c.mode === "voice" ? prompts.voice : undefined, c.mode === "whatsapp" ? prompts.whatsapp : undefined].filter(Boolean).join("\n\n");
+      const suffix = [nowLine(new Date()), ws.card, ws.memory(turn), c.mode.startsWith("whatsapp") ? prompts.whatsapp : undefined, c.mode === "voice" || c.mode === "whatsapp-voice" ? prompts.voice : undefined].filter(Boolean).join("\n\n");
       transcript.push({ role: "user", content: turn });
       const turnId = ws.beginTurn(turn);
       const r = await model.complete({
@@ -67,7 +67,7 @@ export async function runCase(
         signal: AbortSignal.timeout(180_000),
         onText: () => {},
         tools: ws.tools,
-        channel: c.mode,
+        channel: c.mode === "whatsapp-voice" ? "whatsapp" : c.mode,
         onTool: (e) => {
           if (e.status === "started") toolCalls.push(e.summary);
           else if (e.status === "waiting") actions.push(`${e.summary}: pidió permiso al owner, que lo ${c.confirm === "approve" ? "aprobó" : "rechazó"}`);

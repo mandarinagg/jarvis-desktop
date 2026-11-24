@@ -1,6 +1,8 @@
 /**
  * Core <-> Voice Service contract (ADR-008, ADR-013): JSON Lines over the child's stdio.
- * Audio never crosses this channel; only control messages and text do.
+ * Microphone and speaker audio never cross this channel; only control messages and text do. The one
+ * exception is WhatsApp voice notes (ADR-030): `stt.transcribe` and `tts.rendered` carry a note as
+ * base64 Ogg Opus, in memory only.
  *
  * The Python side (services/voice/src/jarvis_voice/protocol.py) mirrors these schemas.
  * Both are checked against the same fixtures (packages/shared/fixtures/voice-protocol.json),
@@ -9,9 +11,19 @@
 import { z } from "zod";
 import { type ParseResult, parseWith } from "./protocol.js";
 
-export const VOICE_PROTOCOL_VERSION = "1.2"; // 1.1: vad.* (barge-in); 1.2: wake.* (wake word)
+export const VOICE_PROTOCOL_VERSION = "1.3"; // 1.1: vad.* (barge-in); 1.2: wake.* (wake word); 1.3: voice notes
 
 const Id = z.string().min(1).max(64);
+
+/** Largest voice note accepted (ADR-030): 600 KB of Ogg Opus, as base64. */
+export const MAX_NOTE_BYTES = 600 * 1024;
+const NoteAudio = z
+  .string()
+  .min(4)
+  .max(Math.ceil(MAX_NOTE_BYTES / 3) * 4)
+  .regex(/^[A-Za-z0-9+/]+={0,2}$/);
+/** Longest reply spoken as a voice note; longer replies go as text only. */
+export const MAX_RENDER_CHARS = 4_000;
 
 // ------------------------------------------------------------------ core -> voice
 
@@ -90,7 +102,20 @@ export type WakeDisable = z.infer<typeof WakeDisable>;
 export const TtsEnd = z.strictObject({ type: z.literal("tts.end"), id: Id, turnId: Id });
 export type TtsEnd = z.infer<typeof TtsEnd>;
 
+/**
+ * WhatsApp voice note -> text (ADR-030): Ogg Opus in base64, transcribed locally with Parakeet.
+ * Answered with `stt.final` (same id) or `voice.error` (stt_failed).
+ */
+export const SttTranscribe = z.strictObject({ type: z.literal("stt.transcribe"), id: Id, audio: NoteAudio });
+export type SttTranscribe = z.infer<typeof SttTranscribe>;
+
+/** Text -> voice note (ADR-030). Answered with `tts.rendered` (same id) or `voice.error` (tts_failed). */
+export const TtsRender = z.strictObject({ type: z.literal("tts.render"), id: Id, text: z.string().min(1).max(MAX_RENDER_CHARS) });
+export type TtsRender = z.infer<typeof TtsRender>;
+
 export const ToVoiceMessage = z.discriminatedUnion("type", [
+  SttTranscribe,
+  TtsRender,
   TtsEnd,
   VoiceConfigure,
   VoicePing,
@@ -182,7 +207,18 @@ export const SttFinal = z.strictObject({
 });
 export type SttFinal = z.infer<typeof SttFinal>;
 
+/** A voice note ready to send: Ogg Opus mono, base64. */
+export const TtsRendered = z.strictObject({
+  type: z.literal("tts.rendered"),
+  id: Id,
+  audio: NoteAudio,
+  durationMs: z.number().nonnegative(),
+  engine: z.enum(["google", "piper"]),
+});
+export type TtsRendered = z.infer<typeof TtsRendered>;
+
 export const FromVoiceMessage = z.discriminatedUnion("type", [
+  TtsRendered,
   VoiceReady,
   VoicePong,
   VoiceError,
