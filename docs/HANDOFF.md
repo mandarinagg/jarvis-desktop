@@ -136,10 +136,16 @@ Regla del owner: «si le hablás, te habla; si le escribís, te escribe».
 - **Instalación:** `%LOCALAPPDATA%\OmniRoute`, versión 3.8.54 fijada.
   - Escucha solo en `127.0.0.1:20128`, con API key obligatoria y sin logs de pedidos.
   - Se arranca con `start-omniroute.ps1`.
+- **Hecho (2026-11-24):**
+  - Gemini y Groq conectados;
+  - combos `jarvis-fallback` (Groq gpt-oss-120b → Gemini 3.1 Flash Lite → Qwen 3.8) y `claude-code-fallback`;
+  - keys `jarvis` y `claude-code` en el Credential Manager;
+  - probado de punta a punta con el tope superado: lee con `read_file`, avisa, cuesta 0 y no puede escribir;
+  - `claude-omni.ps1` probado.
 - **Falta (owner):**
-  1. En http://127.0.0.1:20128: elegir la contraseña, agregar Gemini en **Providers**, crear el combo `jarvis-fallback` y una API key `jarvis`.
-  2. Guardarla: `node packages/core/dist/set-secret.js omniroute-api-key`.
-  3. Probar con `JARVIS_DAILY_BUDGET_USD=0.01` que el chat conteste con el aviso de respaldo.
+  1. En **Providers**, desactivar los proveedores sin key (`aihorde`, `dva`, `cxa`, `ddgw`, `cfp`, `veo-free`).
+  2. Limitar la key `jarvis` al combo `jarvis-fallback`.
+  3. Probar en la app con `JARVIS_DAILY_BUDGET_USD=0.01`.
 - **Claude Code:**
   - `%LOCALAPPDATA%\OmniRoute\claude-omni.ps1` lanza Claude Code por OmniRoute **solo en esa ventana**, con el combo `claude-code-fallback`.
   - La key se guarda con `node keys.mjs set claude-code`, desde esa carpeta.

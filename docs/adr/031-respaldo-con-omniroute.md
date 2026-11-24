@@ -46,6 +46,21 @@ En 2026-11-23 el owner había descartado un modo híbrido con un modelo local. E
 - **Darle al respaldo todas las herramientas:** no tiene evals de seguridad propias. Se habilitará cuando el modelo del combo pase las evals de injection (`--model` en el runner, pendiente).
 - **Bajar el modelo de Claude al llegar al tope (Haiku):** sigue gastando en la misma cuenta y no cubre una caída de Anthropic.
 
+## Validación (2026-11-24)
+- **Combo `jarvis-fallback`, por prioridad:**
+  1. `groq/openai/gpt-oss-120b`;
+  2. `gemini/gemini-3.1-flash-lite`;
+  3. `groq/qwen/qwen3.8-27b`.
+- **Herramientas con el SDK oficial por OmniRoute:**
+  - Groq gpt-oss-120b, 0,6 s;
+  - Qwen 3.8, 1,1 s;
+  - Gemini 3.1 Flash Lite, 0,8 s.
+- **Gemini que fallaron ese día:** 3.8 y 3.7 Flash se cortaron a los 110 s, 2.5 Flash está retirado para cuentas nuevas, 3.1 Pro quedó en espera por límite de uso y 3 Flash Preview volvió vacío.
+- **Punta a punta con `ChatService` y el tope superado:**
+  - leyó `README.md` con `read_file` y contestó en 1,2 s, con el aviso y costo 0;
+  - le pidieron crear un archivo y no tenía la herramienta, así que explicó que no puede.
+- **Proveedores sin key:** OmniRoute trae activados por defecto proveedores anónimos o hechos con scraping web: `aihorde` (máquinas de voluntarios que pueden ver los prompts), `dva`, `cxa`, `ddgw`, `cfp` y `veo-free`. Jarvis usa solo el combo, pero conviene **desactivarlos en Providers** y **limitar la key `jarvis` al combo `jarvis-fallback`**, para que ni un error de configuración mande datos ahí.
+
 ## Consecuencias
 - El owner tiene que tener OmniRoute corriendo. Si no está, la respuesta es «El respaldo (OmniRoute) no está corriendo».
 - Lo que se manda al respaldo sale hacia el proveedor del combo (Google en el caso de Gemini). Las capas gratis pueden usar los datos para entrenar: el owner elige los proveedores sabiéndolo.
