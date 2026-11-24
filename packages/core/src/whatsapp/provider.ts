@@ -4,7 +4,7 @@
  * a fake provider (never the network).
  */
 
-/** Kind of non-text content; Jarvis only reads text for now (ADR-029). */
+/** Kind of non-text content. Jarvis reads text and listens to voice notes (ADR-029, ADR-030). */
 export type WaMediaKind = "image" | "video" | "audio" | "document" | "sticker" | "other";
 
 /** A message from a one-to-one chat, as the provider saw it. Nothing here is trusted. */
@@ -24,6 +24,21 @@ export interface WaIncoming {
   forwarded: boolean;
   /** Text of the message it replies to, if any (may be someone else's). */
   quoted?: string | undefined;
+  /**
+   * An audio message (ADR-030). Metadata come with the message; the bytes are fetched from
+   * WhatsApp only when the channel calls `download`, after `screen` accepted the message.
+   */
+  audio?: WaAudio | undefined;
+}
+
+export interface WaAudio {
+  /** Recorded with the mic in WhatsApp (a voice note), not an attached audio file. */
+  ptt: boolean;
+  /** As WhatsApp reports them (0 when unknown). */
+  seconds: number;
+  bytes: number;
+  mimetype?: string | undefined;
+  download(): Promise<Buffer>;
 }
 
 /** The linked account: its phone JID and, when WhatsApp reports it, its LID. */
@@ -56,6 +71,8 @@ export interface WaEvents {
 
 export interface WaConnection {
   sendText(jid: string, text: string): Promise<{ id: string }>;
+  /** An Ogg Opus voice note (`ptt`), same guard as `sendText`: the self-chat only. */
+  sendVoiceNote(jid: string, audio: Buffer, seconds: number): Promise<{ id: string }>;
   /** Closes the socket, keeping the session linked. */
   stop(): Promise<void>;
   /** Unlinks this device in WhatsApp. */

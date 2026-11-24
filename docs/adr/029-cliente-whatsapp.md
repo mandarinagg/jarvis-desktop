@@ -47,7 +47,7 @@ Además, es la primera vez que Jarvis recibe pedidos desde fuera de la PC. Quien
 
 ### Lo que llega es dato si no lo escribió el owner
 - **Un mensaje reenviado** (`contextInfo.isForwarded`) o **citado** (`quotedMessage`) en el chat propio puede venir de un tercero. Entra en el turno envuelto en `<reenviado>` o `<citado>` como **dato no confiable**, igual que el contenido de un archivo o una web. Solo el texto escrito por el owner es un pedido.
-- **Audio, imágenes, documentos y stickers no se procesan en esta versión.** Jarvis responde que por ahora solo lee texto. Transcribir notas de voz con Parakeet queda para un ADR propio.
+- **Imágenes, documentos y stickers no se procesan en esta versión.** Jarvis responde que por ahora no los lee. Las notas de voz se transcriben en local y se contestan con voz desde ADR-030 (2026-11-23).
 
 ### Acciones sensibles: siempre en la PC
 - **Cada turno de WhatsApp corre con el canal `whatsapp`.** El Permission Engine lo recibe como un dato más de la regla.

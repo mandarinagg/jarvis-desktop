@@ -16,13 +16,13 @@
   - **Inicio:** gasto, pendientes y actividad. Es la primera vista de la app.
   - **Proactividad:** recordatorios con confirmación, briefing y horario silencioso.
   - **Skills:** propuestas con evals y aprobación nativa, también desde la reflexión.
-  - **Cliente WhatsApp:** Baileys sobre el número del owner, solo el chat «Mensaje a mí mismo». **Vinculado y probado con Claude real el 2026-11-23**, con las evals 064–067 en verde. El owner evalúa un **número propio para Jarvis**, para tener un chat aparte; eso cambiaría ADR-029.
+  - **Cliente WhatsApp:** Baileys sobre el número del owner, solo el chat «Mensaje a mí mismo». **Vinculado y probado con Claude real el 2026-11-23**, con las evals 064–067 en verde. Notas de voz de ida y vuelta desde ADR-030 (caso 068), pendientes de probar con el teléfono. El owner evalúa un **número propio para Jarvis**, para tener un chat aparte; eso cambiaría ADR-029.
   - Falta probar con uso real un recordatorio, el briefing y una skill.
 
 ## Lo que funciona hoy
 | Pieza | Dónde | Notas |
 |---|---|---|
-| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.9 (`whatsapp.*`, `dashboard.get`, `proactive.*`, `skills.*`, `voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.2 (`vad.*`, `wake.*`), con fixtures compartidos con Python |
+| Contratos IPC (Zod, JSON Lines) | `packages/shared` | Clientes: protocolo 1.9 (`whatsapp.*`, `dashboard.get`, `proactive.*`, `skills.*`, `voice.*`, `projects.*`, `chat.tool`, `permission.*`, `audit.*`, `builder.*`, `memory.*`). Voz: protocolo propio 1.3 (`vad.*`, `wake.*`, `stt.transcribe`, `tts.render`), con fixtures compartidos con Python |
 | Core daemon | `packages/core` | Named pipe + token, instancia única, logs con redacción, `broadcast` a todos los clientes |
 | Persistencia | `packages/core/src/store.ts` | `node:sqlite`. Migraciones: 002 `voice_turns` (solo tiempos), 003 proyectos e índice FTS5, 004 `audit_log` (append-only), 005 `approved_by`, 006 `wake_events`, 007 `builder_tasks`, 008 memoria (`memories` + FTS5, `memory_uses`, `memory_proposals`, `reflections`, `settings`), 009 `reminders` y `briefings`, 010 skills (`skills`, `skill_proposals`, `skill_evals`), 011 WhatsApp (`whatsapp_session`, `whatsapp_keys` cifradas; `audit_log.channel`) |
 | Secretos | Credential Manager | `anthropic-api-key` (guardada el 2026-11-23), `google-tts-api-key` (migrada el 2026-11-19) y `whatsapp-session-key` (se crea sola al vincular) |
@@ -107,26 +107,27 @@
 ## Próximos pasos (para quien retome)
 0. **Prioridad:** validar con uso real antes de sumar features. El código de las 7 fases está en `main` y las evals dan 93 %.
 
-### En diseño (pedido del owner, 2026-11-23)
-Son dos proyectos independientes. Va primero la voz en WhatsApp; el cerebro animado se diseña después.
+### Notas de voz en WhatsApp (ADR-030, implementado el 2026-11-23, sin validar con el teléfono)
+Regla del owner: «si le hablás, te habla; si le escribís, te escribe».
+- **Cómo funciona:**
+  - una nota de voz del owner se transcribe en local con Parakeet y corre como turno hablado (prompt de WhatsApp más el de voz);
+  - la respuesta va como nota de voz de `es-US-Neural2-B` y, debajo, el mismo texto;
+  - un texto se contesta con texto, y una nota reenviada es un dato y se contesta en texto.
+- **Probado:**
+  - el spike de Smart App Control con `soundfile`: carga bien;
+  - Neural2 → Ogg Opus → Parakeet por el stdio real del servicio (1,2 s sintetizar, 0,14 s transcribir; 2 min en 1,7 s);
+  - tests: 434 de TS y 237 de Python;
+  - evals 064–068: 5/5 con la API real (US$0,19).
+- **Falta (owner):**
+  1. `pnpm build`.
+  2. Reabrir Jarvis.
+  3. Mandarle una nota de voz en «Mensaje a mí mismo»: tiene que volver una nota de voz y el texto.
+  4. Probar también una nota reenviada, que tiene que contestar en texto, y una nota con el servicio de voz apagado (`JARVIS_VOICE=0`), que tiene que avisar.
+  5. Lo que no se pudo probar sin el teléfono:
+     - que WhatsApp reproduzca la nota que manda Baileys (Ogg Opus mono a 24 kHz; la forma de onda sale plana porque falta `audio-decode`);
+     - la descarga de una nota real.
 
-**A. Voz en WhatsApp: notas de voz con Neural2.**
-- **Decidido por el owner:**
-  - la voz sigue siendo `es-US-Neural2-B`;
-  - regla «si le hablás, te habla; si le escribís, te escribe»: a una nota de voz del owner Jarvis contesta con una nota de voz más el texto debajo, y a un texto contesta con texto.
-- **Enfoque propuesto, pendiente de aprobación del owner:** todo el audio vive en el servicio de voz, con dos mensajes nuevos en su protocolo.
-  - Texto → nota de voz: Google sintetiza directamente en `OGG_OPUS`, el formato de WhatsApp, sin `ffmpeg`.
-  - Nota de voz → texto: se decodifica con `soundfile`, se remuestrea a 16 kHz y se transcribe con Parakeet local. El audio del owner nunca va a la nube (ADR-004).
-  - El Core solo hace de puente con Baileys (nota de voz = `audio` con `ptt: true`).
-- **Antes de construir:**
-  - una prueba rápida de que Smart App Control deja cargar la DLL de `soundfile`;
-  - después, ADR nuevo y actualización de ADR-029, que hoy dice «solo texto».
-- **Bordes ya acordados:**
-  - si el servicio de voz está apagado, contesta solo texto y avisa por qué;
-  - una nota de voz de más de unos 2 minutos se rechaza con un aviso.
-- **Descartado:**
-  - transcribir en la nube, porque el audio del owner saldría de la PC;
-  - Google directo desde el Core más `ffmpeg`, porque duplica la key y depende de un binario instalado.
+### En diseño (pedido del owner, 2026-11-23)
 
 **B. «Cerebro de Jarvis»:** una red neuronal animada, al estilo del grafo de graphify, que *es* Jarvis. El owner quiere ver las dos cosas:
 - **cuánto sabe:** crece con las memorias, los proyectos, las skills, las herramientas y las conversaciones, y cuanto más complejo es Jarvis, más nodos y conexiones tiene;

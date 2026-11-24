@@ -112,4 +112,6 @@ Cada fase cierra con **exit criteria medibles**. No se empieza una fase sin cerr
   - [x] Detectar repeticiones en la reflexión diaria y proponer skills solo (ADR-028)
   - [ ] Validación con la API real (casos 062–063)
 - Clientes adicionales: móvil por WhatsApp (elegido por el owner en lugar de Telegram) con su propio número, basado en Baileys como su CRM; ADR-029 aceptado
+  - [x] Notas de voz: se transcriben en local y se contestan con nota de voz más texto (ADR-030, protocolo de voz 1.3, caso 068)
+  - [ ] Validación con el teléfono del owner: una nota de voz de ida y vuelta
 - Mejora continua de latencia y voz

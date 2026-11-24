@@ -9,6 +9,8 @@ Run with ``uv run python -m jarvis_voice.service`` (Smart App Control blocks the
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import os
 import sys
@@ -66,18 +68,27 @@ class VoiceService:
         elif kind == "voice.shutdown":
             log("info", "voice.shutdown")
             self.running = False
-        elif kind in ("tts.speak", "tts.cancel", "tts.end"):
+        elif kind in ("tts.speak", "tts.cancel", "tts.end", "tts.render"):
             if self.tts is None:
                 self.error("not_configured", "TTS is not configured", id_)
+            elif kind == "tts.render":
+                self.tts.render(id_, msg["text"])
             elif kind == "tts.speak":
                 self.tts.speak(msg)
             elif kind == "tts.end":
                 self.tts.end(msg["turnId"])
             else:
                 self.tts.cancel(msg["turnId"])
-        elif kind in ("stt.start", "stt.stop", "stt.cancel", "vad.arm", "vad.disarm", "wake.enable", "wake.disable"):
+        elif kind in ("stt.start", "stt.stop", "stt.cancel", "vad.arm", "vad.disarm", "wake.enable", "wake.disable", "stt.transcribe"):
             if self.stt is None:
                 self.error("not_configured", "STT is not configured", id_)
+            elif kind == "stt.transcribe":
+                try:
+                    data = base64.b64decode(msg["audio"], validate=True)
+                except (binascii.Error, ValueError):
+                    self.error("invalid_message", "audio: invalid base64", id_)
+                    return
+                self.stt.transcribe_note(id_, data)
             elif kind == "stt.start":
                 self.stt.start(id_)
             elif kind == "vad.arm":

@@ -17,6 +17,7 @@ from typing import Any, Protocol
 
 from .cache import PhraseCache
 from .engines import Audio, SynthesisError, TtsEngine
+from .render import NoteRenderer
 
 Send = Callable[[dict[str, Any]], None]
 Log = Callable[..., None]
@@ -75,6 +76,8 @@ class TtsPipeline:
         self._jobs: queue.Queue[Job | None] = queue.Queue()
         self._worker = threading.Thread(target=self._run, name="tts-synth", daemon=True)
         self._worker.start()
+        # WhatsApp voice notes (ADR-030): same engines, own thread, never played here.
+        self.notes = NoteRenderer(engine, send, fallback=fallback, log=log)
 
     # ------------------------------------------------------------ public API (service thread)
 
@@ -116,7 +119,12 @@ class TtsPipeline:
         t.start()
         return t
 
+    def render(self, request_id: str, text: str) -> None:
+        """A whole reply as a voice note (`tts.rendered`), without touching the speaker."""
+        self.notes.render(request_id, text)
+
     def close(self) -> None:
+        self.notes.close()
         self.player.cancel()
         self._jobs.put(None)
         self._worker.join(timeout=5)

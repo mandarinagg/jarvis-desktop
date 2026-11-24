@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-VOICE_PROTOCOL_VERSION = "1.2"
+VOICE_PROTOCOL_VERSION = "1.3"
 MAX_LINE_BYTES = 1024 * 1024
 
 Check = Callable[[Any], bool]
@@ -42,6 +42,15 @@ def _nonneg_number(v: Any) -> bool:
 
 _ID = _str(1, 64)
 _SEQ = _int(0, 10_000)
+
+
+MAX_NOTE_BYTES = 600 * 1024  # ADR-030: largest voice note, before base64
+MAX_RENDER_CHARS = 4_000
+_B64 = re.compile(r"[A-Za-z0-9+/]+={0,2}")
+
+
+def _note_audio(v: Any) -> bool:
+    return isinstance(v, str) and 4 <= len(v) <= -(-MAX_NOTE_BYTES // 3) * 4 and _B64.fullmatch(v) is not None
 
 
 def _unit(v: Any) -> bool:
@@ -89,6 +98,8 @@ TO_VOICE: dict[str, Schema] = {
     "vad.disarm": Schema({"id": _ID}, {}),
     "wake.enable": Schema({"id": _ID}, {"threshold": _unit}),
     "wake.disable": Schema({"id": _ID}, {}),
+    "stt.transcribe": Schema({"id": _ID, "audio": _note_audio}, {}),
+    "tts.render": Schema({"id": _ID, "text": _str(1, MAX_RENDER_CHARS)}, {}),
 }
 
 ERROR_CODES = ("invalid_json", "invalid_message", "incompatible_version", "not_configured", "tts_failed", "stt_failed", "internal")
@@ -96,6 +107,9 @@ ERROR_CODES = ("invalid_json", "invalid_message", "incompatible_version", "not_c
 FROM_VOICE: dict[str, Schema] = {
     "voice.ready": Schema({"id": _ID, "protocolVersion": _str(0, 16), "serviceVersion": _str(0, 32)}, {}),
     "voice.pong": Schema({"id": _ID}, {}),
+    "tts.rendered": Schema(
+        {"id": _ID, "audio": _note_audio, "durationMs": _nonneg_number, "engine": _enum("google", "piper")}, {}
+    ),
     "voice.error": Schema({"code": _enum(*ERROR_CODES), "message": _str(0, 2000)}, {"id": _ID}),
     "tts.started": Schema(
         {"turnId": _ID, "seq": _SEQ, "engine": _enum("google", "piper", "cache"), "latencyMs": _nonneg_number}, {}

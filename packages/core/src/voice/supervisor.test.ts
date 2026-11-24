@@ -69,7 +69,7 @@ describe("VoiceSupervisor", () => {
     const { sup, child, states } = setup();
     sup.start();
     await flush();
-    expect(child(0).received[0]).toMatchObject({ type: "voice.configure", protocolVersion: "1.2" });
+    expect(child(0).received[0]).toMatchObject({ type: "voice.configure", protocolVersion: "1.3" });
     child(0).ready();
     await flush();
     expect(sup.status).toBe("ready");

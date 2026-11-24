@@ -4,16 +4,21 @@
  * the owner writing to themselves, live and recent, is dropped there, without storing or logging
  * it. Accepted messages run as regular chat turns with the `whatsapp` channel: confirmations stay
  * on the PC and replies go only to the self-chat, after the secrets filter.
+ *
+ * Voice notes (ADR-030): "if you talk to him, he talks back". An accepted note is downloaded,
+ * transcribed locally by the voice service and run as a spoken turn; the reply goes as a voice
+ * note with the same text below it. A text message still gets text only.
  */
 import { randomUUID } from "node:crypto";
-import type { ChatSend, CoreMessage } from "@jarvis/shared";
+import { type ChatSend, type CoreMessage, MAX_NOTE_BYTES, MAX_RENDER_CHARS } from "@jarvis/shared";
 import type { ChatMode } from "../chat.js";
 import { type Logger, silentLogger } from "../log.js";
 import type { Session } from "../server.js";
+import { VoiceNoteError, type VoiceNotesPort } from "../voice/notes.js";
 import type { WhatsAppAuthStore } from "./auth-store.js";
 import { TtlCache } from "./baileys-provider.js";
 import { composeTurn, prepareOutgoing, screen } from "./filter.js";
-import { phoneOf, type WaConnection, type WaIncoming, type WaProvider, type WaSelf } from "./provider.js";
+import { phoneOf, type WaAudio, type WaConnection, type WaIncoming, type WaProvider, type WaSelf } from "./provider.js";
 
 export type WhatsAppState = "off" | "connecting" | "waiting_qr" | "connected" | "degraded";
 
@@ -28,13 +33,18 @@ export interface WhatsAppStatus {
 }
 
 export interface ChatPort {
-  chatSend(session: Session, msg: ChatSend, mode: ChatMode): Promise<void>;
+  chatSend(session: Session, msg: ChatSend, mode: ChatMode, opts?: { spoken?: boolean }): Promise<void>;
 }
+
+/** Longest voice note Jarvis listens to (ADR-030). */
+export const MAX_NOTE_SECONDS = 120;
 
 export interface WhatsAppChannelOptions {
   provider: WaProvider;
   auth: WhatsAppAuthStore;
   chat: ChatPort;
+  /** Voice notes in and out (ADR-030). Without it, or with the voice service down, notes get a notice. */
+  voice?: VoiceNotesPort;
   /** Persisted on/off switch (settings `whatsapp.enabled`). */
   enabled: { get(): boolean; set(on: boolean): void };
   /** Status changes, for the desktop app. */
@@ -58,7 +68,12 @@ export const WHATSAPP_SESSION_ID = "whatsapp";
 export const TEXTS = {
   confirmOnPc: "Te dejé la confirmación en la pantalla de la PC. Desde acá no se aprueba nada.",
   noScreen: "Esto pide tu confirmación, pero no hay una ventana de Jarvis abierta en la PC: lo dejo para cuando estés ahí.",
-  mediaOnly: "Por ahora solo leo texto: escribime el pedido.",
+  mediaOnly: "Por ahora leo texto y escucho notas de voz, pero esto no lo puedo abrir: escribime el pedido.",
+  voiceOff: "No puedo escuchar notas de voz ahora: el servicio de voz no está andando. Escribime.",
+  noteTooLong: "La nota de voz es muy larga: escucho hasta 2 minutos. Mandámela más corta o escribime.",
+  noteEmpty: "No entendí nada en la nota de voz. ¿Me la repetís o me escribís?",
+  noteFailed: "No pude escuchar la nota de voz. Probá de nuevo o escribime.",
+  voiceReplyFailed: "No pude grabar la respuesta en audio, así que va solo por escrito.",
   stale: "Ese mensaje me llegó tarde, así que no lo ejecuto: repetímelo si sigue en pie.",
   rateLimited: "Llegamos al tope de mensajes por esta hora. Sigo en un rato o en la PC.",
   sensitive: "La respuesta tiene algo que no conviene mandar por acá. Te lo muestro en la PC.",
@@ -252,7 +267,17 @@ export class WhatsAppChannel {
     }
     this.accepted.push(t);
 
-    const text = composeTurn(m);
+    // Voice note: heard locally first. Only the owner's own voice gets a voice reply; a forwarded
+    // note was spoken by someone else, so it is data and the answer goes in text.
+    let source = m;
+    let spoken = false;
+    if (m.audio) {
+      const heard = await this.listen(m.audio);
+      if (!heard.ok) return this.reply(heard.notice);
+      source = { ...m, text: heard.text };
+      spoken = m.audio.ptt && !m.forwarded;
+    }
+    const text = composeTurn(source);
     if (!text) return this.reply(m.media ? TEXTS.mediaOnly : TEXTS.generic);
 
     const idle = this.opts.conversationIdleMs ?? 2 * HOUR;
@@ -285,7 +310,7 @@ export class WhatsAppChannel {
         }
       },
     };
-    await this.opts.chat.chatSend(session, msg, "whatsapp");
+    await this.opts.chat.chatSend(session, msg, "whatsapp", spoken ? { spoken } : undefined);
     await Promise.all(pending);
     if (this.lastConversation) this.lastConversation.at = this.now().getTime();
     if (error) {
@@ -300,7 +325,50 @@ export class WhatsAppChannel {
       }
       return;
     }
+    // The text passed the secrets filter above, so it may also be spoken. Note first, text below.
+    const voiceFailed = spoken ? !(await this.speak(reply.trim())) : false;
     for (const chunk of out.chunks) await this.send(chunk);
+    if (voiceFailed) await this.reply(TEXTS.voiceReplyFailed);
+  }
+
+  /** Download and transcribe an accepted note. Never logs what was said. */
+  private async listen(a: WaAudio): Promise<{ ok: true; text: string } | { ok: false; notice: string }> {
+    const voice = this.opts.voice;
+    if (!voice?.available()) return { ok: false, notice: TEXTS.voiceOff };
+    // WhatsApp's metadata first: an oversized note is refused before anything is downloaded.
+    if (a.seconds > MAX_NOTE_SECONDS || a.bytes > MAX_NOTE_BYTES) return { ok: false, notice: TEXTS.noteTooLong };
+    const started = this.now().getTime();
+    try {
+      const data = await a.download();
+      if (data.length > MAX_NOTE_BYTES) return { ok: false, notice: TEXTS.noteTooLong };
+      const text = await voice.transcribe(data);
+      this.logger.log("info", "whatsapp.note_heard", { seconds: a.seconds, ms: this.now().getTime() - started, chars: text.length });
+      return text ? { ok: true, text } : { ok: false, notice: TEXTS.noteEmpty };
+    } catch (err) {
+      const reason = err instanceof VoiceNoteError ? err.reason : "download";
+      this.logger.log("warn", "whatsapp.note_failed", { reason, error: err instanceof Error ? err.message.slice(0, 200) : String(err) });
+      return { ok: false, notice: reason === "unavailable" ? TEXTS.voiceOff : reason === "too_large" ? TEXTS.noteTooLong : TEXTS.noteFailed };
+    }
+  }
+
+  /** The reply as a voice note. False when it could not be made (the text still goes). */
+  private async speak(text: string): Promise<boolean> {
+    const voice = this.opts.voice;
+    const spoken = forSpeech(text);
+    if (!voice?.available() || !spoken) return false;
+    if (spoken.length > MAX_RENDER_CHARS) return true; // a long reply is read, not heard: no notice
+    try {
+      const note = await voice.render(spoken);
+      const conn = this.conn;
+      const self = this.self;
+      if (!conn || !self) return false;
+      const { id } = await conn.sendVoiceNote(self.jid, note.audio, note.durationMs / 1000);
+      if (id) this.sentIds.set(id, true);
+      return true;
+    } catch (err) {
+      this.logger.log("warn", "whatsapp.voice_reply_failed", { error: err instanceof Error ? err.message.slice(0, 200) : String(err) });
+      return false;
+    }
   }
 
   /** A fixed text of the channel (already safe), with the prefix. */
@@ -317,4 +385,14 @@ export class WhatsAppChannel {
     const { id } = await conn.sendText(self.jid, text);
     if (id) this.sentIds.set(id, true);
   }
+}
+
+/** WhatsApp formatting is for the eyes: no asterisks, underscores or list dashes read aloud. */
+export function forSpeech(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/[*_~`]/g, "")
+    .replace(/^\s*[-•]\s+/gm, "")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 }
