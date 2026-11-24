@@ -6,7 +6,7 @@
  */
 import { KeyringSecretStore, MCP_SECRET_NAME, type SecretName, setMcpSecret } from "./secrets.js";
 
-const NAMES: readonly SecretName[] = ["anthropic-api-key", "google-tts-api-key"];
+const NAMES: readonly SecretName[] = ["anthropic-api-key", "google-tts-api-key", "omniroute-api-key"];
 
 function readHidden(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {

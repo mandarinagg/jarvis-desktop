@@ -144,3 +144,16 @@ describe("AnthropicChatModel tool loop", () => {
     expect(requests[0]?.tools).toBeUndefined();
   });
 });
+
+describe("toUpstreamError", () => {
+  it("an empty credit balance (400) is a billing error with a clear message", async () => {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const { toUpstreamError } = await import("./model.js");
+    const body = { type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits." } };
+    const err = toUpstreamError(Anthropic.APIError.generate(400, body, undefined, new Headers()));
+    expect(err).toMatchObject({ status: 400, kind: "billing" });
+    expect(err.message).toMatch(/crédito/);
+    const other = toUpstreamError(Anthropic.APIError.generate(400, { type: "error", error: { type: "invalid_request_error", message: "messages: bad" } }, undefined, new Headers()));
+    expect(other.kind).toBeUndefined();
+  });
+});

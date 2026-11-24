@@ -6,7 +6,7 @@ import { Entry } from "@napi-rs/keyring";
 
 export const SECRET_SERVICE = "Jarvis";
 
-export type SecretName = "anthropic-api-key" | "google-tts-api-key" | "whatsapp-session-key";
+export type SecretName = "anthropic-api-key" | "google-tts-api-key" | "whatsapp-session-key" | "omniroute-api-key";
 
 export interface SecretStore {
   get(name: SecretName): string | undefined;

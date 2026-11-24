@@ -127,6 +127,29 @@ Regla del owner: «si le hablás, te habla; si le escribís, te escribe».
      - que WhatsApp reproduzca la nota que manda Baileys (Ogg Opus mono a 24 kHz; la forma de onda sale plana porque falta `audio-decode`);
      - la descarga de una nota real.
 
+### Respaldo con OmniRoute (ADR-031, 2026-11-24, sin validar con un proveedor real)
+- **Cuándo entra:** al llegar al tope diario, o si Claude falla antes de escribir (429, 5xx, 529, sin conexión).
+- **Cómo responde:** Jarvis contesta por OmniRoute local con el combo `jarvis-fallback`.
+  - Solo tiene herramientas de lectura.
+  - Empieza con el aviso «(Respaldo: …)».
+  - Cuesta 0 en el tope de Claude.
+- **Instalación:** `%LOCALAPPDATA%\OmniRoute`, versión 3.8.54 fijada.
+  - Escucha solo en `127.0.0.1:20128`, con API key obligatoria y sin logs de pedidos.
+  - Se arranca con `start-omniroute.ps1`.
+- **Hecho (2026-11-24):**
+  - Gemini y Groq conectados;
+  - combos `jarvis-fallback` (Groq gpt-oss-120b → Gemini 3.1 Flash Lite → Qwen 3.8) y `claude-code-fallback`;
+  - keys `jarvis` y `claude-code` en el Credential Manager;
+  - probado de punta a punta con el tope superado: lee con `read_file`, avisa, cuesta 0 y no puede escribir;
+  - `claude-omni.ps1` probado.
+  - keys `Jarvis` y `claude-code` atadas a su combo (`forcedModel`, acceso `restricted`) con `keys-lock.mjs`, desde la API local de administración. Pidan el modelo que pidan, van a su combo: con ellas no se llega a los proveedores sin key (`aihorde`, `dva`…), verificado.
+- **Falta (owner):** probar en la app con `JARVIS_DAILY_BUDGET_USD=0.01`.
+- **Claude Code:**
+  - `%LOCALAPPDATA%\OmniRoute\claude-omni.ps1` lanza Claude Code por OmniRoute **solo en esa ventana**, con el combo `claude-code-fallback`.
+  - La key se guarda con `node keys.mjs set claude-code`, desde esa carpeta.
+  - El `claude` normal no cambia. Nunca se conecta una suscripción de Claude por OAuth a OmniRoute.
+- **Pendiente técnico:** correr las evals de seguridad contra `jarvis-fallback` antes de darle más herramientas.
+
 ### En diseño (pedido del owner, 2026-11-23)
 
 **B. «Cerebro de Jarvis»:** una red neuronal animada, al estilo del grafo de graphify, que *es* Jarvis. El owner quiere ver las dos cosas:
