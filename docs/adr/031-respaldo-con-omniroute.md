@@ -25,6 +25,7 @@ En 2026-11-23 el owner había descartado un modo híbrido con un modelo local. E
 - **Cuándo entra el respaldo:**
   - con el tope diario alcanzado;
   - o cuando Claude falla **antes de escribir texto**, por un error reintentable (429, 5xx, sin conexión) o por sobrecarga (529).
+  - o cuando la cuenta de Anthropic **se queda sin crédito**. Llega como un 400 «credit balance is too low», que se reconoce aparte de los demás 400. Pasó de verdad el 2026-11-24: WhatsApp dejó de contestar con un 400 genérico.
   - Nunca continúa una respuesta de Claude a medias, y nunca cubre una key inválida (401/403) ni un pedido rechazado (400): eso lo tiene que arreglar el owner.
 - **Cómo:** con el mismo SDK oficial (`@anthropic-ai/sdk`), apuntado a `http://127.0.0.1:20128` y con el modelo `jarvis-fallback`. Ese combo lo arma el owner en OmniRoute (Gemini en la capa gratis, después Groq).
   - Va en la Messages API simple: sin betas, `effort` ni `cache_control`, que un proveedor traducido puede rechazar.

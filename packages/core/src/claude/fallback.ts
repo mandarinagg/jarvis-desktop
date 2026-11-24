@@ -129,8 +129,8 @@ export class FallbackChatModel implements ChatModel {
   }
 }
 
-/** Claude failed in a way a backup can cover: rate limits, overload, server errors, no connection. */
+/** Claude failed in a way a backup can cover: no credit left, rate limits, overload, server errors, no connection. */
 export function fallbackWorthy(err: unknown): boolean {
   if (!(err instanceof UpstreamError)) return false;
-  return err.retryable || err.status === 529 || err.status === 503;
+  return err.kind === "billing" || err.retryable || err.status === 529 || err.status === 503;
 }

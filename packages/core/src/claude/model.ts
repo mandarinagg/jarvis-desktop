@@ -61,6 +61,8 @@ export class UpstreamError extends Error {
     message: string,
     readonly status?: number,
     readonly retryable = false,
+    /** `billing`: the account has no credit left (arrives as a 400). */
+    readonly kind?: "billing",
   ) {
     super(message);
     this.name = "UpstreamError";
@@ -177,7 +179,12 @@ export function toUpstreamError(err: unknown): UpstreamError {
   if (err instanceof Anthropic.AuthenticationError) return new UpstreamError("La API key de Anthropic es inválida o fue revocada.", 401);
   if (err instanceof Anthropic.PermissionDeniedError) return new UpstreamError("La API key no tiene permiso para este modelo.", 403);
   if (err instanceof Anthropic.RateLimitError) return new UpstreamError("Límite de uso de la API alcanzado; probá en un rato.", 429, true);
-  if (err instanceof Anthropic.BadRequestError) return new UpstreamError("La API rechazó el pedido (400).", 400);
+  if (err instanceof Anthropic.BadRequestError) {
+    if (/credit balance/i.test(err.message)) {
+      return new UpstreamError("Se terminó el crédito de la cuenta de Anthropic: cargá saldo en console.anthropic.com (Plans & Billing).", 400, false, "billing");
+    }
+    return new UpstreamError("La API rechazó el pedido (400).", 400);
+  }
   if (err instanceof Anthropic.APIConnectionError) return new UpstreamError("No hay conexión con la API de Anthropic.", undefined, true);
   if (err instanceof Anthropic.APIError) {
     const status = typeof err.status === "number" ? err.status : undefined;

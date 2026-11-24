@@ -112,6 +112,8 @@ describe("OmniRoute backup (ADR-031)", () => {
     expect(fallbackWorthy(new UpstreamError("overloaded", 529))).toBe(true);
     expect(fallbackWorthy(new UpstreamError("bad key", 401))).toBe(false);
     expect(fallbackWorthy(new UpstreamError("bad request", 400))).toBe(false);
+    // Out of Anthropic credit arrives as a 400: exactly the "we ran out" case the backup is for.
+    expect(fallbackWorthy(new UpstreamError("sin crédito", 400, false, "billing"))).toBe(true);
     expect(fallbackWorthy(new Error("x"))).toBe(false);
   });
 });
