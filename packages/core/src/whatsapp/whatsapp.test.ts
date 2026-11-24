@@ -685,3 +685,25 @@ describe("whatsapp voice notes: if you talk to him, he talks back (ADR-030)", ()
     expect(forSpeech("*Listo*: quedó _agendado_.\n- uno\n- dos\n```ts\ncode\n```")).toBe("Listo: quedó agendado.\nuno\ndos");
   });
 });
+
+describe("whatsapp replies go back to the chat the owner wrote from (LID migration)", () => {
+  it("a message from the LID self-chat is answered in the LID chat, not the phone-number one", async () => {
+    const voice = new FakeVoice();
+    const w = world(undefined, voice);
+    await linked(w);
+    ev(w).message(msg({ remoteJid: "123456789:12@lid", text: "hola" }));
+    await w.settle();
+    expect(w.provider.sent).toEqual([{ jid: SELF.lid, text: `${REPLY_PREFIX}eco: hola` }]);
+    ev(w).message(note({ remoteJid: "123456789@lid" }).m);
+    await w.settle();
+    expect(w.provider.notes.at(-1)?.jid).toBe(SELF.lid);
+  });
+
+  it("a message by phone number is answered by phone number", async () => {
+    const w = world();
+    await linked(w);
+    ev(w).message(msg({ remoteJid: "595981000000:3@s.whatsapp.net", text: "hola" }));
+    await w.settle();
+    expect(w.provider.sent.map((s) => s.jid)).toEqual([SELF.jid]);
+  });
+});

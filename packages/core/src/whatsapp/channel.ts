@@ -18,7 +18,7 @@ import { VoiceNoteError, type VoiceNotesPort } from "../voice/notes.js";
 import type { WhatsAppAuthStore } from "./auth-store.js";
 import { TtlCache } from "./baileys-provider.js";
 import { composeTurn, prepareOutgoing, screen } from "./filter.js";
-import { phoneOf, type WaAudio, type WaConnection, type WaIncoming, type WaProvider, type WaSelf } from "./provider.js";
+import { bareJid, phoneOf, type WaAudio, type WaConnection, type WaIncoming, type WaProvider, type WaSelf } from "./provider.js";
 
 export type WhatsAppState = "off" | "connecting" | "waiting_qr" | "connected" | "degraded";
 
@@ -97,6 +97,12 @@ export class WhatsAppChannel {
   private failures = 0;
   private retry: NodeJS.Timeout | undefined;
   private lastConversation: { id: string; at: number } | undefined;
+  /**
+   * The self-chat address the owner last wrote from (phone number or LID). Replies go there: since
+   * WhatsApp's LID migration the phone can't decrypt a reply addressed to the other identity and
+   * shows "Esperando este mensaje" (seen 2026-11-24).
+   */
+  private replyJid: string | undefined;
   private stopping = false;
   private readonly logger: Logger;
   private readonly now: () => Date;
@@ -255,6 +261,7 @@ export class WhatsAppChannel {
   }
 
   private async turn(m: WaIncoming): Promise<void> {
+    this.replyJid = bareJid(m.remoteJid);
     const t = this.now().getTime();
     this.accepted = this.accepted.filter((x) => t - x < HOUR);
     const perHour = this.opts.perHour ?? 30;
@@ -362,7 +369,7 @@ export class WhatsAppChannel {
       const conn = this.conn;
       const self = this.self;
       if (!conn || !self) return false;
-      const { id } = await conn.sendVoiceNote(self.jid, note.audio, note.durationMs / 1000);
+      const { id } = await conn.sendVoiceNote(this.replyJid ?? self.jid, note.audio, note.durationMs / 1000);
       if (id) this.sentIds.set(id, true);
       return true;
     } catch (err) {
@@ -382,7 +389,7 @@ export class WhatsAppChannel {
     const conn = this.conn;
     const self = this.self;
     if (!conn || !self) return;
-    const { id } = await conn.sendText(self.jid, text);
+    const { id } = await conn.sendText(this.replyJid ?? self.jid, text);
     if (id) this.sentIds.set(id, true);
   }
 }

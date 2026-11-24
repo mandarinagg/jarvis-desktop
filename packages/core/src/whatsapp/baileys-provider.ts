@@ -322,7 +322,8 @@ export class BaileysProvider implements WaProvider {
       sendText: async (jid, text) => {
         // Second barrier after the channel's: nothing ever goes to a contact (ADR-029).
         if (!self || !isSelfChat(jid, self)) throw new Error("WhatsApp: solo se envía al chat propio del owner");
-        const sent = await sock.sendMessage(self.jid, { text });
+        // To the identity the owner wrote from (number or LID): the other one may not decrypt.
+        const sent = await sock.sendMessage(bareJid(jid) ?? self.jid, { text });
         const id = sent?.key.id ?? "";
         if (id) this.sent.set(id, text);
         return { id };
@@ -331,7 +332,7 @@ export class BaileysProvider implements WaProvider {
         if (!self || !isSelfChat(jid, self)) throw new Error("WhatsApp: solo se envía al chat propio del owner");
         // `seconds` given: Baileys skips probing the file. Without `audio-decode` installed the
         // waveform stays flat; the note plays the same (ADR-030).
-        const sent = await sock.sendMessage(self.jid, { audio, mimetype: "audio/ogg; codecs=opus", ptt: true, seconds: Math.max(1, Math.round(seconds)) });
+        const sent = await sock.sendMessage(bareJid(jid) ?? self.jid, { audio, mimetype: "audio/ogg; codecs=opus", ptt: true, seconds: Math.max(1, Math.round(seconds)) });
         return { id: sent?.key.id ?? "" };
       },
       stop: () => {
