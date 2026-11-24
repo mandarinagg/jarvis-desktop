@@ -142,10 +142,8 @@ Regla del owner: «si le hablás, te habla; si le escribís, te escribe».
   - keys `jarvis` y `claude-code` en el Credential Manager;
   - probado de punta a punta con el tope superado: lee con `read_file`, avisa, cuesta 0 y no puede escribir;
   - `claude-omni.ps1` probado.
-- **Falta (owner):**
-  1. En **Providers**, desactivar los proveedores sin key (`aihorde`, `dva`, `cxa`, `ddgw`, `cfp`, `veo-free`).
-  2. Limitar la key `jarvis` al combo `jarvis-fallback`.
-  3. Probar en la app con `JARVIS_DAILY_BUDGET_USD=0.01`.
+  - keys `Jarvis` y `claude-code` atadas a su combo (`forcedModel`, acceso `restricted`) con `keys-lock.mjs`, desde la API local de administración. Pidan el modelo que pidan, van a su combo: con ellas no se llega a los proveedores sin key (`aihorde`, `dva`…), verificado.
+- **Falta (owner):** probar en la app con `JARVIS_DAILY_BUDGET_USD=0.01`.
 - **Claude Code:**
   - `%LOCALAPPDATA%\OmniRoute\claude-omni.ps1` lanza Claude Code por OmniRoute **solo en esa ventana**, con el combo `claude-code-fallback`.
   - La key se guarda con `node keys.mjs set claude-code`, desde esa carpeta.
