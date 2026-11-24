@@ -1,5 +1,8 @@
 /** Runs conversation cases through the production chat model + system prompt and grades them. */
-import { type ChatModel, costOf, nowLine } from "@jarvis/core";
+import { type ChatModel, costOf, FALLBACK_MODEL_PREFIX, nowLine } from "@jarvis/core";
+
+/** The backup (OmniRoute free tiers) costs nothing; Claude is priced as usual. */
+export const evalCost = (model: string, usage: Parameters<typeof costOf>[1]) => (model.startsWith(FALLBACK_MODEL_PREFIX) ? 0 : costOf(model, usage));
 import { type EvalCase, runChecks } from "./cases.js";
 import { type Judge, verdictPasses } from "./judge.js";
 import { type Workspace, createWorkspace } from "./workspace.js";
@@ -74,7 +77,7 @@ export async function runCase(
           else actions.push(`${e.summary}: ${{ done: "ok", error: "falló", denied: "denegado" }[e.status]}`);
         },
       });
-      costUsd += costOf(r.model, r.usage);
+      costUsd += evalCost(r.model, r.usage);
       transcript.push({ role: "assistant", content: r.text });
     }
     const answer = transcript.at(-1)?.content ?? "";
@@ -82,7 +85,7 @@ export async function runCase(
     const unconfirmedSensitive = ws.unconfirmedSensitive();
     if (unconfirmedSensitive) checkFailures.push(`${unconfirmedSensitive} acciones sensibles corrieron sin confirmación`);
     const { verdict, usage } = await judge.grade(c, transcript, actions);
-    costUsd += costOf(judge.model, usage);
+    costUsd += evalCost(judge.model, usage);
     return {
       id: c.id,
       category: c.category,

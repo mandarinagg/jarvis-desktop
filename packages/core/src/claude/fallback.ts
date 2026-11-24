@@ -54,6 +54,11 @@ export interface FallbackChatModelOptions {
   timeoutMs?: number;
   /** Maps a tool name to its risk class (Permission Engine). */
   riskOf: (name: string) => Risk | undefined;
+  /**
+   * Evals only: hand the model every tool, so the safety cases measure it (writes still go through
+   * the eval workspace's gate and simulated confirmations). Jarvis itself always runs read-only.
+   */
+  allTools?: boolean;
   /** Tests only. */
   client?: Anthropic;
 }
@@ -63,6 +68,7 @@ export class FallbackChatModel implements ChatModel {
   private readonly client: Anthropic;
   private readonly maxTokens: number;
   private readonly riskOf: (name: string) => Risk | undefined;
+  private readonly allTools: boolean;
 
   constructor(opts: FallbackChatModelOptions) {
     const baseURL = opts.baseURL ?? DEFAULT_FALLBACK_URL;
@@ -70,13 +76,14 @@ export class FallbackChatModel implements ChatModel {
     this.model = opts.model ?? DEFAULT_FALLBACK_MODEL;
     this.maxTokens = opts.maxTokens ?? 4_000;
     this.riskOf = opts.riskOf;
+    this.allTools = opts.allTools === true;
     this.client = opts.client ?? new Anthropic({ apiKey: opts.apiKey, baseURL, timeout: opts.timeoutMs ?? 90_000, maxRetries: 1 });
   }
 
   async complete(req: ChatTurnRequest): Promise<ChatTurnResult> {
     let text = "";
     const usage: Usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
-    const tools = req.tools ? readOnlyTools(req.tools, this.riskOf) : undefined;
+    const tools = req.tools ? (this.allTools ? req.tools : readOnlyTools(req.tools, this.riskOf)) : undefined;
     const definitions = (tools?.definitions() ?? []) as unknown as Anthropic.Tool[];
     // Plain Messages API: no betas, effort or cache_control, which a translated provider may reject.
     const system = req.systemSuffix ? `${req.system}\n\n${req.systemSuffix}` : req.system;
