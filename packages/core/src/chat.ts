@@ -25,6 +25,8 @@ export interface ChatServiceOptions {
   model: () => ChatModel | undefined;
   /** Backup model through OmniRoute (ADR-031); undefined when not configured. */
   fallback?: () => ChatModel | undefined;
+  /** The Anthropic account has no credit left: the owner must be told (main notifies once a day). */
+  onOutOfCredit?: () => void;
   systemPrompt: string;
   /** Extra instructions for spoken turns (prompts/voice.md). */
   voicePrompt?: string;
@@ -150,6 +152,7 @@ export class ChatService {
         try {
           result = await model.complete(request);
         } catch (err) {
+          if (err instanceof UpstreamError && err.kind === "billing") this.opts.onOutOfCredit?.();
           // Only before any text: a half-written answer is never continued by another model.
           if (!backup || streamed || !fallbackWorthy(err)) throw err;
           this.logger.log("warn", "chat.fallback", { reason: "upstream", status: err instanceof UpstreamError ? err.status : undefined });

@@ -57,6 +57,13 @@ export interface WaAuthState {
   writeKeys(data: Record<string, Record<string, string | null>>): void;
 }
 
+/**
+ * Signs that end-to-end encryption with the owner's phone is broken: the phone asked Jarvis to
+ * resend a message it couldn't decrypt, gave up on one (it stays "Esperando este mensaje"), or an
+ * incoming message couldn't be decrypted. Only the kind, never the message.
+ */
+export type WaHealthSignal = "retry_requested" | "retry_exhausted" | "decrypt_failed";
+
 export interface WaEvents {
   /** A new QR to link (it expires in seconds and another one arrives). */
   qr(qr: string): void;
@@ -67,6 +74,7 @@ export interface WaEvents {
    */
   closed(reason: "logged_out" | "qr_timeout" | "error", detail: string): void;
   message(m: WaIncoming): void;
+  health?(signal: WaHealthSignal): void;
 }
 
 export interface WaConnection {

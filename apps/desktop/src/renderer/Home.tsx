@@ -110,7 +110,7 @@ const WA_LABEL: Record<WhatsApp["state"], string> = {
   connecting: "Conectando…",
   waiting_qr: "Esperando que escanees el QR",
   connected: "Conectado",
-  degraded: "Con problemas: reintentando",
+  degraded: "Con problemas",
 };
 
 /**
