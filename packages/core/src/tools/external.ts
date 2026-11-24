@@ -66,7 +66,7 @@ export function classifier(server: ExternalServer): (tool: string) => Risk {
 }
 
 /** Jarvis' own credentials: never handed to a third party, whatever the config says. */
-const JARVIS_SECRETS = new Set(["anthropic-api-key", "google-tts-api-key"]);
+const JARVIS_SECRETS = new Set(["anthropic-api-key", "google-tts-api-key", "omniroute-api-key"]);
 
 /** Resolves the configured environment; a missing keyring secret makes the server unusable. */
 export function serverEnv(server: ExternalServer, secret: (name: string) => string | undefined): Record<string, string> {

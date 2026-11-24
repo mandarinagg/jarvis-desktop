@@ -20,6 +20,7 @@ import { SkillsService } from "./skills/service.js";
 import { SkillStore } from "./skills/store.js";
 import { SKILLS_SERVER, SKILLS_TOOLS, createSkillsServer, skillsIndex } from "./tools/skills-server.js";
 import { REMINDERS_SERVER, REMINDERS_TOOLS, createRemindersServer, remindersPreviews } from "./tools/reminders-server.js";
+import { FallbackChatModel } from "./claude/fallback.js";
 import { AnthropicChatModel, type ChatModel, type Effort } from "./claude/model.js";
 import { openDatabase } from "./db.js";
 import { localDay } from "./db.js";
@@ -27,7 +28,7 @@ import { AnthropicReflectionModel, Reflector, SKILL_WINDOW_DAYS } from "./memory
 import { retrieve } from "./memory/retrieve.js";
 import { MemoryService } from "./memory/service.js";
 import { MemoryStore } from "./memory/store.js";
-import { createLogger, rotatingFile, tee } from "./log.js";
+import { createLogger, type Logger, rotatingFile, tee } from "./log.js";
 import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
 import { projectCard } from "./projects/context.js";
 import { ProjectIndex } from "./projects/indexer.js";
@@ -63,6 +64,35 @@ const EFFORTS: readonly Effort[] = ["low", "medium", "high", "xhigh", "max"];
 function anthropicKey(env: NodeJS.ProcessEnv): () => string | undefined {
   const secrets = new KeyringSecretStore();
   return () => secrets.get("anthropic-api-key") ?? env.ANTHROPIC_API_KEY;
+}
+
+/**
+ * Backup through a local OmniRoute (ADR-031): only with the key in Credential Manager and not
+ * turned off with JARVIS_FALLBACK=0. The URL must be loopback; anything else disables the backup.
+ */
+function fallbackResolver(env: NodeJS.ProcessEnv, permissions: PermissionEngine, logger: Logger): () => ChatModel | undefined {
+  const secrets = new KeyringSecretStore();
+  const riskOf = (name: string) => {
+    const [server, tool] = name.split("__");
+    return server && tool ? permissions.risk(server, tool) : undefined;
+  };
+  let cached: { key: string; model: ChatModel } | undefined;
+  let warned = false;
+  return () => {
+    if (env.JARVIS_FALLBACK === "0") return undefined;
+    const key = secrets.get("omniroute-api-key");
+    if (!key) return undefined;
+    if (cached?.key !== key) {
+      try {
+        cached = { key, model: new FallbackChatModel({ apiKey: key, baseURL: env.JARVIS_FALLBACK_URL || undefined, model: env.JARVIS_FALLBACK_MODEL || undefined, riskOf }) };
+      } catch (err) {
+        if (!warned) logger.log("error", "chat.fallback_disabled", { error: err instanceof Error ? err.message : String(err) });
+        warned = true;
+        return undefined;
+      }
+    }
+    return cached.model;
+  };
 }
 
 function modelResolver(env: NodeJS.ProcessEnv): () => ChatModel | undefined {
@@ -223,6 +253,7 @@ async function main(): Promise<number> {
   const chat = new ChatService({
     store,
     model: modelResolver(env),
+    fallback: fallbackResolver(env, permissions, logger),
     systemPrompt,
     skillsContext: () => skillsIndex(skillStore),
     voicePrompt: loadVoicePrompt(),

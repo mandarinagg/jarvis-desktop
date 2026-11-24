@@ -127,6 +127,25 @@ Regla del owner: «si le hablás, te habla; si le escribís, te escribe».
      - que WhatsApp reproduzca la nota que manda Baileys (Ogg Opus mono a 24 kHz; la forma de onda sale plana porque falta `audio-decode`);
      - la descarga de una nota real.
 
+### Respaldo con OmniRoute (ADR-031, 2026-11-24, sin validar con un proveedor real)
+- **Cuándo entra:** al llegar al tope diario, o si Claude falla antes de escribir (429, 5xx, 529, sin conexión).
+- **Cómo responde:** Jarvis contesta por OmniRoute local con el combo `jarvis-fallback`.
+  - Solo tiene herramientas de lectura.
+  - Empieza con el aviso «(Respaldo: …)».
+  - Cuesta 0 en el tope de Claude.
+- **Instalación:** `%LOCALAPPDATA%\OmniRoute`, versión 3.8.54 fijada.
+  - Escucha solo en `127.0.0.1:20128`, con API key obligatoria y sin logs de pedidos.
+  - Se arranca con `start-omniroute.ps1`.
+- **Falta (owner):**
+  1. En http://127.0.0.1:20128: elegir la contraseña, agregar Gemini en **Providers**, crear el combo `jarvis-fallback` y una API key `jarvis`.
+  2. Guardarla: `node packages/core/dist/set-secret.js omniroute-api-key`.
+  3. Probar con `JARVIS_DAILY_BUDGET_USD=0.01` que el chat conteste con el aviso de respaldo.
+- **Claude Code:**
+  - `%LOCALAPPDATA%\OmniRoute\claude-omni.ps1` lanza Claude Code por OmniRoute **solo en esa ventana**, con el combo `claude-code-fallback`.
+  - La key se guarda con `node keys.mjs set claude-code`, desde esa carpeta.
+  - El `claude` normal no cambia. Nunca se conecta una suscripción de Claude por OAuth a OmniRoute.
+- **Pendiente técnico:** correr las evals de seguridad contra `jarvis-fallback` antes de darle más herramientas.
+
 ### En diseño (pedido del owner, 2026-11-23)
 
 **B. «Cerebro de Jarvis»:** una red neuronal animada, al estilo del grafo de graphify, que *es* Jarvis. El owner quiere ver las dos cosas:

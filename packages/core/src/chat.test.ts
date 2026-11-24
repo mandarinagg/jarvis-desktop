@@ -245,3 +245,65 @@ describe("ChatService queries", () => {
     expect(sent.at(-1)).toMatchObject({ type: "budget.status", dailyBudgetUsd: 2, spentTodayUsd: costOf("claude-opus-5-5", usage) });
   });
 });
+
+describe("ChatService backup through OmniRoute (ADR-031)", () => {
+  class Backup implements ChatModel {
+    readonly model = "jarvis-fallback";
+    requests: ChatTurnRequest[] = [];
+    async complete(req: ChatTurnRequest) {
+      this.requests.push(req);
+      req.onText("Hola desde el respaldo");
+      return { text: "Hola desde el respaldo", stopReason: "end_turn", model: "omniroute:gemini-2.5-flash", usage };
+    }
+  }
+  const make = (primary: ChatModel, budget = 3) => {
+    const store = new ConversationStore(openDatabase(":memory:"));
+    const backup = new Backup();
+    const service = new ChatService({ store, model: () => primary, fallback: () => backup, systemPrompt: "SYS", dailyBudgetUsd: budget });
+    return { store, service, backup };
+  };
+  const text = (sent: CoreMessage[]) => sent.filter((m) => m.type === "chat.delta").map((m) => (m as { text: string }).text).join("");
+
+  it("with the daily cap reached, answers through the backup with a notice and costs nothing", async () => {
+    const primary = new FakeModel();
+    const { store, service, backup } = make(primary, 0.5);
+    const c = store.createConversation("x");
+    store.recordUsage({ turnId: "old", conversationId: c.id, model: "claude-opus-5-5", usage, costUsd: 0.5 });
+    const { session, sent } = fakeSession();
+    await service.chatSend(session, { type: "chat.send", id: "m1", text: "hola" });
+    expect(primary.requests).toHaveLength(0);
+    expect(backup.requests).toHaveLength(1);
+    expect(text(sent)).toMatch(/^\(Respaldo: .*\)\n\nHola desde el respaldo$/);
+    const done = sent.at(-1) as Extract<CoreMessage, { type: "chat.done" }>;
+    expect(done.costUsd).toBe(0);
+    expect(store.spentOn(localDay(new Date()))).toBeCloseTo(0.5);
+    const started = sent[0] as Extract<CoreMessage, { type: "chat.started" }>;
+    expect(store.messages(started.conversationId).at(-1)?.content).toMatch(/^\(Respaldo: /);
+  });
+
+  it("a rate limit or outage before any text moves the turn to the backup", async () => {
+    const primary = new FakeModel(() => Promise.reject(new UpstreamError("rate", 429, true)));
+    const { service, backup } = make(primary);
+    const { session, sent } = fakeSession();
+    await service.chatSend(session, { type: "chat.send", id: "m1", text: "hola" });
+    expect(backup.requests).toHaveLength(1);
+    expect(sent.at(-1)?.type).toBe("chat.done");
+  });
+
+  it("never continues a half-written Claude answer, and never covers a bad key", async () => {
+    const half = new FakeModel(async (req) => {
+      req.onText("Empiezo");
+      throw new UpstreamError("down", undefined, true);
+    });
+    const a = make(half);
+    const s1 = fakeSession();
+    await a.service.chatSend(s1.session, { type: "chat.send", id: "m1", text: "hola" });
+    expect(a.backup.requests).toHaveLength(0);
+    expect(s1.sent.at(-1)).toMatchObject({ type: "error", code: "upstream_error" });
+
+    const b = make(new FakeModel(() => Promise.reject(new UpstreamError("bad key", 401))));
+    const s2 = fakeSession();
+    await b.service.chatSend(s2.session, { type: "chat.send", id: "m2", text: "hola" });
+    expect(b.backup.requests).toHaveLength(0);
+  });
+});

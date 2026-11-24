@@ -90,6 +90,7 @@ El TTS representa US$ 0,08–0,46 por día del total. El Builder (Claude Agent S
   - en el chat, el turno no arranca y aparece «Se alcanzó el tope diario de US$ 3.00 (gastado: …)»;
   - por voz lo dice («Llegué al tope de gasto de hoy…») y por WhatsApp responde un aviso fijo;
   - el Builder no arranca tareas nuevas, la reflexión diaria se saltea y las evals de skills quedan para mañana.
+  - **Con el respaldo configurado (ADR-031),** el chat, la voz y WhatsApp siguen contestando por OmniRoute local. La respuesta lleva el aviso «(Respaldo: …)», solo con herramientas de lectura y sin costo para el tope. Lo mismo pasa si Claude falla antes de escribir (429, 5xx, 529, sin conexión).
 - **Alerta al 80 %:** el indicador de gasto del panel Inicio cambia de color; con el 100 % se marca como superado.
   - El owner puede ajustarlos. Si se mantiene el objetivo de US$1, se revisa con datos reales en la Fase 1.
 

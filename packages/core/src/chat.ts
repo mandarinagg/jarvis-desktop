@@ -1,10 +1,15 @@
 /**
  * Text chat turns (Phase 1, L0): daily budget check -> persist user message -> stream Claude ->
  * persist reply + usage. One turn at a time per conversation; cancellable (chat.cancel, disconnect).
+ *
+ * Backup (ADR-031): when the daily cap is reached, or Claude fails before any text arrived (rate
+ * limit, overload, no connection), the turn runs on the local OmniRoute backup with read tools only,
+ * and the reply starts with a notice so the owner knows who answered.
  */
 import { randomUUID } from "node:crypto";
 import type { BudgetGet, ChatCancel, ChatSend, ConversationsGet, ConversationsList, ConversationsSetMode } from "@jarvis/shared";
-import { type ChatModel, TurnCancelledError, UpstreamError } from "./claude/model.js";
+import { FALLBACK_MODEL_PREFIX, FALLBACK_NOTICE, fallbackWorthy } from "./claude/fallback.js";
+import { type ChatModel, type ChatTurnRequest, TurnCancelledError, UpstreamError } from "./claude/model.js";
 import type { ProjectStore } from "./projects/store.js";
 import type { ToolRuntime } from "./tools/hub.js";
 import type { Channel } from "./tools/permissions.js";
@@ -18,6 +23,8 @@ export interface ChatServiceOptions {
   store: ConversationStore;
   /** Resolved per turn so a key stored while the Core runs is picked up without a restart. */
   model: () => ChatModel | undefined;
+  /** Backup model through OmniRoute (ADR-031); undefined when not configured. */
+  fallback?: () => ChatModel | undefined;
   systemPrompt: string;
   /** Extra instructions for spoken turns (prompts/voice.md). */
   voicePrompt?: string;
@@ -78,8 +85,13 @@ export class ChatService {
     const model = this.opts.model();
     if (!model) return fail("upstream_error", NO_KEY);
 
+    const backup = this.opts.fallback?.();
+    let useBackup = false;
     const spent = store.spentOn(localDay(this.now()));
-    if (spent >= this.opts.dailyBudgetUsd) {
+    if (spent >= this.opts.dailyBudgetUsd && backup) {
+      useBackup = true;
+      this.logger.log("info", "chat.fallback", { reason: "budget" });
+    } else if (spent >= this.opts.dailyBudgetUsd) {
       return fail(
         "budget_exceeded",
         `Se alcanzó el tope diario de US$ ${this.opts.dailyBudgetUsd.toFixed(2)} (gastado: US$ ${spent.toFixed(2)}).`,
@@ -112,7 +124,8 @@ export class ChatService {
       }
       const thinking = this.opts.modePrompt?.(conversation.id);
       const suffix = [this.opts.clock?.(this.now()), this.opts.skillsContext?.(), card, memories, thinking, mode === "whatsapp" ? this.opts.whatsappPrompt : undefined, mode === "voice" || opts.spoken ? this.opts.voicePrompt : undefined].filter(Boolean).join("\n\n");
-      const result = await model.complete({
+      let streamed = false;
+      const request: ChatTurnRequest = {
         system: this.opts.systemPrompt,
         systemSuffix: suffix || undefined,
         tools: this.opts.tools,
@@ -121,11 +134,32 @@ export class ChatService {
         onTool: (e) => session.send({ type: "chat.tool", turnId, tool: e.name, summary: e.summary.slice(0, 300), status: e.status }),
         messages: history,
         signal: controller.signal,
-        onText: (text) => session.send({ type: "chat.delta", turnId, text }),
-      });
+        onText: (text) => {
+          streamed = true;
+          session.send({ type: "chat.delta", turnId, text });
+        },
+      };
+      const runBackup = (b: ChatModel) => {
+        session.send({ type: "chat.delta", turnId, text: FALLBACK_NOTICE });
+        return b.complete(request).then((r) => ({ ...r, text: FALLBACK_NOTICE + r.text }));
+      };
+      let result;
+      if (useBackup && backup) {
+        result = await runBackup(backup);
+      } else {
+        try {
+          result = await model.complete(request);
+        } catch (err) {
+          // Only before any text: a half-written answer is never continued by another model.
+          if (!backup || streamed || !fallbackWorthy(err)) throw err;
+          this.logger.log("warn", "chat.fallback", { reason: "upstream", status: err instanceof UpstreamError ? err.status : undefined });
+          result = await runBackup(backup);
+        }
+      }
 
       if (result.text) store.appendMessage({ conversationId: conversation.id, turnId, role: "assistant", content: result.text });
-      const costUsd = costOf(result.model, result.usage);
+      // The backup's cost is tracked in OmniRoute (free tiers): it never counts against Claude's cap.
+      const costUsd = result.model.startsWith(FALLBACK_MODEL_PREFIX) ? 0 : costOf(result.model, result.usage);
       store.recordUsage({ turnId, conversationId: conversation.id, model: result.model, usage: result.usage, costUsd });
       this.logger.log("info", "chat.turn_done", {
         turnId,
