@@ -74,7 +74,7 @@
 1. ~~Cuenta de Anthropic y key~~: hecho el 2026-11-23. Confirmá que en la consola esté el **tope mensual de US$60**.
 2. ~~Guardar la clave~~: hecho (`anthropic-api-key` en el Credential Manager).
 3. ~~Correr las evals~~: hecho el 2026-11-23 (62/67 después de ajustar los prompts). Falta 10/10 en proyectos (hoy 8/10).
-4. Usar Jarvis por texto y por voz: `pnpm --filter @jarvis/desktop start`, con `Ctrl+Shift+Space` o el botón «Mantené para hablar».
+4. Usar Jarvis por texto y por voz: con el acceso directo **Jarvis** del escritorio o `pnpm --filter @jarvis/desktop start`, con `Ctrl+Shift+Space` o el botón «Mantené para hablar».
 5. Después de unas 20 conversaciones por voz: `node packages/core/dist/voice-stats.js`. Tiene que decir `OK: p50 … < 2000 ms`.
 6. **Wake word:**
    1. `uv run jarvis-stt-bench setup`, que baja los modelos.
@@ -106,6 +106,35 @@
 
 ## Próximos pasos (para quien retome)
 0. **Prioridad:** validar con uso real antes de sumar features. El código de las 7 fases está en `main` y las evals dan 93 %.
+
+### En diseño (pedido del owner, 2026-11-23)
+Son dos proyectos independientes. Va primero la voz en WhatsApp; el cerebro animado se diseña después.
+
+**A. Voz en WhatsApp: notas de voz con Neural2.**
+- **Decidido por el owner:**
+  - la voz sigue siendo `es-US-Neural2-B`;
+  - regla «si le hablás, te habla; si le escribís, te escribe»: a una nota de voz del owner Jarvis contesta con una nota de voz más el texto debajo, y a un texto contesta con texto.
+- **Enfoque propuesto, pendiente de aprobación del owner:** todo el audio vive en el servicio de voz, con dos mensajes nuevos en su protocolo.
+  - Texto → nota de voz: Google sintetiza directamente en `OGG_OPUS`, el formato de WhatsApp, sin `ffmpeg`.
+  - Nota de voz → texto: se decodifica con `soundfile`, se remuestrea a 16 kHz y se transcribe con Parakeet local. El audio del owner nunca va a la nube (ADR-004).
+  - El Core solo hace de puente con Baileys (nota de voz = `audio` con `ptt: true`).
+- **Antes de construir:**
+  - una prueba rápida de que Smart App Control deja cargar la DLL de `soundfile`;
+  - después, ADR nuevo y actualización de ADR-029, que hoy dice «solo texto».
+- **Bordes ya acordados:**
+  - si el servicio de voz está apagado, contesta solo texto y avisa por qué;
+  - una nota de voz de más de unos 2 minutos se rechaza con un aviso.
+- **Descartado:**
+  - transcribir en la nube, porque el audio del owner saldría de la PC;
+  - Google directo desde el Core más `ffmpeg`, porque duplica la key y depende de un binario instalado.
+
+**B. «Cerebro de Jarvis»:** una red neuronal animada, al estilo del grafo de graphify, que *es* Jarvis. El owner quiere ver las dos cosas:
+- **cuánto sabe:** crece con las memorias, los proyectos, las skills, las herramientas y las conversaciones, y cuanto más complejo es Jarvis, más nodos y conexiones tiene;
+- **pensar en vivo:** se enciende mientras responde, con las herramientas que usa y los recuerdos que recupera.
+
+Todavía no tiene diseño ni ADR. Los datos ya están en el Core (`dashboard.get`, memoria, proyectos, skills, audit).
+
+**Acceso directo:** `Jarvis.lnk` en el escritorio del owner. Abre `apps/desktop/node_modules/electron/dist/electron.exe` sobre `apps/desktop`, sin consola, y corre el último `pnpm build`. Falta un ícono propio y no está en el repo.
 1. **Evals que faltan** (cuidando el gasto, ~US$0,03 por caso: correr solo los casos afectados con `--case NNN`):
    - llevar proyectos a 10/10 (021, 026: citas de archivos que no abrió) y revisar 052 (agregó detalles fuera del recuerdo) y 002;
    - correr 049 y 058 **de día**: dependen de qué significa «mañana»;
