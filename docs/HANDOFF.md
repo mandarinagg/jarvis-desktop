@@ -1,9 +1,13 @@
 # Handoff: estado del proyecto
 
-> Última actualización: **2026-11-23**. Actualizar al cerrar cada sesión de trabajo. Lo de largo plazo está en `ROADMAP.md`; este archivo cuenta **dónde estamos y qué sigue**.
+> Última actualización: **2026-11-24**. Actualizar al cerrar cada sesión de trabajo. Lo de largo plazo está en `ROADMAP.md`; este archivo cuenta **dónde estamos y qué sigue**.
 
 ## Dónde estamos
-**Todo está en `main`**: las Fases 0 a 7 están implementadas. Los PRs #32–#53 se mergearon el 2026-11-23 y no queda ningún PR abierto. La key de Anthropic ya está guardada y las evals corrieron con la API real: **62/67 (93 %)**, 14/14 injections resistidas y 0 acciones sin confirmación (detalle más abajo). Lo que falta es **validar con uso real**, no escribir código.
+**2026-11-24: hay 4 PRs apilados sin mergear**, en este orden: #55 (handoff) → #56 (notas de voz, ADR-030) → #57 (respaldo OmniRoute, ADR-031) → #58 (incidente de WhatsApp). Se mergean en ese orden.
+- **El crédito de Anthropic se terminó el 2026-11-24.** Jarvis contesta por el respaldo (Groq/Gemini por OmniRoute, solo lectura) hasta que el owner cargue saldo en console.anthropic.com → Plans & Billing. El Builder y las evals con Claude no andan sin crédito.
+- La app abierta corre la rama `fix/whatsapp-reply-lid` (punta de la pila), compilada.
+
+Hasta el 2026-11-23 **todo estaba en `main`**: las Fases 0 a 7 están implementadas. Los PRs #32–#53 se mergearon el 2026-11-23 y no queda ningún PR abierto. La key de Anthropic ya está guardada y las evals corrieron con la API real: **62/67 (93 %)**, 14/14 injections resistidas y 0 acciones sin confirmación (detalle más abajo). Lo que falta es **validar con uso real**, no escribir código.
 
 - **Fase 0 (Diagnóstico):** completa.
 - **Fase 1 (L0: Core + chat):** validada con la API real (evals de personalidad, privacidad y respuestas).
@@ -161,6 +165,43 @@ Regla del owner: «si le hablás, te habla; si le escribís, te escribe».
   - La key se guarda con `node keys.mjs set claude-code`, desde esa carpeta.
   - El `claude` normal no cambia. Nunca se conecta una suscripción de Claude por OAuth a OmniRoute.
 - **Pendiente técnico:** correr las evals de seguridad contra `jarvis-fallback` antes de darle más herramientas.
+
+### Voz de Jarvis con OmniVoice (2026-11-24, en curso, sin ADR)
+- **Voz:** el owner pidió la voz de JARVIS; se le explicó que clonar la del actor (o del doblaje) no se hace sin su permiso.
+- **Elegida:** **`12-maduro` base**, generada con OmniVoice:
+  - diseño `male, elderly, very low pitch`, semilla **256**, `--lang es`, sin procesado;
+  - clip de referencia en `C:\Users\antho\Desktop\PROJECTOS NUEVOS\voces-jarvis\v4\12-maduro-base.wav` (fuera del repo), con su texto: «Buenas noches, señor. Terminé el análisis: la conexión es segura y el sistema funciona a la perfección. ¿Desea que comencemos?».
+- **Motor:** `omnivoice.cpp` (los binarios vienen con VoiceStudio 0.5.8, instalado en `%LOCALAPPDATA%\Programs\VoiceStudio`; Smart App Control lo dejó correr).
+  - Modelo Apache-2.0, en `%APPDATA%\Jarvis\models\tts\omnivoice\` (Q8_0, revisión `361609388ae5…`, hashes verificados). Corre por Vulkan en la RX 6600 XT.
+  - VoiceStudio es AGPL, pero no se usa su código: solo el binario de omnivoice.cpp, como proceso aparte.
+- **Latencia medida:**
+  - CLI con la voz diseñada: 0,6 s (8 pasos), 1,1 s (16) y 2,2 s (32) por frase corta, sin contar la carga del modelo;
+  - servidor residente `tts-server` (`/v1/audio/voices` + `/v1/audio/speech`): con la voz **clonada** desde el clip tarda ~9–11 s por frase (procesa la referencia cada vez); diseñada, 2,3–4,8 s. **Ignora `steps`/`num_step`.**
+- **Siguiente paso:** bajar la latencia, mirando el código del server de omnivoice.cpp (cómo se pasan los pasos), o usar el CLI con `--ref-rvq` precodificado y `--steps 8–16`. Después, ADR-032 y un motor `omnivoice` en `services/voice` con Neural2 como respaldo.
+- Hay un `tts-server` de prueba corriendo en `127.0.0.1:18731` (no persiste al reiniciar).
+
+### Evals gratis por el respaldo (pedido del owner, 2026-11-24, a medias)
+- Por defecto, las evals corren por el respaldo, con juez y modelo vía OmniRoute (US$0). Con Claude, solo con flag y Haiku o Sonnet, nunca Opus.
+- Hecho a medias, en la rama `wip/evals-free-backup`:
+  - `BackupJudge` (JSON validado con zod);
+  - `evalCost` (respaldo = 0);
+  - `FallbackChatModel.allTools` (solo evals).
+- Falta `--model`/`--judge` en `evals/src/run.ts`, con tests, y una corrida real.
+
+### Trabajo remoto por WhatsApp (pedido del owner, 2026-11-24, en diseño)
+- **Pedido:** desde WhatsApp, estando lejos, «trabajá en Zestia» o «en el editor de prompts», y que Jarvis haga cambios reales, autorizado por **reconocimiento de la voz del owner**.
+- **Hallazgos:**
+  - `zestia` y `editor_prompt` ya están registrados como proyectos;
+  - no hay `builder.json`;
+  - ADR-029 prohíbe confirmar y arrancar el Builder desde WhatsApp;
+  - el Builder necesita crédito de Claude.
+- **Propuesto:**
+  - verificación del hablante **más una frase al azar dicha en el momento**, porque la voz sola se engaña con grabaciones o clones;
+  - opción **B**: preparar el cambio en la rama del Builder y aprobar el merge a distancia, sin push ni deploy.
+- **Pendiente:** que el owner elija entre A (solo preparar), B y C (hasta producción). Después, documento de diseño y ADR.
+
+### Interfaz (pendiente de aclarar con el owner)
+- El owner pidió «la interfaz gráfica de Jarvis». Falta confirmar si es el «cerebro» animado (abajo) o un rediseño general de la app.
 
 ### En diseño (pedido del owner, 2026-11-23)
 
