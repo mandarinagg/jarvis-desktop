@@ -307,3 +307,22 @@ describe("ChatService backup through OmniRoute (ADR-031)", () => {
     expect(b.backup.requests).toHaveLength(0);
   });
 });
+
+describe("ChatService tells the owner when Anthropic runs out of credit", () => {
+  it("a billing error calls onOutOfCredit, with or without a backup; other errors don't", async () => {
+    const billing = () => Promise.reject(new UpstreamError("sin crédito", 400, false, "billing"));
+    for (const withBackup of [true, false]) {
+      const store = new ConversationStore(openDatabase(":memory:"));
+      let calls = 0;
+      const backup: ChatModel = { model: "b", complete: async () => ({ text: "ok", stopReason: "end_turn", model: "omniroute:x", usage }) };
+      const service = new ChatService({ store, model: () => new FakeModel(billing), ...(withBackup ? { fallback: () => backup } : {}), systemPrompt: "SYS", dailyBudgetUsd: 3, onOutOfCredit: () => calls++ });
+      await service.chatSend(fakeSession().session, { type: "chat.send", id: "m", text: "hola" });
+      expect(calls).toBe(1);
+    }
+    const store = new ConversationStore(openDatabase(":memory:"));
+    let calls = 0;
+    const service = new ChatService({ store, model: () => new FakeModel(() => Promise.reject(new UpstreamError("rate", 429, true))), systemPrompt: "SYS", dailyBudgetUsd: 3, onOutOfCredit: () => calls++ });
+    await service.chatSend(fakeSession().session, { type: "chat.send", id: "m", text: "hola" });
+    expect(calls).toBe(0);
+  });
+});

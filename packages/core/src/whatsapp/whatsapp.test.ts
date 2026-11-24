@@ -707,3 +707,54 @@ describe("whatsapp replies go back to the chat the owner wrote from (LID migrati
     expect(w.provider.sent.map((s) => s.jid)).toEqual([SELF.jid]);
   });
 });
+
+describe("whatsapp crypto health: the owner learns when the phone can't read Jarvis", () => {
+  it("the Baileys logger turns retry and decrypt events into signals, never the payload", () => {
+    const signals: string[] = [];
+    const lines: unknown[] = [];
+    const log = baileysLogger({ log: (level, m, f) => lines.push({ level, m, f }) }, (s) => signals.push(s));
+    log.debug({ key: { id: "X" }, msg: { conversation: "privado" } }, "recv retry request");
+    log.info({ attrs: {}, key: {} }, "will not send message again, as sent too many times");
+    log.debug({ key: {} }, "recv retry request, but message not available");
+    log.error({ err: new Error("Bad MAC"), msg: { conversation: "privado" } }, "failed to decrypt message");
+    log.debug({}, "something else");
+    expect(signals).toEqual(["retry_requested", "retry_exhausted", "retry_exhausted", "decrypt_failed"]);
+    expect(JSON.stringify(lines)).not.toContain("privado");
+  });
+
+  it("repeated signals mark the channel degraded with what to do; it keeps answering", async () => {
+    const w = world();
+    await linked(w);
+    const health = ev(w).health;
+    expect(health).toBeTypeOf("function");
+    health?.("retry_requested");
+    health?.("retry_requested");
+    expect(w.channel.current.state).toBe("connected");
+    health?.("retry_requested");
+    expect(w.channel.current).toMatchObject({ state: "degraded", detail: TEXTS.cryptoUnhealthy });
+    ev(w).message(msg({ text: "sigo acá" }));
+    await w.settle();
+    expect(w.turns).toHaveLength(1);
+  });
+
+  it("a single exhausted retry is enough: that message is lost on the phone", async () => {
+    const w = world();
+    await linked(w);
+    ev(w).health?.("retry_exhausted");
+    expect(w.channel.current).toMatchObject({ state: "degraded", detail: TEXTS.cryptoUnhealthy });
+  });
+
+  it("old signals expire, and a fresh link clears the warning", async () => {
+    const w = world();
+    await linked(w);
+    ev(w).health?.("decrypt_failed");
+    ev(w).health?.("decrypt_failed");
+    w.clock.now = new Date(NOW.getTime() + 11 * 60_000);
+    for (let i = 0; i < 4; i++) ev(w).health?.("decrypt_failed");
+    expect(w.channel.current.state).toBe("connected"); // 4 recent < 5
+    ev(w).health?.("decrypt_failed");
+    expect(w.channel.current.state).toBe("degraded");
+    ev(w).connected(SELF);
+    expect(w.channel.current.state).toBe("connected");
+  });
+});

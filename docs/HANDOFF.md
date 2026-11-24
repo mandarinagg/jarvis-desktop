@@ -127,6 +127,18 @@ Regla del owner: «si le hablás, te habla; si le escribís, te escribe».
      - que WhatsApp reproduzca la nota que manda Baileys (Ogg Opus mono a 24 kHz; la forma de onda sale plana porque falta `audio-decode`);
      - la descarga de una nota real.
 
+### Incidente WhatsApp del 2026-11-24 («Esperando este mensaje»)
+- **Qué pasó:**
+  - el owner escribe desde el chat propio por **LID** (migración de WhatsApp), pero Jarvis respondía siempre al **número**; el teléfono no podía descifrar las respuestas;
+  - además, se terminó el crédito de Anthropic (400 «credit balance is too low»);
+  - y la app siguió hablando con un **Core viejo** después del build, porque el Core es un daemon aparte.
+- **Arreglos (rama `fix/whatsapp-reply-lid`):**
+  - la respuesta va al mismo chat (LID o número) por el que escribió el owner;
+  - la tarjeta de WhatsApp pasa a «Con problemas» y dice qué hacer cuando Baileys ve reintentos o fallas de descifrado (1 reintento agotado, 3 pedidos de reenvío o 5 fallas en 10 min);
+  - la app detecta un Core viejo por su sello de build (`run/core.build`) y lo reinicia con `core.shutdown`;
+  - sin crédito, entra el respaldo y llega una notificación de Windows una vez por día (protocolo 1.10, `proactive.notify` con `kind: "alert"`).
+- **Si vuelve a pasar:** Inicio → WhatsApp → Desvincular y volver a vincular. Para apagar el Core a mano: `node packages/core/dist/stop-core.mjs` (no está en el repo; usa `core.shutdown`).
+
 ### Respaldo con OmniRoute (ADR-031, 2026-11-24, sin validar con un proveedor real)
 - **Cuándo entra:** al llegar al tope diario, o si Claude falla antes de escribir (429, 5xx, 529, sin conexión).
 - **Cómo responde:** Jarvis contesta por OmniRoute local con el combo `jarvis-fallback`.

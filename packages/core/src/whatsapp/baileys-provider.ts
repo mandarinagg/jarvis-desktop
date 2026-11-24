@@ -23,7 +23,25 @@ import makeWASocket, {
 } from "baileys";
 import { type Logger, redact } from "../log.js";
 import { isSelfChat } from "./filter.js";
-import { bareJid, type WaAuthState, type WaConnection, type WaEvents, type WaIncoming, type WaMediaKind, type WaProvider, type WaSelf } from "./provider.js";
+import {
+  bareJid,
+  type WaAuthState,
+  type WaConnection,
+  type WaEvents,
+  type WaHealthSignal,
+  type WaIncoming,
+  type WaMediaKind,
+  type WaProvider,
+  type WaSelf,
+} from "./provider.js";
+
+/** Baileys log texts that reveal broken encryption with the owner's devices (6.7.x wording). */
+const HEALTH_TEXTS: readonly [string, WaHealthSignal][] = [
+  ["recv retry request, but message not available", "retry_exhausted"],
+  ["will not send message again", "retry_exhausted"],
+  ["recv retry request", "retry_requested"],
+  ["failed to decrypt message", "decrypt_failed"],
+];
 
 /** The real content of an ephemeral, view-once or captioned-document message. */
 const innerOf = (message: proto.IMessage): proto.IMessage =>
@@ -199,8 +217,15 @@ interface BaileysLogger {
  * Baileys logs frames and message payloads at debug/trace level. Only warnings and errors pass,
  * and only their text plus an error message: never the object, which may carry message data.
  */
-export function baileysLogger(logger: Logger): BaileysLogger {
+export function baileysLogger(logger: Logger, onSignal?: (s: WaHealthSignal) => void): BaileysLogger {
+  // Only the message text is inspected, at every level; the payload object never leaves here.
+  const signal = (obj: unknown, msg?: string) => {
+    const text = typeof msg === "string" ? msg : typeof obj === "string" ? obj : "";
+    const hit = HEALTH_TEXTS.find(([t]) => text.startsWith(t));
+    if (hit) onSignal?.(hit[1]);
+  };
   const out = (level: "warn" | "error") => (obj: unknown, msg?: string) => {
+    signal(obj, msg);
     const err = (obj as { err?: unknown } | undefined)?.err;
     const error = err instanceof Error ? redact(err.message).slice(0, 200) : undefined;
     logger.log(level, "whatsapp.baileys", { text: typeof msg === "string" ? redact(msg).slice(0, 200) : typeof obj === "string" ? redact(obj).slice(0, 200) : undefined, error });
@@ -209,8 +234,8 @@ export function baileysLogger(logger: Logger): BaileysLogger {
     level: "warn",
     child: () => self,
     trace: () => {},
-    debug: () => {},
-    info: () => {},
+    debug: signal,
+    info: signal,
     warn: out("warn"),
     error: out("error"),
   };
@@ -245,8 +270,14 @@ export class BaileysProvider implements WaProvider {
   start(auth: WaAuthState, events: WaEvents): Promise<WaConnection> {
     const saved = auth.readCreds();
     const creds: AuthenticationCreds = saved ? (JSON.parse(saved, BufferJSON.reviver) as AuthenticationCreds) : initAuthCreds();
-    const logger = baileysLogger(this.logger);
     let self: WaSelf | undefined;
+    const logger = baileysLogger(this.logger, (s) => {
+      try {
+        events.health?.(s);
+      } catch {
+        // a health listener must never break the socket
+      }
+    });
     const sock = makeWASocket({
       auth: { creds, keys: makeCacheableSignalKeyStore(signalKeys(auth), logger, this.caches.signal) },
       logger,

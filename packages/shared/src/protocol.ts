@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.9"; // 1.9: whatsapp.* (Phase 7); 1.8: skills.* (Phase 7); 1.7: proactive.*, reminders.cancel (Phase 7); 1.6: dashboard.* (Phase 7); 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
+export const PROTOCOL_VERSION = "1.10"; // 1.10: proactive.notify kind "alert"; 1.9: whatsapp.* (Phase 7); 1.8: skills.* (Phase 7); 1.7: proactive.*, reminders.cancel (Phase 7); 1.6: dashboard.* (Phase 7); 1.1: voice.* (Phase 2); 1.2: chat.tool, projects.* (Phase 3); 1.3: permission.*, audit.* (Phase 4); 1.4: builder.* (Phase 5); 1.5: memory.*, conversations.setMode (Phase 6)
 
 const Id = z.string().min(1).max(64);
 const SessionToken = z.string().regex(/^[0-9a-f]{64}$/, "token must be 256-bit lowercase hex");
@@ -652,7 +652,7 @@ export type ProactiveState = z.infer<typeof ProactiveState>;
 /** Something Jarvis wants the owner to see now (never sent during quiet hours). Plain text. */
 export const ProactiveNotify = z.strictObject({
   type: z.literal("proactive.notify"),
-  kind: z.enum(["reminder", "briefing"]),
+  kind: z.enum(["reminder", "briefing", "alert"]),
   title: z.string().max(100),
   body: z.string().max(4_000),
 });

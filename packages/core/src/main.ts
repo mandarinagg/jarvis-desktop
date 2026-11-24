@@ -8,6 +8,7 @@ import { rm } from "node:fs/promises";
 import type { CoreMessage, TtsConfig } from "@jarvis/shared";
 import type { Session } from "./server.js";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Builder } from "./builder/service.js";
 import { BuilderTaskStore } from "./builder/store.js";
 import { ChatService } from "./chat.js";
@@ -29,7 +30,7 @@ import { retrieve } from "./memory/retrieve.js";
 import { MemoryService } from "./memory/service.js";
 import { MemoryStore } from "./memory/store.js";
 import { createLogger, type Logger, rotatingFile, tee } from "./log.js";
-import { defaultPipeName, jarvisHome, tokenPath } from "./paths.js";
+import { defaultPipeName, jarvisHome, tokenPath, writeCoreBuildStamp } from "./paths.js";
 import { projectCard } from "./projects/context.js";
 import { ProjectIndex } from "./projects/indexer.js";
 import { ProjectsService } from "./projects/service.js";
@@ -250,10 +251,24 @@ async function main(): Promise<number> {
   const proactiveTimer = setInterval(() => proactive.tick(), 30_000);
   proactiveTimer.unref();
   const auditService = new AuditService(audit, path.join(home, "exports"));
+  let creditAlertDay: string | undefined;
   const chat = new ChatService({
     store,
     model: modelResolver(env),
     fallback: fallbackResolver(env, permissions, logger),
+    onOutOfCredit: () => {
+      // Once per local day: the owner hears about it on the PC (WhatsApp replies carry the backup notice).
+      const day = new Date().toLocaleDateString("sv");
+      if (creditAlertDay === day) return;
+      creditAlertDay = day;
+      logger.log("warn", "chat.out_of_credit");
+      broadcast({
+        type: "proactive.notify",
+        kind: "alert",
+        title: "Sin crédito en Anthropic",
+        body: "Jarvis sigue respondiendo con el modelo de respaldo, sin acciones. Cargá saldo en console.anthropic.com → Plans & Billing.",
+      });
+    },
     systemPrompt,
     skillsContext: () => skillsIndex(skillStore),
     voicePrompt: loadVoicePrompt(),
@@ -423,6 +438,11 @@ async function main(): Promise<number> {
   }
   // The token is written only after we own the pipe, so a second instance never overwrites it.
   await writeSessionToken(tokenPath(home), token);
+  try {
+    writeCoreBuildStamp(home, fileURLToPath(import.meta.url));
+  } catch (err) {
+    logger.log("warn", "core.build_stamp_failed", { error: err instanceof Error ? err.message : String(err) });
+  }
   broadcast = (m) => server.broadcast(m);
   sessions = () => server.sessionList();
   logger.log("info", "core.ready", { pipe, version: CORE_VERSION, dailyBudgetUsd: budget });

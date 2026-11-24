@@ -18,7 +18,11 @@ import { VoiceNoteError, type VoiceNotesPort } from "../voice/notes.js";
 import type { WhatsAppAuthStore } from "./auth-store.js";
 import { TtlCache } from "./baileys-provider.js";
 import { composeTurn, prepareOutgoing, screen } from "./filter.js";
-import { bareJid, phoneOf, type WaAudio, type WaConnection, type WaIncoming, type WaProvider, type WaSelf } from "./provider.js";
+import { bareJid, phoneOf, type WaAudio, type WaConnection, type WaHealthSignal, type WaIncoming, type WaProvider, type WaSelf } from "./provider.js";
+
+/** Within this window: 1 exhausted retry, 3 retry requests or 5 decrypt failures mean broken crypto. */
+const HEALTH_WINDOW_MS = 10 * 60_000;
+const HEALTH_LIMITS: Record<WaHealthSignal, number> = { retry_exhausted: 1, retry_requested: 3, decrypt_failed: 5 };
 
 export type WhatsAppState = "off" | "connecting" | "waiting_qr" | "connected" | "degraded";
 
@@ -74,6 +78,7 @@ export const TEXTS = {
   noteEmpty: "No entendí nada en la nota de voz. ¿Me la repetís o me escribís?",
   noteFailed: "No pude escuchar la nota de voz. Probá de nuevo o escribime.",
   voiceReplyFailed: "No pude grabar la respuesta en audio, así que va solo por escrito.",
+  cryptoUnhealthy: "Tu teléfono no está pudiendo leer los mensajes de Jarvis («Esperando este mensaje»). Desvinculá y volvé a vincular WhatsApp desde acá.",
   stale: "Ese mensaje me llegó tarde, así que no lo ejecuto: repetímelo si sigue en pie.",
   rateLimited: "Llegamos al tope de mensajes por esta hora. Sigo en un rato o en la PC.",
   sensitive: "La respuesta tiene algo que no conviene mandar por acá. Te lo muestro en la PC.",
@@ -103,6 +108,7 @@ export class WhatsAppChannel {
    * shows "Esperando este mensaje" (seen 2026-11-24).
    */
   private replyJid: string | undefined;
+  private healthSignals: { at: number; kind: WaHealthSignal }[] = [];
   private stopping = false;
   private readonly logger: Logger;
   private readonly now: () => Date;
@@ -169,6 +175,7 @@ export class WhatsAppChannel {
           if (this.auth !== auth) return;
           this.self = self;
           this.failures = 0;
+          this.healthSignals = [];
           auth.setPhone(phoneOf(self));
           this.setStatus({ ...this.status, state: "connected", qr: undefined, detail: undefined, phone: phoneOf(self) });
           this.logger.log("info", "whatsapp.connected");
@@ -180,6 +187,10 @@ export class WhatsAppChannel {
         message: (m) => {
           if (this.auth !== auth) return;
           this.incoming(m);
+        },
+        health: (kind) => {
+          if (this.auth !== auth) return;
+          this.health(kind);
         },
       });
       if (this.auth !== auth) await conn.stop(); // unlinked or replaced while opening
@@ -228,6 +239,16 @@ export class WhatsAppChannel {
   private setStatus(s: WhatsAppStatus): void {
     this.status = s;
     this.opts.onStatus?.(this.current);
+  }
+
+  /** Counts encryption trouble; past the limit the card says what to do (the channel keeps working). */
+  private health(kind: WaHealthSignal): void {
+    const t = this.now().getTime();
+    this.healthSignals = [...this.healthSignals.filter((s) => t - s.at < HEALTH_WINDOW_MS), { at: t, kind }];
+    const count = this.healthSignals.filter((s) => s.kind === kind).length;
+    if (count < HEALTH_LIMITS[kind] || this.status.detail === TEXTS.cryptoUnhealthy) return;
+    this.logger.log("warn", "whatsapp.crypto_unhealthy", { kind, count });
+    this.setStatus({ ...this.status, state: "degraded", detail: TEXTS.cryptoUnhealthy });
   }
 
   /** Every message the account receives lands here. Other chats leave no trace but a counter. */
